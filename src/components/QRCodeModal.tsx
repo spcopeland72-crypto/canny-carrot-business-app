@@ -5,11 +5,7 @@ import {
   Modal,
   StyleSheet,
   TouchableOpacity,
-  Alert,
-  Platform,
 } from 'react-native';
-import QRCode from 'react-native-qrcode-svg';
-import * as Print from 'expo-print';
 import {Colors} from '../constants/Colors';
 
 interface QRCodeModalProps {
@@ -25,76 +21,6 @@ const QRCodeModal: React.FC<QRCodeModalProps> = ({
   qrValue,
   onClose,
 }) => {
-  const handlePrint = async () => {
-    try {
-      // Generate QR code as base64 image
-      const html = `
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <meta charset="utf-8">
-            <title>${title}</title>
-            <style>
-              @media print {
-                body {
-                  margin: 0;
-                  padding: 20px;
-                }
-              }
-              body {
-                font-family: Arial, sans-serif;
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                justify-content: center;
-                padding: 40px;
-                text-align: center;
-              }
-              h1 {
-                margin-bottom: 30px;
-                text-align: center;
-                font-size: 24px;
-                color: #333;
-              }
-              .qr-container {
-                display: flex;
-                justify-content: center;
-                align-items: center;
-                margin: 20px 0;
-                padding: 20px;
-                border: 2px solid #333;
-                border-radius: 8px;
-              }
-            </style>
-          </head>
-          <body>
-            <h1>${title}</h1>
-            <div class="qr-container">
-              <div id="qrcode"></div>
-            </div>
-            <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
-            <script>
-              QRCode.toCanvas(document.getElementById('qrcode'), '${qrValue}', {
-                width: 300,
-                margin: 2
-              }, function (error) {
-                if (error) console.error(error);
-              });
-            </script>
-          </body>
-        </html>
-      `;
-
-      await Print.printAsync({
-        html,
-        base64: false,
-      });
-    } catch (error) {
-      Alert.alert('Error', 'Failed to print QR code. Please try again.');
-      console.error('Print error:', error);
-    }
-  };
-
   return (
     <Modal
       visible={visible}
@@ -106,22 +32,25 @@ const QRCodeModal: React.FC<QRCodeModalProps> = ({
           <Text style={styles.modalTitle}>{title}</Text>
           
           <View style={styles.qrContainer}>
-            {qrValue ? (
-              <QRCode
-                value={qrValue}
-                size={200}
-                color={Colors.text.primary}
-                backgroundColor={Colors.background}
-              />
-            ) : (
-              <Text style={styles.errorText}>Unable to generate QR code</Text>
-            )}
+            {/* Simple QR code placeholder for web */}
+            <View style={styles.qrPlaceholder}>
+              <Text style={styles.qrIcon}>📱</Text>
+              <Text style={styles.qrText}>QR Code</Text>
+              <Text style={styles.qrValue} numberOfLines={2}>
+                {qrValue}
+              </Text>
+            </View>
           </View>
 
           <View style={styles.buttonContainer}>
             <TouchableOpacity
               style={[styles.button, styles.printButton]}
-              onPress={handlePrint}>
+              onPress={() => {
+                // Print functionality - using window.print for web
+                if (typeof window !== 'undefined') {
+                  window.print();
+                }
+              }}>
               <Text style={styles.printButtonText}>Print</Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -166,6 +95,30 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.neutral[200],
   },
+  qrPlaceholder: {
+    width: 200,
+    height: 200,
+    backgroundColor: Colors.neutral[100],
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 8,
+  },
+  qrIcon: {
+    fontSize: 48,
+    marginBottom: 12,
+  },
+  qrText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: Colors.text.primary,
+    marginBottom: 8,
+  },
+  qrValue: {
+    fontSize: 12,
+    color: Colors.text.secondary,
+    textAlign: 'center',
+    paddingHorizontal: 16,
+  },
   buttonContainer: {
     flexDirection: 'row',
     gap: 12,
@@ -193,12 +146,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: Colors.text.primary,
   },
-  errorText: {
-    fontSize: 14,
-    color: Colors.text.secondary,
-    textAlign: 'center',
-  },
 });
 
 export default QRCodeModal;
-

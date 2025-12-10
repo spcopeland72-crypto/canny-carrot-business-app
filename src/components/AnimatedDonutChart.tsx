@@ -1,9 +1,8 @@
-import React, {useEffect, useRef, useState} from 'react';
-import {View, StyleSheet, Animated} from 'react-native';
-import Svg, {Circle} from 'react-native-svg';
+import React from 'react';
+import {View, StyleSheet, Text} from 'react-native';
 
 interface AnimatedDonutChartProps {
-  percentage: number; // 0-100
+  percentage: number;
   color: string;
   size: number;
   strokeWidth?: number;
@@ -15,57 +14,24 @@ const AnimatedDonutChart: React.FC<AnimatedDonutChartProps> = ({
   size,
   strokeWidth = 8,
 }) => {
-  const animatedValue = useRef(new Animated.Value(0)).current;
-  const [currentPercentage, setCurrentPercentage] = useState(0);
-  const radius = (size - strokeWidth) / 2;
-  const circumference = 2 * Math.PI * radius;
-
-  useEffect(() => {
-    Animated.timing(animatedValue, {
-      toValue: percentage / 100,
-      duration: 1500,
-      useNativeDriver: false,
-    }).start();
-  }, [percentage]);
-
-  useEffect(() => {
-    const listener = animatedValue.addListener(({value}) => {
-      setCurrentPercentage(value * 100);
-    });
-
-    return () => {
-      animatedValue.removeListener(listener);
-    };
-  }, [animatedValue]);
-
-  const strokeDashoffset = circumference * (1 - currentPercentage / 100);
-
   return (
     <View style={[styles.container, {width: size, height: size}]}>
-      <Svg width={size} height={size}>
-        {/* Background circle */}
-        <Circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          stroke="#E5E7EB"
-          strokeWidth={strokeWidth}
-          fill="transparent"
-        />
-        {/* Animated progress circle */}
-        <Circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          stroke={color}
-          strokeWidth={strokeWidth}
-          fill="transparent"
-          strokeDasharray={circumference}
-          strokeDashoffset={strokeDashoffset}
-          strokeLinecap="round"
-          transform={`rotate(-90 ${size / 2} ${size / 2})`}
-        />
-      </Svg>
+      <View
+        style={[
+          styles.circle,
+          {
+            width: size,
+            height: size,
+            borderRadius: size / 2,
+            borderWidth: strokeWidth,
+            borderColor: color,
+            opacity: 0.3,
+          },
+        ]}
+      />
+      <View style={styles.textContainer}>
+        <Text style={[styles.percentage, {color}]}>{Math.round(percentage)}%</Text>
+      </View>
     </View>
   );
 };
@@ -74,8 +40,20 @@ const styles = StyleSheet.create({
   container: {
     justifyContent: 'center',
     alignItems: 'center',
+    position: 'relative',
+  },
+  circle: {
+    position: 'absolute',
+  },
+  textContainer: {
+    position: 'absolute',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  percentage: {
+    fontSize: 10,
+    fontWeight: 'bold',
   },
 });
 
 export default AnimatedDonutChart;
-

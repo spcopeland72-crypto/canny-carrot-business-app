@@ -18,13 +18,8 @@ interface HelpModalProps {
 
 const MODAL_MARGIN = 20;
 
-// Load background image
-let backgroundImage;
-try {
-  backgroundImage = require('../../Images/canny=carrot-mobile.png');
-} catch (e) {
-  backgroundImage = null;
-}
+// Use no background image to avoid dynamic require issues
+const backgroundImage = null;
 
 const pages = [
   {id: 1, title: 'How it Works'},

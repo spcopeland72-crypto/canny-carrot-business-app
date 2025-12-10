@@ -21,8 +21,17 @@ import AnimatedBarChart from './AnimatedBarChart';
 import AnimatedDonutChart from './AnimatedDonutChart';
 import AnimatedAreaChart from './AnimatedAreaChart';
 
-// Logo will use fallback text instead of dynamic requires
-const logoImage = null;
+// Load logo image
+let logoImage;
+try {
+  logoImage = require('../../assets/logo.png');
+} catch (e) {
+  try {
+    logoImage = require('../../Images/NEW Logo With Outline.png');
+  } catch (e2) {
+    logoImage = null;
+  }
+}
 
 const SCREEN_WIDTH = Dimensions.get('window').width || 375;
 const CARD_WIDTH = SCREEN_WIDTH * 0.25; // Match customer app width

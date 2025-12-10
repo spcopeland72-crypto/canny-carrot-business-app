@@ -1,15 +1,20 @@
 import React from 'react';
-import {View, Text, TouchableOpacity, StyleSheet} from 'react-native';
+import {View, Text, TouchableOpacity, StyleSheet, Image} from 'react-native';
 import {Colors} from '../constants/Colors';
 
 interface BottomNavigationProps {
   currentScreen: string;
   onNavigate: (screen: string) => void;
+  onScanPress?: () => void;
 }
+
+// Use emoji fallback instead of dynamic image requires
+const qrImage = null;
 
 const BottomNavigation: React.FC<BottomNavigationProps> = ({
   currentScreen,
   onNavigate,
+  onScanPress,
 }) => {
   return (
     <View style={styles.bottomNav}>
@@ -27,14 +32,72 @@ const BottomNavigation: React.FC<BottomNavigationProps> = ({
       </TouchableOpacity>
       <TouchableOpacity
         style={styles.navItem}
-        onPress={() => onNavigate('Business')}>
-        <Text style={styles.navIcon}>🏢</Text>
+        onPress={() => onNavigate('Search')}>
+        <Text style={styles.navIcon}>🔍</Text>
         <Text
           style={[
             styles.navLabel,
-            currentScreen === 'Business' && styles.navLabelActive,
+            currentScreen === 'Search' && styles.navLabelActive,
           ]}>
-          Business
+          Search
+        </Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={styles.navItemCenter}
+        onPress={() => {
+          if (onScanPress) {
+            onScanPress();
+          } else {
+            onNavigate('Scan');
+          }
+        }}>
+        <View style={styles.scanButton}>
+          {qrImage ? (
+            <Image
+              source={qrImage}
+              style={styles.scanIconImage}
+              resizeMode="contain"
+            />
+          ) : (
+            <Text style={styles.scanIcon}>📷</Text>
+          )}
+        </View>
+        <Text
+          style={[
+            styles.navLabel,
+            currentScreen === 'Scan' && styles.navLabelActive,
+          ]}>
+          Scan
+        </Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={styles.navItem}
+        onPress={() => onNavigate('Help')}>
+        <Text style={styles.navIcon}>❓</Text>
+        <Text
+          style={[
+            styles.navLabel,
+            currentScreen === 'Help' && styles.navLabelActive,
+          ]}>
+          Help
+        </Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={styles.navItem}
+        onPress={() => onNavigate('More')}>
+        <Text
+          style={[
+            styles.navIcon,
+            currentScreen === 'More' && styles.navIconActive,
+          ]}>
+          ⋯
+        </Text>
+        <Text
+          style={[
+            styles.navLabel,
+            currentScreen === 'More' && styles.navLabelActive,
+          ]}>
+          More
         </Text>
       </TouchableOpacity>
     </View>
@@ -53,7 +116,7 @@ const styles = StyleSheet.create({
     borderTopColor: Colors.neutral[200],
     paddingTop: 8,
     paddingBottom: 20,
-    paddingHorizontal: 8,
+    paddingHorizontal: 4,
     justifyContent: 'space-around',
     alignItems: 'center',
   },
@@ -61,19 +124,43 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flex: 1,
   },
+  navItemCenter: {
+    alignItems: 'center',
+    flex: 1,
+  },
   navIcon: {
-    fontSize: 24,
+    fontSize: 20,
     marginBottom: 4,
   },
+  navIconActive: {
+    color: Colors.secondary,
+  },
   navLabel: {
-    fontSize: 12,
+    fontSize: 10,
     color: Colors.text.secondary,
   },
   navLabelActive: {
     color: Colors.primary,
     fontWeight: '600',
   },
+  scanButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: Colors.secondary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  scanIcon: {
+    fontSize: 24,
+  },
+  scanIconImage: {
+    width: 24,
+    height: 24,
+  },
 });
 
 export default BottomNavigation;
+
 
