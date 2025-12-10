@@ -1,0 +1,25 @@
+{
+  "expo": {
+    "name": "Canny Carrot Business",
+    "slug": "canny-carrot-business-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.cannycarrot.business"
+    },
+    "android": {
+      "package": "com.cannycarrot.business"
+    },
+    "web": {}
+  }
+}
+
