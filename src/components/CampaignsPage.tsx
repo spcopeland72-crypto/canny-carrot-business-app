@@ -13,41 +13,32 @@ import PageTemplate from './PageTemplate';
 interface Campaign {
   id: string;
   name: string;
-  startDate: string;
-  endDate: string;
-  status: 'Active' | 'Upcoming' | 'Ended';
-  participants: number;
+  count?: number; // Current participants
+  total?: number; // Target participants
+  icon?: string;
+  status: 'active' | 'upcoming' | 'completed' | 'Active' | 'Upcoming' | 'Ended';
+  startDate?: string;
+  endDate?: string;
+  participants?: number; // Alias for count
 }
 
 interface CampaignsPageProps {
   currentScreen: string;
   onNavigate: (screen: string) => void;
   onBack?: () => void;
+  campaigns?: Campaign[];
+  onDeleteCampaign?: (id: string) => void;
 }
 
 const CampaignsPage: React.FC<CampaignsPageProps> = ({
   currentScreen,
   onNavigate,
   onBack,
+  campaigns: propsCampaigns = [],
+  onDeleteCampaign,
 }) => {
-  const [campaigns, setCampaigns] = useState<Campaign[]>([
-    {
-      id: '1',
-      name: 'Christmas Special',
-      startDate: '2024-12-01',
-      endDate: '2024-12-31',
-      status: 'Active',
-      participants: 120,
-    },
-    {
-      id: '2',
-      name: 'New Year Promotion',
-      startDate: '2025-01-01',
-      endDate: '2025-01-31',
-      status: 'Upcoming',
-      participants: 0,
-    },
-  ]);
+  // Use campaigns from props (loaded from file), fallback to empty array
+  const campaigns = propsCampaigns.length > 0 ? propsCampaigns : [];
 
   const handleDelete = (id: string) => {
     Alert.alert(
@@ -59,7 +50,9 @@ const CampaignsPage: React.FC<CampaignsPageProps> = ({
           text: 'Delete',
           style: 'destructive',
           onPress: () => {
-            setCampaigns(campaigns.filter(c => c.id !== id));
+            if (onDeleteCampaign) {
+              onDeleteCampaign(id);
+            }
           },
         },
       ],
@@ -84,19 +77,23 @@ const CampaignsPage: React.FC<CampaignsPageProps> = ({
             <View key={campaign.id} style={styles.campaignCard}>
               <View style={styles.campaignInfo}>
                 <Text style={styles.campaignName}>{campaign.name}</Text>
+                {campaign.startDate && (
+                  <Text style={styles.campaignDetail}>
+                    Start: {campaign.startDate}
+                  </Text>
+                )}
+                {campaign.endDate && (
+                  <Text style={styles.campaignDetail}>End: {campaign.endDate}</Text>
+                )}
                 <Text style={styles.campaignDetail}>
-                  Start: {campaign.startDate}
-                </Text>
-                <Text style={styles.campaignDetail}>End: {campaign.endDate}</Text>
-                <Text style={styles.campaignDetail}>
-                  Participants: {campaign.participants}
+                  Participants: {campaign.participants ?? campaign.count ?? 0} / {campaign.total ?? 0}
                 </Text>
                 <Text
                   style={[
                     styles.status,
-                    campaign.status === 'Active' && styles.statusActive,
-                    campaign.status === 'Upcoming' && styles.statusUpcoming,
-                    campaign.status === 'Ended' && styles.statusEnded,
+                    (campaign.status === 'Active' || campaign.status === 'active') && styles.statusActive,
+                    (campaign.status === 'Upcoming' || campaign.status === 'upcoming') && styles.statusUpcoming,
+                    (campaign.status === 'Ended' || campaign.status === 'completed') && styles.statusEnded,
                   ]}>
                   {campaign.status}
                 </Text>
@@ -206,6 +203,8 @@ const styles = StyleSheet.create({
 });
 
 export default CampaignsPage;
+
+
 
 
 

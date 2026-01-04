@@ -144,7 +144,7 @@ const RewardsPage: React.FC<RewardsPageProps> = ({
           <QRCodeModal
             visible={qrCodeModalVisible}
             title={selectedReward.name}
-            qrValue={selectedReward.name}
+            qrValue={selectedReward.qrCode || `REWARD:${selectedReward.id}:${selectedReward.name}:${selectedReward.requirement}:${selectedReward.rewardType || 'free_product'}:`}
             onClose={() => {
               setQrCodeModalVisible(false);
               setSelectedReward(null);

@@ -72,3 +72,23 @@ const styles = StyleSheet.create({
 
 export default ScanPage;
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

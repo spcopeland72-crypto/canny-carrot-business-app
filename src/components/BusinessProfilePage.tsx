@@ -11,6 +11,8 @@ import {
 } from 'react-native';
 import {Colors} from '../constants/Colors';
 import PageTemplate from './PageTemplate';
+import QRCodeModal from './QRCodeModal';
+import {generateCompanyQRCode} from '../utils/qrCodeUtils';
 // Note: Image picker and document picker would be implemented with actual expo packages
 // import * as ImagePicker from 'expo-image-picker';
 // import * as DocumentPicker from 'expo-document-picker';
@@ -33,6 +35,36 @@ const BusinessProfilePage: React.FC<BusinessProfilePageProps> = ({
   const [logo, setLogo] = useState<any>(null);
   const [file1, setFile1] = useState<any>(null);
   const [file2, setFile2] = useState<any>(null);
+  const [qrCodeModalVisible, setQrCodeModalVisible] = useState(false);
+  
+  // Generate company QR code using shared utility
+  // In production, this would be loaded from the business profile (assigned by admin)
+  // For demo: Generate a consistent number based on business ID
+  // Admin assigns sequential numbers: 0000001, 0000002, ..., 1000000
+  const getBusinessNumber = (businessId: string): number => {
+    let businessNumber = 0;
+    if (businessId) {
+      // Simple hash to convert ID to a consistent number (for demo purposes)
+      // In production, this number comes from the admin system
+      for (let i = 0; i < businessId.length; i++) {
+        businessNumber = ((businessNumber << 5) - businessNumber) + businessId.charCodeAt(i);
+        businessNumber = businessNumber & businessNumber; // Convert to 32bit integer
+      }
+      businessNumber = Math.abs(businessNumber) % 1000000 + 1; // 1-1000000
+    } else {
+      // Default to 1 if no ID
+      businessNumber = 1;
+    }
+    return businessNumber;
+  };
+  
+  // Company QR code - assigned when business is created by Canny Carrot admin
+  // Format: COMPANY:0000001:BusinessName (supports up to 1,000,000 businesses)
+  // In production, this would be loaded from the business profile stored in the database
+  const companyQRCode = generateCompanyQRCode(
+    getBusinessNumber('blackwells-butchers'),
+    businessName
+  );
 
   const pickImage = async (setter: (image: any) => void) => {
     // TODO: Implement with expo-image-picker
@@ -117,6 +149,16 @@ const BusinessProfilePage: React.FC<BusinessProfilePageProps> = ({
             multiline
           />
 
+          <Text style={styles.label}>Company QR Code</Text>
+          <TouchableOpacity
+            style={styles.qrCodeButton}
+            onPress={() => setQrCodeModalVisible(true)}>
+            <Text style={styles.qrCodeButtonText}>📱 View Company QR Code</Text>
+          </TouchableOpacity>
+          <Text style={styles.qrCodeHint}>
+            This QR code is assigned when your business is created by Canny Carrot admin
+          </Text>
+
           <Text style={styles.label}>Logo</Text>
           <TouchableOpacity
             style={styles.uploadButton}
@@ -158,6 +200,14 @@ const BusinessProfilePage: React.FC<BusinessProfilePageProps> = ({
           </TouchableOpacity>
         </View>
       </ScrollView>
+      
+      {/* Company QR Code Modal */}
+      <QRCodeModal
+        visible={qrCodeModalVisible}
+        title={`${businessName} - Company QR Code`}
+        qrValue={companyQRCode}
+        onClose={() => setQrCodeModalVisible(false)}
+      />
     </PageTemplate>
   );
 };
@@ -221,6 +271,27 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: Colors.background,
+  },
+  qrCodeButton: {
+    backgroundColor: Colors.primary,
+    borderRadius: 8,
+    padding: 14,
+    alignItems: 'center',
+    marginTop: 8,
+    flexDirection: 'row',
+    justifyContent: 'center',
+  },
+  qrCodeButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: Colors.background,
+  },
+  qrCodeHint: {
+    fontSize: 12,
+    color: Colors.text.light,
+    fontStyle: 'italic',
+    marginTop: 8,
+    marginBottom: 8,
   },
 });
 

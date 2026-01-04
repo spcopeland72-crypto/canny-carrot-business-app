@@ -17,11 +17,12 @@ const getApiBaseUrl = (): string => {
   if (apiUrl) return apiUrl;
   
   // Fallback to environment variable or default
+  // Use production API for testing real infrastructure
   if (Platform.OS === 'web') {
-    return process.env.API_BASE_URL || 'http://localhost:3001';
+    return process.env.API_BASE_URL || 'https://api.cannycarrot.com';
   }
-  // For native, use localhost for emulator, or your local IP for device
-  return __DEV__ ? 'http://10.0.2.2:3001' : 'https://api.cannycarrot.com';
+  // For native, use production API (test against real infrastructure)
+  return 'https://api.cannycarrot.com';
 };
 
 const API_BASE_URL = getApiBaseUrl();

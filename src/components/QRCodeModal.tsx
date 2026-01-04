@@ -5,8 +5,10 @@ import {
   Modal,
   StyleSheet,
   TouchableOpacity,
+  Platform,
 } from 'react-native';
 import {Colors} from '../constants/Colors';
+import QRCode from 'react-native-qrcode-svg';
 
 interface QRCodeModalProps {
   visible: boolean;
@@ -32,14 +34,28 @@ const QRCodeModal: React.FC<QRCodeModalProps> = ({
           <Text style={styles.modalTitle}>{title}</Text>
           
           <View style={styles.qrContainer}>
-            {/* Simple QR code placeholder for web */}
-            <View style={styles.qrPlaceholder}>
-              <Text style={styles.qrIcon}>📱</Text>
-              <Text style={styles.qrText}>QR Code</Text>
-              <Text style={styles.qrValue} numberOfLines={2}>
-                {qrValue}
-              </Text>
-            </View>
+            {qrValue ? (
+              <QRCode
+                value={qrValue}
+                size={200}
+                color={Colors.text.primary}
+                backgroundColor={Colors.background}
+                logo={undefined}
+                logoSize={30}
+                logoBackgroundColor={Colors.background}
+                logoMargin={2}
+                logoBorderRadius={15}
+                quietZone={10}
+              />
+            ) : (
+              <View style={styles.qrPlaceholder}>
+                <Text style={styles.qrIcon}>📱</Text>
+                <Text style={styles.qrText}>QR Code</Text>
+                <Text style={styles.qrValue} numberOfLines={2}>
+                  No QR code value
+                </Text>
+              </View>
+            )}
           </View>
 
           <View style={styles.buttonContainer}>

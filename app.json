@@ -5,21 +5,68 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
+    "icon": "./assets/logo.png",
     "splash": {
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#2D5A27"
     },
     "assetBundlePatterns": [
       "**/*"
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.cannycarrot.business"
+      "bundleIdentifier": "com.cannycarrot.business",
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Canny Carrot Business needs camera access to scan customer QR codes",
+        "NSPhotoLibraryUsageDescription": "Upload photos for your business profile and rewards"
+      }
     },
     "android": {
-      "package": "com.cannycarrot.business"
+      "package": "com.cannycarrot.business",
+      "versionCode": 1,
+      "permissions": [
+        "CAMERA",
+        "VIBRATE",
+        "INTERNET",
+        "ACCESS_NETWORK_STATE"
+      ],
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "*.cannycarrot.com",
+              "pathPrefix": "/business"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ]
     },
-    "web": {}
+    "web": {
+      "bundler": "metro",
+      "favicon": "./assets/favicon-business.png"
+    },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow Canny Carrot Business to access your camera to scan customer QR codes."
+        }
+      ]
+    ],
+    "extra": {
+      "apiUrl": "https://api.cannycarrot.com",
+      "stripePublishableKey": "pk_test_51ScwkeDHSurbVejhGnt9ePMBcN2fJFlmrWV324cPXH5axBub0KyRlu3PnsjfeVnnTD0XSWTPMaUchZSx3IZ27oEK00vX5UUqwJ"
+    },
+    "updates": {
+      "enabled": true,
+      "fallbackToCacheTimeout": 30000
+    },
+    "runtimeVersion": "1.0.0"
   }
 }
+
 

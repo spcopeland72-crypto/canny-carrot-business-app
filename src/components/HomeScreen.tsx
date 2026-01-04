@@ -46,6 +46,7 @@ interface HomeScreenProps {
   onNavigate?: (screen: string) => void;
   onScanPress?: () => void;
   rewards?: Reward[];
+  campaigns?: Campaign[];
 }
 
 interface Campaign {
@@ -62,6 +63,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   onNavigate = () => {},
   onScanPress = () => {},
   rewards: propsRewards = [],
+  campaigns: propsCampaigns = [],
 }) => {
   const [notificationsModalVisible, setNotificationsModalVisible] = useState(false);
   const [helpModalVisible, setHelpModalVisible] = useState(false);
@@ -71,13 +73,9 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
 
   // Use rewards from props, fallback to empty array
   const rewards = propsRewards.length > 0 ? propsRewards : [];
-
-  const campaigns: Campaign[] = [
-    {id: '1', name: 'Christmas Special', count: 120, total: 200, icon: '🎄', status: 'active'},
-    {id: '2', name: 'New Year Promotion', count: 0, total: 150, icon: '🎆', status: 'upcoming'},
-    {id: '3', name: 'Valentine\'s Campaign', count: 89, total: 100, icon: '💝', status: 'completed'},
-    {id: '4', name: 'Spring Sale', count: 45, total: 100, icon: '🌸', status: 'active'},
-  ];
+  
+  // Use campaigns from props, fallback to empty array
+  const campaigns = propsCampaigns.length > 0 ? propsCampaigns : [];
 
   // 2x2 Box Elements (matching customer app Features section)
   const boxElements = [
@@ -1036,5 +1034,7 @@ const styles = StyleSheet.create({
 });
 
 export default HomeScreen;
+
+
 
 

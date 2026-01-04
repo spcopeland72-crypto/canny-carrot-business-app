@@ -13,6 +13,7 @@ import {Colors} from '../constants/Colors';
 import PageTemplate from './PageTemplate';
 import QRCodeModal from './QRCodeModal';
 import {saveProducts, loadProducts} from '../utils/dataStorage';
+import {generateRewardQRCode} from '../utils/qrCodeUtils';
 
 interface Reward {
   id: string;
@@ -40,6 +41,7 @@ interface CreateEditRewardPageProps {
     rewardType: 'free_product' | 'discount' | 'other';
     selectedProducts?: string[];
     selectedActions?: string[];
+    qrCode?: string;
   }) => void;
 }
 
@@ -69,19 +71,20 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
   const [newProductName, setNewProductName] = useState('');
   const [qrCodeModalVisible, setQrCodeModalVisible] = useState(false);
   const [createdRewardName, setCreatedRewardName] = useState('');
+  const [createdRewardQrCode, setCreatedRewardQrCode] = useState('');
 
-  // Load products on mount only
+  // Load products on mount - load from file to show all products in dropdown
   React.useEffect(() => {
     const loadInitialProducts = async () => {
       try {
         const loadedProducts = await loadProducts();
         if (loadedProducts && Array.isArray(loadedProducts) && loadedProducts.length > 0) {
-          // Merge loaded products with defaults, removing duplicates
-          const merged = [...new Set([...defaultProducts, ...loadedProducts])];
-          setProducts(merged);
+          // Use all loaded products from file (includes all previously created products)
+          setProducts(loadedProducts);
         } else {
-          // If no saved products, use defaults
+          // If no saved products, use defaults and save them
           setProducts(defaultProducts);
+          await saveProducts(defaultProducts);
         }
       } catch (error) {
         console.error('Error loading products:', error);
@@ -109,13 +112,25 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
       return;
     }
     
+    // Generate QR code value using shared utility
+    const rewardId = reward?.id || Date.now().toString();
+    const requirementValue = parseInt(requirement, 10);
+    const qrCodeValue = generateRewardQRCode(
+      rewardId,
+      name,
+      requirementValue,
+      rewardType,
+      type === 'product' ? selectedProducts : undefined
+    );
+    
     const rewardData = {
       name,
       type,
-      requirement: parseInt(requirement, 10),
+      requirement: requirementValue,
       rewardType,
       selectedProducts: type === 'product' ? selectedProducts : undefined,
       selectedActions: type === 'action' ? selectedActions : undefined,
+      qrCode: qrCodeValue, // Include QR code in reward data
     };
     
     // Call onSave callback if provided
@@ -123,9 +138,11 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
       onSave(rewardData);
     }
     
-    // If creating new reward, show QR code modal
+    // If creating new reward, show QR code modal with the generated QR code
     if (!isEdit) {
       setCreatedRewardName(name);
+      setCreatedRewardQrCode(qrCodeValue); // Store QR code value for display in modal
+      // The reward will be saved with QR code via onSave callback
       setQrCodeModalVisible(true);
     } else {
       Alert.alert('Success', 'Reward updated successfully');
@@ -143,25 +160,27 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
       return;
     }
     const newProduct = newProductName.trim();
-    const updatedProducts = [...products, newProduct];
+    
+    // Load existing products from file to ensure we have the complete list
+    const existingProducts = await loadProducts();
+    const allProducts = [...new Set([...existingProducts, ...products, newProduct])];
     
     // Update state first
-    setProducts(updatedProducts);
+    setProducts(allProducts);
     // Automatically select the newly created product
     setSelectedProducts([...selectedProducts, newProduct]);
     setNewProductName('');
     setCreateProductModalVisible(false);
     
-    // Save products to file (save all products including defaults)
+    // Save all products to file (appends new product to the list)
     try {
-      await saveProducts(updatedProducts);
+      await saveProducts(allProducts);
       console.log('Product saved successfully:', newProduct);
+      Alert.alert('Success', 'Product created successfully');
     } catch (error) {
       console.error('Error saving product:', error);
       Alert.alert('Warning', 'Product created but failed to save. It may not persist.');
     }
-    
-    Alert.alert('Success', 'Product created successfully');
   };
 
   const handleSelectProduct = (product: string) => {
@@ -201,7 +220,7 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
               setSelectedProducts(selectedProducts.filter(p => p !== product));
             }
             
-            // Save to file
+            // Save updated list to file
             try {
               await saveProducts(updatedProducts);
               console.log('Product deleted successfully:', product);
@@ -500,7 +519,13 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
       <QRCodeModal
         visible={qrCodeModalVisible}
         title={createdRewardName}
-        qrValue={createdRewardName}
+        qrValue={createdRewardQrCode || reward?.qrCode || (reward?.id ? generateRewardQRCode(
+          reward.id,
+          reward.name,
+          reward.requirement || 1,
+          reward.rewardType || 'free_product',
+          reward.selectedProducts
+        ) : '')}
         onClose={() => {
           setQrCodeModalVisible(false);
           Alert.alert('Success', 'Reward created successfully');
