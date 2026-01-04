@@ -1,0 +1,61 @@
+# EAS Build ignore file - exclude unnecessary files from build
+
+# Dependencies (will be installed during build)
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Build artifacts
+android/app/build/
+android/.gradle/
+ios/build/
+ios/Pods/
+dist/
+
+# Development files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Git
+.git/
+.gitignore
+
+# Documentation
+*.md
+!README.md
+
+# Test files
+__tests__/
+*.test.ts
+*.test.tsx
+*.spec.ts
+*.spec.tsx
+
+# Backup files
+*-BACKUP*/
+*-backup*/
+*.bak
+
+# Environment files (use EAS secrets instead)
+.env.local
+.env.*.local
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
