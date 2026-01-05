@@ -33,6 +33,7 @@ export interface Reward {
   description?: string;
   status?: RewardStatus; // live, draft, or archived
   qrCode?: string;
+  pinCode?: string; // 4-digit PIN code required for redemption
   selectedProducts?: string[];
   selectedActions?: string[];
   createdAt?: string;

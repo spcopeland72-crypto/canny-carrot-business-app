@@ -92,23 +92,63 @@ const executeCommand = async (
   // Use HTTP API to Canny Carrot API (which proxies to Redis)
   if (client.isWeb) {
     try {
-      const response = await fetch(`${client.apiUrl}/${command}`, {
+      const requestUrl = `${client.apiUrl}/${command}`;
+      const requestBody = JSON.stringify({ args });
+      const requestHeaders = { 'Content-Type': 'application/json' };
+      
+      // Log request details
+      console.log('🔵 [REDIS CLIENT] Sending request:', {
+        url: requestUrl,
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ args }),
+        headers: requestHeaders,
+        body: requestBody,
+        parsedBody: { args },
+      });
+      
+      const response = await fetch(requestUrl, {
+        method: 'POST',
+        headers: requestHeaders,
+        body: requestBody,
+      });
+
+      // Log response details
+      console.log('🔵 [REDIS CLIENT] Received response:', {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok,
+        headers: Object.fromEntries(response.headers.entries()),
       });
 
       if (!response.ok) {
-        throw new Error(`Redis API error: ${response.statusText}`);
+        // Try to get error details from response body
+        let errorMessage = response.statusText;
+        let errorBody = null;
+        try {
+          errorBody = await response.json();
+          errorMessage = errorBody.error || errorBody.message || JSON.stringify(errorBody);
+          console.error('❌ [REDIS CLIENT] Error response body:', errorBody);
+        } catch (e) {
+          // If JSON parse fails, try text
+          try {
+            errorMessage = await response.text();
+            console.error('❌ [REDIS CLIENT] Error response text:', errorMessage);
+          } catch (e2) {
+            // Keep statusText if both fail
+          }
+        }
+        throw new Error(`Redis API error (${response.status}): ${errorMessage}`);
       }
 
       const result = await response.json();
+      console.log('✅ [REDIS CLIENT] Success response body:', result);
+      
       // Handle API response format: { data: ... } or direct value
       if (result.data !== undefined) {
         return result.data;
       }
       return result;
     } catch (error) {
+      console.error('❌ [REDIS CLIENT] Request failed:', error);
       // If offline or API unavailable, throw to trigger offline queue
       throw new Error(`Redis API unavailable: ${error}`);
     }

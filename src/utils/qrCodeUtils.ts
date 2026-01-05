@@ -37,19 +37,63 @@ export type ParsedQR =
 
 /**
  * Generate QR code for a reward
- * Format: REWARD:{id}:{name}:{requirement}:{rewardType}:{products}
+ * Format: JSON string containing reward details + business profile data + PIN
  */
 export const generateRewardQRCode = (
   id: string,
   name: string,
   requirement: number,
   rewardType: 'free_product' | 'discount' | 'other',
-  products?: string[]
+  products?: string[],
+  actions?: string[],
+  pinCode?: string,
+  businessProfile?: {
+    name: string;
+    address?: string;
+    addressLine1?: string;
+    addressLine2?: string;
+    city?: string;
+    postcode?: string;
+    country?: string;
+    phone?: string;
+    email?: string;
+    website?: string;
+    socialMedia?: {
+      facebook?: string;
+      instagram?: string;
+      twitter?: string;
+      tiktok?: string;
+      linkedin?: string;
+    };
+  }
 ): string => {
-  const productsValue = products && products.length > 0
-    ? products.join(',')
-    : '';
-  return `REWARD:${id}:${name}:${requirement}:${rewardType}:${productsValue}`;
+  const qrData = {
+    type: 'reward',
+    reward: {
+      id,
+      name,
+      requirement,
+      rewardType,
+      products: products || [],
+      actions: actions || [],
+      pinCode: pinCode || '',
+    },
+    business: businessProfile ? {
+      name: businessProfile.name,
+      address: businessProfile.address || 
+        [businessProfile.addressLine1, businessProfile.addressLine2, businessProfile.city, businessProfile.postcode, businessProfile.country]
+          .filter(Boolean)
+          .join(', '),
+      phone: businessProfile.phone || '',
+      email: businessProfile.email || '',
+      website: businessProfile.website || '',
+      socialMedia: businessProfile.socialMedia || {},
+    } : undefined,
+    version: '1.0',
+    createdAt: new Date().toISOString(),
+  };
+  
+  return JSON.stringify(qrData);
 };
 
 /**

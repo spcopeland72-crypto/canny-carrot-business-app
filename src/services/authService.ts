@@ -126,7 +126,7 @@ export const createBusinessAccount = async (
     }
     
     // Call API to register business user account
-    const response = await fetch(`${API_BASE_URL}/auth/business/register`, {
+    const response = await fetch(`${API_BASE_URL}/api/v1/auth/business/register`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -289,6 +289,17 @@ export const loginBusiness = async (email: string, password: string): Promise<Bu
     }
 
     console.log('✅ First login successful - credentials stored locally for subsequent logins');
+    
+    // FIRST LOGIN: Download all business data to local repository
+    try {
+      const { downloadAllData } = await import('./localRepository');
+      await downloadAllData(businessId, API_BASE_URL);
+      console.log('✅ All business data downloaded to local repository');
+    } catch (downloadError) {
+      console.error('⚠️ Error downloading data (will retry later):', downloadError);
+      // Don't fail login if download fails - user can still use app offline
+    }
+    
     return auth;
   } catch (error: any) {
     console.error('Error logging in:', error);

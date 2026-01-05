@@ -43,6 +43,8 @@ import type {ScreenName} from './src/types';
 import {saveRewards, loadRewards, saveCampaigns, loadCampaigns, type Reward, type Campaign} from './src/utils/dataStorage';
 import {generateRewardQRCode} from './src/utils/qrCodeUtils';
 import {isAuthenticated, getStoredAuth} from './src/services/authService';
+import {rewardsRepository, campaignsRepository, customersRepository} from './src/services/localRepository';
+import {startDailySync} from './src/services/dailySyncService';
 
 function App(): React.JSX.Element {
   const [currentScreen, setCurrentScreen] = useState<ScreenName>('Home');
@@ -96,16 +98,16 @@ function App(): React.JSX.Element {
     {id: '4', name: 'Spring Sale', count: 45, total: 100, icon: '🌸', status: 'active'},
   ];
 
-  // Check authentication status on mount
+  // Always show login screen on start (for testing different business IDs)
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const authenticated = await isAuthenticated();
-        setIsAuthenticatedState(authenticated);
+        // Always start with login screen - clear auth state
+        setIsAuthenticatedState(false);
+        setIsLoading(false);
       } catch (error) {
         console.error('Error checking authentication:', error);
         setIsAuthenticatedState(false);
-      } finally {
         setIsLoading(false);
       }
     };
@@ -139,6 +141,15 @@ function App(): React.JSX.Element {
     try {
       const authenticated = await isAuthenticated();
       setIsAuthenticatedState(authenticated);
+      
+      // Start daily sync service if authenticated
+      if (authenticated) {
+        const auth = await getStoredAuth();
+        if (auth?.businessId) {
+          startDailySync(auth.businessId);
+          console.log('✅ Daily sync service started');
+        }
+      }
     } catch (error) {
       console.error('Error after login:', error);
       setIsAuthenticatedState(false);
@@ -209,13 +220,14 @@ function App(): React.JSX.Element {
   //   // Function archived - login functionality disabled
   // };
 
-  const handleAddReward = (rewardData: {
+  const handleAddReward = async (rewardData: {
     name: string;
     type: 'product' | 'action';
     requirement: number;
     rewardType: 'free_product' | 'discount' | 'other';
     selectedProducts?: string[];
     selectedActions?: string[];
+    pinCode?: string;
     qrCode?: string;
   }) => {
     const icons = ['🎁', '⭐', '📱', '👥', '💎', '🎂', '🎉', '🏆', '🎯', '🎊'];
@@ -251,20 +263,25 @@ function App(): React.JSX.Element {
       rewardType: rewardData.rewardType,
       selectedProducts: rewardData.selectedProducts,
       selectedActions: rewardData.selectedActions,
+      pinCode: rewardData.pinCode, // Save PIN code in reward record
       qrCode: qrCode, // Save QR code in reward record
     };
     const updatedRewards = [...rewards, newReward];
     setRewards(updatedRewards);
+    // Save to local repository (source of truth)
+    await rewardsRepository.save(newReward);
+    // Also save to legacy storage for backward compatibility
     saveRewards(updatedRewards);
   };
 
-  const handleUpdateReward = (rewardId: string, rewardData: {
+  const handleUpdateReward = async (rewardId: string, rewardData: {
     name: string;
     type: 'product' | 'action';
     requirement: number;
     rewardType: 'free_product' | 'discount' | 'other';
     selectedProducts?: string[];
     selectedActions?: string[];
+    pinCode?: string;
     qrCode?: string;
   }) => {
     const updatedRewards = rewards.map(r => 
@@ -276,13 +293,16 @@ function App(): React.JSX.Element {
     saveRewards(updatedRewards);
   };
 
-  const handleDeleteReward = (rewardId: string) => {
+  const handleDeleteReward = async (rewardId: string) => {
     const updatedRewards = rewards.filter(r => r.id !== rewardId);
     setRewards(updatedRewards);
+    // Delete from local repository (source of truth)
+    await rewardsRepository.delete(rewardId);
+    // Also save to legacy storage for backward compatibility
     saveRewards(updatedRewards);
   };
 
-  const handleAddCampaign = (campaignData: {
+  const handleAddCampaign = async (campaignData: {
     name: string;
     type: 'product' | 'action';
     requirement: number;
@@ -301,10 +321,13 @@ function App(): React.JSX.Element {
     };
     const updatedCampaigns = [...campaigns, newCampaign];
     setCampaigns(updatedCampaigns);
+    // Save to local repository (source of truth)
+    await campaignsRepository.save(newCampaign);
+    // Also save to legacy storage for backward compatibility
     saveCampaigns(updatedCampaigns);
   };
 
-  const handleUpdateCampaign = (campaignId: string, campaignData: {
+  const handleUpdateCampaign = async (campaignId: string, campaignData: {
     name: string;
     type: 'product' | 'action';
     requirement: number;
@@ -318,12 +341,21 @@ function App(): React.JSX.Element {
         : c
     );
     setCampaigns(updatedCampaigns);
+    // Save to local repository (source of truth)
+    const updatedCampaign = updatedCampaigns.find(c => c.id === campaignId);
+    if (updatedCampaign) {
+      await campaignsRepository.save(updatedCampaign);
+    }
+    // Also save to legacy storage for backward compatibility
     saveCampaigns(updatedCampaigns);
   };
 
-  const handleDeleteCampaign = (campaignId: string) => {
+  const handleDeleteCampaign = async (campaignId: string) => {
     const updatedCampaigns = campaigns.filter(c => c.id !== campaignId);
     setCampaigns(updatedCampaigns);
+    // Delete from local repository (source of truth)
+    await campaignsRepository.delete(campaignId);
+    // Also save to legacy storage for backward compatibility
     saveCampaigns(updatedCampaigns);
   };
 
@@ -589,18 +621,6 @@ function App(): React.JSX.Element {
         );
     }
   };
-
-  // LOGIN PAGE DISABLED - Login functionality archived
-  // App now shows HomeScreen directly without authentication check
-
-  // Show loading screen only if actually loading data
-  if (isLoading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <Text style={styles.loadingText}>Loading...</Text>
-      </View>
-    );
-  }
 
   return (
     <>

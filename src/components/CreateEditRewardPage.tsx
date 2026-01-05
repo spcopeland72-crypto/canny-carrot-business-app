@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useState, useEffect} from 'react';
 import {
   View,
   Text,
@@ -14,6 +14,8 @@ import PageTemplate from './PageTemplate';
 import QRCodeModal from './QRCodeModal';
 import {saveProducts, loadProducts} from '../utils/dataStorage';
 import {generateRewardQRCode} from '../utils/qrCodeUtils';
+import {businessRepository} from '../services/localRepository';
+import type {BusinessProfile} from '../types';
 
 interface Reward {
   id: string;
@@ -41,6 +43,7 @@ interface CreateEditRewardPageProps {
     rewardType: 'free_product' | 'discount' | 'other';
     selectedProducts?: string[];
     selectedActions?: string[];
+    pinCode?: string;
     qrCode?: string;
   }) => void;
 }
@@ -62,6 +65,8 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
   >(reward?.rewardType || 'free_product');
   const [selectedProducts, setSelectedProducts] = useState<string[]>(reward?.selectedProducts || []);
   const [selectedActions, setSelectedActions] = useState<string[]>(reward?.selectedActions || []);
+  const [pinCode, setPinCode] = useState(reward?.pinCode || '');
+  const [businessProfile, setBusinessProfile] = useState<BusinessProfile | null>(null);
   
   // Product management state
   const defaultProducts = ['Product 1', 'Product 2', 'Product 3'];
@@ -73,26 +78,30 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
   const [createdRewardName, setCreatedRewardName] = useState('');
   const [createdRewardQrCode, setCreatedRewardQrCode] = useState('');
 
-  // Load products on mount - load from file to show all products in dropdown
-  React.useEffect(() => {
-    const loadInitialProducts = async () => {
+  // Load products and business profile on mount
+  useEffect(() => {
+    const loadInitialData = async () => {
       try {
+        // Load products
         const loadedProducts = await loadProducts();
         if (loadedProducts && Array.isArray(loadedProducts) && loadedProducts.length > 0) {
-          // Use all loaded products from file (includes all previously created products)
           setProducts(loadedProducts);
         } else {
-          // If no saved products, use defaults and save them
           setProducts(defaultProducts);
           await saveProducts(defaultProducts);
         }
+        
+        // Load business profile
+        const profile = await businessRepository.get();
+        if (profile) {
+          setBusinessProfile(profile);
+        }
       } catch (error) {
-        console.error('Error loading products:', error);
-        // Continue with default products if loading fails
+        console.error('Error loading initial data:', error);
         setProducts(defaultProducts);
       }
     };
-    loadInitialProducts();
+    loadInitialData();
   }, []); // Only run on mount
   const actions = [
     'Write a Review',
@@ -112,7 +121,13 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
       return;
     }
     
-    // Generate QR code value using shared utility
+    // Validate PIN code (must be 4 digits)
+    if (!pinCode || pinCode.length !== 4 || !/^\d{4}$/.test(pinCode)) {
+      Alert.alert('Error', 'Please enter a valid 4-digit PIN code');
+      return;
+    }
+    
+    // Generate QR code value using shared utility with business profile data
     const rewardId = reward?.id || Date.now().toString();
     const requirementValue = parseInt(requirement, 10);
     const qrCodeValue = generateRewardQRCode(
@@ -120,7 +135,22 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
       name,
       requirementValue,
       rewardType,
-      type === 'product' ? selectedProducts : undefined
+      type === 'product' ? selectedProducts : undefined,
+      type === 'action' ? selectedActions : undefined,
+      pinCode,
+      businessProfile ? {
+        name: businessProfile.name,
+        address: businessProfile.address,
+        addressLine1: businessProfile.addressLine1,
+        addressLine2: businessProfile.addressLine2,
+        city: businessProfile.city,
+        postcode: businessProfile.postcode,
+        country: businessProfile.country,
+        phone: businessProfile.phone,
+        email: businessProfile.email,
+        website: businessProfile.website,
+        socialMedia: businessProfile.socialMedia,
+      } : undefined
     );
     
     const rewardData = {
@@ -130,6 +160,7 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
       rewardType,
       selectedProducts: type === 'product' ? selectedProducts : undefined,
       selectedActions: type === 'action' ? selectedActions : undefined,
+      pinCode: pinCode, // Include PIN code in reward data
       qrCode: qrCodeValue, // Include QR code in reward data
     };
     
@@ -503,13 +534,31 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
             </TouchableOpacity>
           </View>
 
+          <Text style={styles.label}>4-Digit PIN Code *</Text>
+          <Text style={styles.labelHint}>
+            Required for customers to redeem this reward
+          </Text>
+          <TextInput
+            style={styles.input}
+            value={pinCode}
+            onChangeText={(text) => {
+              // Only allow digits and limit to 4 characters
+              const digitsOnly = text.replace(/[^0-9]/g, '').slice(0, 4);
+              setPinCode(digitsOnly);
+            }}
+            placeholder="Enter 4-digit PIN"
+            placeholderTextColor={Colors.text.light}
+            keyboardType="numeric"
+            maxLength={4}
+          />
+
           <Text style={styles.note}>
             * Business verification required to award points for actions
           </Text>
 
           <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
             <Text style={styles.saveButtonText}>
-              {isEdit ? 'Update Reward' : 'Create Reward'}
+              {isEdit ? 'Save Changes' : 'Create Reward'}
             </Text>
           </TouchableOpacity>
         </View>
@@ -550,6 +599,13 @@ const styles = StyleSheet.create({
     color: Colors.text.primary,
     marginTop: 16,
     marginBottom: 8,
+  },
+  labelHint: {
+    fontSize: 12,
+    color: Colors.text.light,
+    marginTop: -4,
+    marginBottom: 8,
+    fontStyle: 'italic',
   },
   input: {
     backgroundColor: Colors.neutral[50],
