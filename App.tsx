@@ -136,16 +136,42 @@ function App(): React.JSX.Element {
     };
   }, []);
 
-  // Handle successful login
+  // Handle successful login - load data from local repository
   const handleLoginSuccess = async () => {
     try {
       const authenticated = await isAuthenticated();
       setIsAuthenticatedState(authenticated);
       
-      // Start daily sync service if authenticated
       if (authenticated) {
         const auth = await getStoredAuth();
         if (auth?.businessId) {
+          // Load data from local repository (single source of truth)
+          try {
+            const loadedRewards = await rewardsRepository.getAll();
+            if (loadedRewards && loadedRewards.length > 0) {
+              const rewardsWithQRCodes = ensureRewardsHaveQRCodes(loadedRewards);
+              setRewards(rewardsWithQRCodes);
+              console.log(`✅ Loaded ${loadedRewards.length} rewards from local repository`);
+            } else {
+              console.log('ℹ️ No rewards in local repository');
+              setRewards([]);
+            }
+            
+            const loadedCampaigns = await campaignsRepository.getAll();
+            if (loadedCampaigns && loadedCampaigns.length > 0) {
+              setCampaigns(loadedCampaigns);
+              console.log(`✅ Loaded ${loadedCampaigns.length} campaigns from local repository`);
+            } else {
+              console.log('ℹ️ No campaigns in local repository');
+              setCampaigns([]);
+            }
+          } catch (repoError) {
+            console.error('Error loading data from repository:', repoError);
+            setRewards([]);
+            setCampaigns([]);
+          }
+          
+          // Start daily sync service
           startDailySync(auth.businessId);
           console.log('✅ Daily sync service started');
         }
@@ -156,64 +182,7 @@ function App(): React.JSX.Element {
     }
   };
 
-  // Load rewards and campaigns on mount
-  useEffect(() => {
-    let mounted = true;
-    const loadData = async () => {
-      try {
-        const loadedRewards = await loadRewards();
-        if (mounted && loadedRewards && Array.isArray(loadedRewards) && loadedRewards.length > 0) {
-          // Ensure all loaded rewards have QR codes (generate for any that don't)
-          const rewardsWithQRCodes = ensureRewardsHaveQRCodes(loadedRewards);
-          setRewards(rewardsWithQRCodes);
-          // Save updated rewards back to file if any QR codes were generated
-          const needsUpdate = loadedRewards.some(r => !r.qrCode);
-          if (needsUpdate) {
-            await saveRewards(rewardsWithQRCodes);
-            console.log('✅ Generated QR codes for existing rewards');
-          }
-        } else if (mounted && (!loadedRewards || loadedRewards.length === 0)) {
-          // If no rewards file exists, save initial rewards to file
-          // This ensures all rewards in carousel have a record in the file
-          const rewardsWithQRCodes = ensureRewardsHaveQRCodes(initialRewards);
-          setRewards(rewardsWithQRCodes);
-          await saveRewards(rewardsWithQRCodes);
-        }
-        
-        const loadedCampaigns = await loadCampaigns();
-        if (mounted && loadedCampaigns && Array.isArray(loadedCampaigns) && loadedCampaigns.length > 0) {
-          setCampaigns(loadedCampaigns);
-        } else if (mounted && (!loadedCampaigns || loadedCampaigns.length === 0)) {
-          // If no campaigns file exists, save initial campaigns to file
-          // This ensures all campaigns in carousel have a record in the file
-          setCampaigns(initialCampaigns);
-          await saveCampaigns(initialCampaigns);
-        }
-      } catch (error) {
-        console.error('Error loading data:', error);
-        // On error, use initial rewards and campaigns and save them
-        if (mounted) {
-          const rewardsWithQRCodes = ensureRewardsHaveQRCodes(initialRewards);
-          setRewards(rewardsWithQRCodes);
-          await saveRewards(rewardsWithQRCodes);
-          setCampaigns(initialCampaigns);
-          await saveCampaigns(initialCampaigns);
-        }
-      } finally {
-        if (mounted) {
-          setIsLoading(false);
-        }
-      }
-    };
-    const timer = setTimeout(() => {
-      loadData();
-    }, 100);
-    
-    return () => {
-      mounted = false;
-      clearTimeout(timer);
-    };
-  }, []); // Removed isAuthenticatedState dependency - load data immediately
+  // Data is now loaded from localRepository after login (in handleLoginSuccess)
 
   // LOGIN SUCCESS HANDLER ARCHIVED - Login functionality disabled
   // const handleLoginSuccess = async () => {
