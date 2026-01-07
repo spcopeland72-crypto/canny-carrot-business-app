@@ -328,9 +328,31 @@ function App(): React.JSX.Element {
     saveCampaigns(updatedCampaigns);
   };
 
-  const handleNavigate = (screen: ScreenName) => {
+  // Reload rewards from repository
+  const reloadRewards = async () => {
+    try {
+      const loadedRewards = await rewardsRepository.getAll();
+      if (loadedRewards && loadedRewards.length > 0) {
+        const rewardsWithQRCodes = ensureRewardsHaveQRCodes(loadedRewards);
+        setRewards(rewardsWithQRCodes);
+        console.log(`✅ Reloaded ${loadedRewards.length} rewards from repository`);
+      } else {
+        setRewards([]);
+        console.log('ℹ️ No rewards in repository');
+      }
+    } catch (error) {
+      console.error('Error reloading rewards:', error);
+    }
+  };
+
+  const handleNavigate = async (screen: ScreenName) => {
     setPreviousScreen(currentScreen);
     setCurrentScreen(screen);
+    
+    // Reload rewards when navigating to Home to ensure carousel is up-to-date
+    if (screen === 'Home') {
+      await reloadRewards();
+    }
   };
 
   const handleBack = () => {

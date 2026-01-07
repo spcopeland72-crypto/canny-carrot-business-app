@@ -18,6 +18,7 @@ interface PageTemplateProps {
   children: React.ReactNode;
   showBackButton?: boolean;
   onBack?: () => void;
+  headerRight?: React.ReactNode; // Custom header buttons
 }
 
 const PageTemplate: React.FC<PageTemplateProps> = ({
@@ -27,6 +28,7 @@ const PageTemplate: React.FC<PageTemplateProps> = ({
   children,
   showBackButton = true,
   onBack,
+  headerRight,
 }) => {
   const handleBack = () => {
     if (onBack) {
@@ -51,7 +53,13 @@ const PageTemplate: React.FC<PageTemplateProps> = ({
           </TouchableOpacity>
         )}
         <Text style={styles.headerTitle}>{title}</Text>
-        {showBackButton && <View style={styles.backButtonSpacer} />}
+        {headerRight ? (
+          <View style={styles.headerRight}>
+            {headerRight}
+          </View>
+        ) : showBackButton ? (
+          <View style={styles.backButtonSpacer} />
+        ) : null}
       </View>
 
       <ScrollView
@@ -107,6 +115,14 @@ const styles = StyleSheet.create({
     color: Colors.background,
     flex: 1,
     textAlign: 'center',
+  },
+  headerRight: {
+    position: 'absolute',
+    right: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    zIndex: 10,
   },
   scrollView: {
     flex: 1,

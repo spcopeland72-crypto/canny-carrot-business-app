@@ -163,6 +163,7 @@ export interface Reward {
   icon: string;
   type: 'product' | 'action';
   requirement: number;
+  pointsPerPurchase?: number; // Points allocated per purchase/action (default: 1)
   rewardType: 'free_product' | 'discount' | 'other';
   selectedProducts?: string[];
   selectedActions?: string[];

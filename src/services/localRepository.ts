@@ -32,7 +32,7 @@ interface SyncMetadata {
 /**
  * Get sync metadata
  */
-const getSyncMetadata = async (): Promise<SyncMetadata> => {
+export const getSyncMetadata = async (): Promise<SyncMetadata> => {
   try {
     const data = await AsyncStorage.getItem(REPOSITORY_KEYS.SYNC_METADATA);
     if (data) {
@@ -52,7 +52,7 @@ const getSyncMetadata = async (): Promise<SyncMetadata> => {
 /**
  * Update sync metadata
  */
-const updateSyncMetadata = async (updates: Partial<SyncMetadata>): Promise<void> => {
+export const updateSyncMetadata = async (updates: Partial<SyncMetadata>): Promise<void> => {
   try {
     const current = await getSyncMetadata();
     const updated = { ...current, ...updates };

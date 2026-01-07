@@ -8,12 +8,14 @@
     "start": "expo start",
     "web": "expo start --web",
     "web:https": "expo start --web --https",
+    "web:8082": "expo start --web --port 8082",
     "test": "jest",
     "lint": "eslint . --ext .js,.jsx,.ts,.tsx"
   },
   "dependencies": {
     "@expo/metro-runtime": "^6.1.2",
     "@react-native-async-storage/async-storage": "^2.2.0",
+    "@types/qrcode": "^1.5.6",
     "expo": "~51.0.0",
     "expo-av": "^16.0.7",
     "expo-camera": "^17.0.10",
@@ -23,6 +25,7 @@
     "expo-modules-core": "^3.0.29",
     "html5-qrcode": "^2.3.8",
     "ioredis": "^5.3.2",
+    "qrcode": "^1.5.4",
     "react": "18.2.0",
     "react-dom": "18.2.0",
     "react-native": "0.74.5",

@@ -58,6 +58,7 @@ export const generateRewardQRCode = (
     phone?: string;
     email?: string;
     website?: string;
+    logo?: string; // Business logo/icon URL or base64
     socialMedia?: {
       facebook?: string;
       instagram?: string;
@@ -65,7 +66,8 @@ export const generateRewardQRCode = (
       tiktok?: string;
       linkedin?: string;
     };
-  }
+  },
+  pointsPerPurchase?: number // Points allocated per purchase/action
 ): string => {
   const qrData = {
     type: 'reward',
@@ -73,6 +75,7 @@ export const generateRewardQRCode = (
       id,
       name,
       requirement,
+      pointsPerPurchase: pointsPerPurchase || 1, // Default to 1 point per transaction
       rewardType,
       products: products || [],
       actions: actions || [],
@@ -87,13 +90,56 @@ export const generateRewardQRCode = (
       phone: businessProfile.phone || '',
       email: businessProfile.email || '',
       website: businessProfile.website || '',
+      // Note: Logo is NOT included in QR code to keep data size manageable
+      // QR codes have limited capacity (~2,953 bytes max), and base64 images are too large
+      // Logo is stored separately in business profile and can be displayed from there
+      // logo: businessProfile.logo || '', // Excluded to prevent QR code data overflow
       socialMedia: businessProfile.socialMedia || {},
     } : undefined,
     version: '1.0',
     createdAt: new Date().toISOString(),
   };
   
-  return JSON.stringify(qrData);
+  const qrCodeString = JSON.stringify(qrData);
+  
+  // Validate QR code size before returning
+  // QR codes have limited capacity:
+  // - Version 1-10: ~100-500 bytes
+  // - Version 40 (max): ~2,953 bytes for alphanumeric
+  // We'll use a conservative limit of 2000 bytes to ensure reliability
+  const MAX_QR_SIZE = 2000;
+  if (qrCodeString.length > MAX_QR_SIZE) {
+    console.error(`[qrCodeUtils] QR code too large: ${qrCodeString.length} bytes (max: ${MAX_QR_SIZE})`);
+    // Remove optional fields to reduce size
+    const minimalQrData = {
+      type: 'reward',
+      reward: {
+        id,
+        name: name.substring(0, 50), // Truncate name if too long
+        requirement,
+        pointsPerPurchase: pointsPerPurchase || 1,
+        rewardType,
+        products: (products || []).slice(0, 5), // Limit products
+        actions: (actions || []).slice(0, 5), // Limit actions
+        pinCode: pinCode || '',
+      },
+      business: businessProfile ? {
+        name: businessProfile.name.substring(0, 50), // Truncate business name
+        // Remove address, phone, email, website to reduce size
+      } : undefined,
+      version: '1.0',
+    };
+    
+    const minimalQrString = JSON.stringify(minimalQrData);
+    if (minimalQrString.length > MAX_QR_SIZE) {
+      throw new Error(`QR code data too large (${qrCodeString.length} bytes). Please reduce reward information (shorter name, fewer products, etc.).`);
+    }
+    
+    console.warn(`[qrCodeUtils] QR code reduced from ${qrCodeString.length} to ${minimalQrString.length} bytes`);
+    return minimalQrString;
+  }
+  
+  return qrCodeString;
 };
 
 /**

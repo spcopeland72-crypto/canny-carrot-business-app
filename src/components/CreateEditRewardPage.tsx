@@ -14,7 +14,7 @@ import PageTemplate from './PageTemplate';
 import QRCodeModal from './QRCodeModal';
 import {saveProducts, loadProducts} from '../utils/dataStorage';
 import {generateRewardQRCode} from '../utils/qrCodeUtils';
-import {businessRepository} from '../services/localRepository';
+import {businessRepository, rewardsRepository} from '../services/localRepository';
 import type {BusinessProfile} from '../types';
 
 interface Reward {
@@ -25,6 +25,7 @@ interface Reward {
   icon: string;
   type: 'product' | 'action';
   requirement: number;
+  pointsPerPurchase?: number; // Points allocated per purchase/action
   rewardType: 'free_product' | 'discount' | 'other';
   selectedProducts?: string[];
   selectedActions?: string[];
@@ -40,6 +41,7 @@ interface CreateEditRewardPageProps {
     name: string;
     type: 'product' | 'action';
     requirement: number;
+    pointsPerPurchase?: number;
     rewardType: 'free_product' | 'discount' | 'other';
     selectedProducts?: string[];
     selectedActions?: string[];
@@ -60,6 +62,7 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
   const [name, setName] = useState(reward?.name || '');
   const [type, setType] = useState<'product' | 'action'>(reward?.type || 'product');
   const [requirement, setRequirement] = useState(reward?.requirement?.toString() || '');
+  const [pointsPerPurchase, setPointsPerPurchase] = useState(reward?.pointsPerPurchase?.toString() || '1');
   const [rewardType, setRewardType] = useState<
     'free_product' | 'discount' | 'other'
   >(reward?.rewardType || 'free_product');
@@ -77,6 +80,7 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
   const [qrCodeModalVisible, setQrCodeModalVisible] = useState(false);
   const [createdRewardName, setCreatedRewardName] = useState('');
   const [createdRewardQrCode, setCreatedRewardQrCode] = useState('');
+  const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
 
   // Load products and business profile on mount
   useEffect(() => {
@@ -95,6 +99,7 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
         const profile = await businessRepository.get();
         if (profile) {
           setBusinessProfile(profile);
+          // If profile has logo, it will be included in QR code generation
         }
       } catch (error) {
         console.error('Error loading initial data:', error);
@@ -116,68 +121,99 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
   ];
 
   const handleSave = () => {
-    if (!name || !requirement) {
-      Alert.alert('Error', 'Please fill in all required fields');
-      return;
-    }
-    
-    // Validate PIN code (must be 4 digits)
-    if (!pinCode || pinCode.length !== 4 || !/^\d{4}$/.test(pinCode)) {
-      Alert.alert('Error', 'Please enter a valid 4-digit PIN code');
-      return;
-    }
-    
-    // Generate QR code value using shared utility with business profile data
-    const rewardId = reward?.id || Date.now().toString();
-    const requirementValue = parseInt(requirement, 10);
-    const qrCodeValue = generateRewardQRCode(
-      rewardId,
-      name,
-      requirementValue,
-      rewardType,
-      type === 'product' ? selectedProducts : undefined,
-      type === 'action' ? selectedActions : undefined,
-      pinCode,
-      businessProfile ? {
-        name: businessProfile.name,
-        address: businessProfile.address,
-        addressLine1: businessProfile.addressLine1,
-        addressLine2: businessProfile.addressLine2,
-        city: businessProfile.city,
-        postcode: businessProfile.postcode,
-        country: businessProfile.country,
-        phone: businessProfile.phone,
-        email: businessProfile.email,
-        website: businessProfile.website,
-        socialMedia: businessProfile.socialMedia,
-      } : undefined
-    );
-    
-    const rewardData = {
-      name,
-      type,
-      requirement: requirementValue,
-      rewardType,
-      selectedProducts: type === 'product' ? selectedProducts : undefined,
-      selectedActions: type === 'action' ? selectedActions : undefined,
-      pinCode: pinCode, // Include PIN code in reward data
-      qrCode: qrCodeValue, // Include QR code in reward data
-    };
-    
-    // Call onSave callback if provided
-    if (onSave) {
-      onSave(rewardData);
-    }
-    
-    // If creating new reward, show QR code modal with the generated QR code
-    if (!isEdit) {
-      setCreatedRewardName(name);
-      setCreatedRewardQrCode(qrCodeValue); // Store QR code value for display in modal
-      // The reward will be saved with QR code via onSave callback
-      setQrCodeModalVisible(true);
-    } else {
-      Alert.alert('Success', 'Reward updated successfully');
-      onBack?.();
+    try {
+      if (!name || !requirement || !pointsPerPurchase) {
+        Alert.alert('Error', 'Please fill in all required fields');
+        return;
+      }
+      
+      // Validate PIN code (must be 4 digits)
+      if (!pinCode || pinCode.length !== 4 || !/^\d{4}$/.test(pinCode)) {
+        Alert.alert('Error', 'Please enter a valid 4-digit PIN code');
+        return;
+      }
+      
+      // Generate QR code value using shared utility with business profile data
+      const rewardId = reward?.id || Date.now().toString();
+      const requirementValue = parseInt(requirement, 10);
+      const pointsValue = parseInt(pointsPerPurchase, 10) || 1;
+      
+      let qrCodeValue: string;
+      try {
+        qrCodeValue = generateRewardQRCode(
+          rewardId,
+          name,
+          requirementValue,
+          rewardType,
+          type === 'product' ? selectedProducts : undefined,
+          type === 'action' ? selectedActions : undefined,
+          pinCode,
+          businessProfile ? {
+            name: businessProfile.name,
+            address: businessProfile.address,
+            addressLine1: businessProfile.addressLine1,
+            addressLine2: businessProfile.addressLine2,
+            city: businessProfile.city,
+            postcode: businessProfile.postcode,
+            country: businessProfile.country,
+            phone: businessProfile.phone,
+            email: businessProfile.email,
+            website: businessProfile.website,
+            // Logo excluded from QR code to prevent data overflow
+            // Logo is stored separately in business profile
+            socialMedia: businessProfile.socialMedia,
+          } : undefined,
+          pointsValue // Include points per purchase
+        );
+        
+        // QR code size validation is now handled in generateRewardQRCode
+        // If it throws an error, it means the data is too large even after optimization
+        const qrCodeSize = qrCodeValue.length;
+        console.log(`[CreateEditReward] QR code generated successfully: ${qrCodeSize} bytes`);
+        
+        console.log(`[CreateEditReward] QR code generated successfully: ${qrCodeSize} bytes`);
+      } catch (qrError) {
+        console.error('[CreateEditReward] Error generating QR code:', qrError);
+        Alert.alert(
+          'Error',
+          'Failed to generate QR code. Please check your reward details and try again.'
+        );
+        return;
+      }
+      
+      const rewardData = {
+        name,
+        type,
+        requirement: requirementValue,
+        pointsPerPurchase: pointsValue,
+        rewardType,
+        selectedProducts: type === 'product' ? selectedProducts : undefined,
+        selectedActions: type === 'action' ? selectedActions : undefined,
+        pinCode: pinCode, // Include PIN code in reward data
+        qrCode: qrCodeValue, // Include QR code in reward data
+      };
+      
+      // Call onSave callback if provided
+      if (onSave) {
+        onSave(rewardData);
+      }
+      
+      // If creating new reward, show QR code modal with success message
+      if (!isEdit) {
+        setCreatedRewardName(name);
+        setCreatedRewardQrCode(qrCodeValue); // Store QR code value for display in modal
+        // The reward will be saved with QR code via onSave callback
+        setQrCodeModalVisible(true); // Show QR code modal with success message
+      } else {
+        Alert.alert('Success', 'Reward updated successfully');
+        onBack?.();
+      }
+    } catch (error) {
+      console.error('[CreateEditReward] Unexpected error in handleSave:', error);
+      Alert.alert(
+        'Error',
+        'An unexpected error occurred while saving the reward. Please try again.'
+      );
     }
   };
 
@@ -223,6 +259,55 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
     setDropdownVisible(false);
   };
 
+  // Copy reward - duplicates current reward but clears name
+  const handleCopyReward = () => {
+    if (!isEdit || !reward) {
+      Alert.alert('Info', 'No reward to copy. Create a reward first.');
+      return;
+    }
+    
+    // Copy all fields except name (which will be cleared)
+    setName(''); // Clear name
+    setType(reward.type || 'product');
+    setRequirement(reward.requirement?.toString() || '');
+    setPointsPerPurchase(reward.pointsPerPurchase?.toString() || '1');
+    setRewardType(reward.rewardType || 'free_product');
+    setSelectedProducts(reward.selectedProducts || []);
+    setSelectedActions(reward.selectedActions || []);
+    setPinCode(''); // Clear PIN code (user needs to enter new one)
+    
+    Alert.alert('Copied', 'Reward details copied. Please enter a new name and PIN code.');
+  };
+
+  // Delete reward with confirmation
+  const handleDeleteReward = () => {
+    if (!isEdit || !rewardId) {
+      Alert.alert('Info', 'No reward to delete.');
+      return;
+    }
+    setDeleteConfirmVisible(true);
+  };
+
+  const confirmDeleteReward = async () => {
+    if (!isEdit || !rewardId) return;
+    
+    try {
+      await rewardsRepository.delete(rewardId);
+      Alert.alert('Success', 'Reward deleted successfully', [
+        {
+          text: 'OK',
+          onPress: () => {
+            onBack?.();
+          },
+        },
+      ]);
+    } catch (error) {
+      console.error('Error deleting reward:', error);
+      Alert.alert('Error', 'Failed to delete reward. Please try again.');
+    }
+    setDeleteConfirmVisible(false);
+  };
+
   const handleDeleteProduct = async (product: string) => {
     // Don't allow deleting default products
     if (defaultProducts.includes(product)) {
@@ -265,12 +350,31 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
     );
   };
 
+  // Header buttons (copy and delete) - only show in edit mode
+  const headerButtons = isEdit ? (
+    <>
+      <TouchableOpacity
+        style={styles.headerButton}
+        onPress={handleCopyReward}
+        activeOpacity={0.7}>
+        <Text style={styles.headerButtonText}>📋</Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={styles.headerButton}
+        onPress={handleDeleteReward}
+        activeOpacity={0.7}>
+        <Text style={styles.headerButtonText}>🗑️</Text>
+      </TouchableOpacity>
+    </>
+  ) : null;
+
   return (
     <PageTemplate
       title={isEdit ? 'Edit Reward' : 'Create Reward'}
       currentScreen={currentScreen}
       onNavigate={onNavigate}
-      onBack={onBack}>
+      onBack={onBack}
+      headerRight={headerButtons}>
       <ScrollView style={styles.content}>
         <View style={styles.form}>
           <Text style={styles.label}>Reward Name *</Text>
@@ -488,6 +592,25 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
             placeholderTextColor={Colors.text.light}
           />
 
+          <Text style={styles.label}>
+            Number of Points per {type === 'product' ? 'Purchase' : 'Action'} *
+          </Text>
+          <Text style={styles.labelHint}>
+            Points allocated to each {type === 'product' ? 'purchase' : 'action'} (default: 1 point per transaction)
+          </Text>
+          <TextInput
+            style={styles.input}
+            value={pointsPerPurchase}
+            onChangeText={(text) => {
+              // Only allow digits
+              const digitsOnly = text.replace(/[^0-9]/g, '');
+              setPointsPerPurchase(digitsOnly || '1');
+            }}
+            placeholder="Enter number of points (default: 1)"
+            keyboardType="numeric"
+            placeholderTextColor={Colors.text.light}
+          />
+
           <Text style={styles.label}>Reward Type *</Text>
           <View style={styles.radioGroup}>
             <TouchableOpacity
@@ -564,7 +687,7 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
         </View>
       </ScrollView>
       
-      {/* QR Code Modal */}
+      {/* QR Code Modal with Success Message */}
       <QRCodeModal
         visible={qrCodeModalVisible}
         title={createdRewardName}
@@ -575,21 +698,115 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
           reward.rewardType || 'free_product',
           reward.selectedProducts
         ) : '')}
+        showSuccessMessage={!isEdit} // Show "Reward created!" for new rewards
         onClose={() => {
           setQrCodeModalVisible(false);
-          Alert.alert('Success', 'Reward created successfully');
           onBack?.();
         }}
       />
+      
+      {/* Delete Confirmation Modal */}
+      <Modal
+        visible={deleteConfirmVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setDeleteConfirmVisible(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.deleteModal}>
+            <Text style={styles.deleteModalTitle}>Delete Reward?</Text>
+            <Text style={styles.deleteModalMessage}>
+              Are you sure you want to delete "{reward?.name}"? This action cannot be undone.
+            </Text>
+            <View style={styles.deleteModalButtons}>
+              <TouchableOpacity
+                style={[styles.deleteModalButton, styles.deleteModalButtonCancel]}
+                onPress={() => setDeleteConfirmVisible(false)}>
+                <Text style={styles.deleteModalButtonTextCancel}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.deleteModalButton, styles.deleteModalButtonDelete]}
+                onPress={confirmDeleteReward}>
+                <Text style={styles.deleteModalButtonTextDelete}>Delete</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </PageTemplate>
   );
 };
 
 const styles = StyleSheet.create({
+  headerButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerButtonText: {
+    fontSize: 18,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  deleteModal: {
+    backgroundColor: Colors.background,
+    borderRadius: 16,
+    padding: 24,
+    width: '85%',
+    maxWidth: 400,
+    alignItems: 'center',
+  },
+  deleteModalTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: Colors.text.primary,
+    marginBottom: 12,
+  },
+  deleteModalMessage: {
+    fontSize: 16,
+    color: Colors.text.secondary,
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  deleteModalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    width: '100%',
+  },
+  deleteModalButton: {
+    flex: 1,
+    padding: 14,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  deleteModalButtonCancel: {
+    backgroundColor: Colors.neutral[200],
+  },
+  deleteModalButtonDelete: {
+    backgroundColor: '#FF3B30',
+  },
+  deleteModalButtonTextCancel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: Colors.text.primary,
+  },
+  deleteModalButtonTextDelete: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: Colors.background,
+  },
   content: {
     flex: 1,
+    backgroundColor: Colors.background,
   },
   form: {
+    paddingVertical: 16,
     paddingHorizontal: 16,
     paddingTop: 16,
   },

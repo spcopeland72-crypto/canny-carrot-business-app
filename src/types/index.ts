@@ -27,6 +27,7 @@ export interface Reward {
   name: string;
   type: 'product' | 'action';
   requirement: number;
+  pointsPerPurchase?: number; // Points allocated per purchase/action (default: 1)
   rewardType: 'free_product' | 'discount' | 'other';
   productId?: string;
   action?: string;
@@ -131,7 +132,8 @@ export interface BusinessProfile {
   city?: string;
   postcode?: string;
   country?: string;
-  logo?: string;
+  logo?: string;              // Full logo image (base64 data URI)
+  logoIcon?: string;          // Circular icon version of logo (64x64, optimized for app use)
   additionalFiles?: string[];  // Flyers, menus, etc.
   companyQRCode?: string;      // Unique QR code assigned by admin (7-digit format)
   companyNumber?: string;      // Business registration number

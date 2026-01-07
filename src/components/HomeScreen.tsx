@@ -1,4 +1,4 @@
-import React, {useState, useRef} from 'react';
+import React, {useState, useRef, useEffect} from 'react';
 import {
   View,
   Text,
@@ -20,6 +20,7 @@ import AnimatedLineChart from './AnimatedLineChart';
 import AnimatedBarChart from './AnimatedBarChart';
 import AnimatedDonutChart from './AnimatedDonutChart';
 import AnimatedAreaChart from './AnimatedAreaChart';
+import {businessRepository} from '../services/localRepository';
 
 // Logo will use fallback text instead of dynamic requires
 const logoImage = null;
@@ -69,7 +70,36 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   const [helpModalVisible, setHelpModalVisible] = useState(false);
   const [hasUnreadNotifications] = useState(true);
   const [logoError, setLogoError] = useState(false);
-  const [businessName] = useState('Cafe Maison'); // This would come from business context
+  const [businessName, setBusinessName] = useState('Business'); // Default until loaded from repository
+  const [businessLogo, setBusinessLogo] = useState<string | null>(null); // Business logo from profile
+
+  // Load business name and logo from local repository on mount
+  useEffect(() => {
+    const loadBusinessData = async () => {
+      try {
+        const profile = await businessRepository.get();
+        if (profile) {
+          if (profile.name) {
+            setBusinessName(profile.name);
+            console.log('[HomeScreen] Loaded business name from repository:', profile.name);
+          }
+          // Use logoIcon (circular) if available, otherwise use full logo
+          if (profile.logoIcon) {
+            setBusinessLogo(profile.logoIcon);
+            console.log('[HomeScreen] Loaded business logo icon from repository');
+          } else if (profile.logo) {
+            setBusinessLogo(profile.logo);
+            console.log('[HomeScreen] Loaded business logo from repository');
+          }
+        } else {
+          console.log('[HomeScreen] No business profile found in repository, using default');
+        }
+      } catch (error) {
+        console.error('[HomeScreen] Error loading business data:', error);
+      }
+    };
+    loadBusinessData();
+  }, []);
 
   // Use rewards from props, fallback to empty array
   const rewards = propsRewards.length > 0 ? propsRewards : [];
@@ -180,9 +210,19 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerTop}>
-          {/* Logo */}
+          {/* Logo - Use business logo if available, otherwise use default CC logo */}
           <View style={styles.logoContainer}>
-            {logoImage && !logoError ? (
+            {businessLogo ? (
+              <Image
+                source={{uri: businessLogo}}
+                style={[styles.logo, styles.businessLogo]}
+                resizeMode="cover"
+                onError={() => {
+                  console.log('Business logo failed to load, using default');
+                  setBusinessLogo(null);
+                }}
+              />
+            ) : logoImage && !logoError ? (
               <Image
                 source={logoImage}
                 style={styles.logo}
@@ -596,6 +636,9 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     color: Colors.background,
+  },
+  businessLogo: {
+    borderRadius: 25, // Make it circular
   },
   businessName: {
     fontSize: 18,

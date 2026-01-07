@@ -31,30 +31,56 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
+  // Debug: Log component mount
+  React.useEffect(() => {
+    console.log('[LoginPage] Component mounted');
+    console.log('[LoginPage] onLoginSuccess prop:', typeof onLoginSuccess);
+    return () => {
+      console.log('[LoginPage] Component unmounting');
+    };
+  }, [onLoginSuccess]);
+
   const handleLogin = async () => {
+    console.log('[LoginPage] handleLogin called');
+    console.log('[LoginPage] Email:', email);
+    console.log('[LoginPage] Password length:', password?.length || 0);
+    
     if (!email || !email.includes('@')) {
+      console.log('[LoginPage] Email validation failed');
       Alert.alert('Error', 'Please enter a valid email address');
       return;
     }
 
     if (!password || password.length < 8) {
+      console.log('[LoginPage] Password validation failed');
       Alert.alert('Error', 'Password must be at least 8 characters');
       return;
     }
 
+    console.log('[LoginPage] Starting login process...');
     setIsLoading(true);
     try {
+      console.log('[LoginPage] Calling loginBusiness...');
       const auth = await loginBusiness(email, password);
+      console.log('[LoginPage] loginBusiness returned:', { 
+        hasAuth: !!auth, 
+        isAuthenticated: auth?.isAuthenticated 
+      });
       if (auth && auth.isAuthenticated) {
+        console.log('[LoginPage] Login successful, calling onLoginSuccess');
         onLoginSuccess();
       } else {
+        console.log('[LoginPage] Login failed - invalid credentials');
         Alert.alert('Login Failed', 'Invalid email or password. Please try again.');
       }
     } catch (error: any) {
+      console.error('[LoginPage] Login error:', error);
+      console.error('[LoginPage] Error message:', error?.message);
+      console.error('[LoginPage] Error stack:', error?.stack);
       Alert.alert('Login Failed', error.message || 'Invalid email or password. Please try again.');
-      console.error('Login error:', error);
     } finally {
       setIsLoading(false);
+      console.log('[LoginPage] Login process completed');
     }
   };
 
@@ -177,8 +203,15 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
             {/* Login Button */}
             <TouchableOpacity
               style={[styles.loginButton, isLoading && styles.loginButtonDisabled]}
-              onPress={handleLogin}
-              disabled={isLoading}>
+              onPress={(e) => {
+                console.log('[LoginPage] Login button pressed', e);
+                e?.preventDefault?.();
+                handleLogin();
+              }}
+              onPressIn={() => console.log('[LoginPage] Login button press started')}
+              disabled={isLoading}
+              activeOpacity={0.7}
+              testID="login-button">
               <Text style={styles.loginButtonText}>
                 {isLoading ? 'Logging in...' : 'Login'}
               </Text>
