@@ -9,6 +9,8 @@
     "web": "expo start --web",
     "web:https": "expo start --web --https",
     "web:8082": "expo start --web --port 8082",
+    "build:web": "expo export -p web",
+    "vercel-build": "npm run build:web",
     "test": "jest",
     "lint": "eslint . --ext .js,.jsx,.ts,.tsx"
   },

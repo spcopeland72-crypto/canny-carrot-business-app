@@ -1,5 +1,9 @@
 node_modules
-.expo/web/cache
-.expo/web/
+.expo
+.expo/
+dist
+dist/
+web-build
+web-build/
 *.log
 .DS_Store
