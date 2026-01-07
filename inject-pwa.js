@@ -53,8 +53,17 @@ if (fs.existsSync(manifestSrc)) {
 
 // 3. Copy logo files from assets to dist as PWA icons
 const assetsDir = path.join(__dirname, 'assets');
-const logoFile = 'canny-carrot-logo.png';
+const logoFile = 'canny-carrot-logo.png'; // Business app specific logo
 const logoSrc = path.join(assetsDir, logoFile);
+
+// Verify we're using the correct business app logo (not customer app logo)
+if (!fs.existsSync(logoSrc)) {
+  console.error(`❌ ERROR: Business app logo file not found: ${logoSrc}`);
+  console.error(`   Expected: canny-carrot-logo.png`);
+  console.error(`   This should be different from customer app logo (cropped-cc-app-logo.png)`);
+  process.exit(1);
+}
+console.log(`✅ Using business app logo: ${logoFile}`);
 
 if (fs.existsSync(logoSrc)) {
   // Copy as standard PWA icons (192 and 512)
