@@ -216,9 +216,49 @@ export const loginBusiness = async (email: string, password: string): Promise<Bu
         throw new Error(result.error || 'Invalid password');
       }
 
-      // Password verified - return existing local credentials
-      // No need to update local storage, credentials already exist
+      // Password verified - now check repository sync
       console.log('✅ Subsequent login successful - using local credentials');
+      
+      // REPOSITORY SYNC LOGIC: Check if repository exists and sync if needed
+      try {
+        const { 
+          repositoryExists, 
+          downloadAllData, 
+          getLocalRepositoryTimestamp,
+          getDatabaseRecordTimestamp,
+          isLocalOlderThanDatabase 
+        } = await import('./localRepository');
+        
+        const repoExists = await repositoryExists();
+        
+        if (!repoExists) {
+          // NO REPOSITORY: Create local repository AND pull account record from database
+          console.log('📥 [LOGIN] No local repository found - creating and downloading from database');
+          await downloadAllData(existingAuth.businessId, API_BASE_URL);
+          console.log('✅ [LOGIN] Local repository created and populated from database');
+        } else {
+          // REPOSITORY EXISTS: Check timestamps and refresh if local is older
+          console.log('📊 [LOGIN] Local repository exists - checking timestamps');
+          const localTimestamp = await getLocalRepositoryTimestamp();
+          const dbTimestamp = await getDatabaseRecordTimestamp(existingAuth.businessId, API_BASE_URL);
+          
+          if (isLocalOlderThanDatabase(localTimestamp, dbTimestamp)) {
+            console.log('🔄 [LOGIN] Local repository is older than database - refreshing from database');
+            console.log(`   Local: ${localTimestamp || 'N/A'}`);
+            console.log(`   Database: ${dbTimestamp || 'N/A'}`);
+            await downloadAllData(existingAuth.businessId, API_BASE_URL);
+            console.log('✅ [LOGIN] Local repository refreshed from database');
+          } else {
+            console.log('✅ [LOGIN] Local repository is up to date - no refresh needed');
+            console.log(`   Local: ${localTimestamp || 'N/A'}`);
+            console.log(`   Database: ${dbTimestamp || 'N/A'}`);
+          }
+        }
+      } catch (syncError) {
+        console.error('⚠️ Error syncing repository (will retry later):', syncError);
+        // Don't fail login if sync fails - user can still use app offline
+      }
+      
       return existingAuth;
     }
 
@@ -290,14 +330,44 @@ export const loginBusiness = async (email: string, password: string): Promise<Bu
 
     console.log('✅ First login successful - credentials stored locally for subsequent logins');
     
-    // FIRST LOGIN: Download all business data to local repository
+    // REPOSITORY SYNC LOGIC: Check if repository exists and sync if needed
     try {
-      const { downloadAllData } = await import('./localRepository');
-      await downloadAllData(businessId, API_BASE_URL);
-      console.log('✅ All business data downloaded to local repository');
-    } catch (downloadError) {
-      console.error('⚠️ Error downloading data (will retry later):', downloadError);
-      // Don't fail login if download fails - user can still use app offline
+      const { 
+        repositoryExists, 
+        downloadAllData, 
+        getLocalRepositoryTimestamp,
+        getDatabaseRecordTimestamp,
+        isLocalOlderThanDatabase 
+      } = await import('./localRepository');
+      
+      const repoExists = await repositoryExists();
+      
+      if (!repoExists) {
+        // NO REPOSITORY: Create local repository AND pull account record from database
+        console.log('📥 [LOGIN] No local repository found - creating and downloading from database');
+        await downloadAllData(businessId, API_BASE_URL);
+        console.log('✅ [LOGIN] Local repository created and populated from database');
+      } else {
+        // REPOSITORY EXISTS: Check timestamps and refresh if local is older
+        console.log('📊 [LOGIN] Local repository exists - checking timestamps');
+        const localTimestamp = await getLocalRepositoryTimestamp();
+        const dbTimestamp = await getDatabaseRecordTimestamp(businessId, API_BASE_URL);
+        
+        if (isLocalOlderThanDatabase(localTimestamp, dbTimestamp)) {
+          console.log('🔄 [LOGIN] Local repository is older than database - refreshing from database');
+          console.log(`   Local: ${localTimestamp || 'N/A'}`);
+          console.log(`   Database: ${dbTimestamp || 'N/A'}`);
+          await downloadAllData(businessId, API_BASE_URL);
+          console.log('✅ [LOGIN] Local repository refreshed from database');
+        } else {
+          console.log('✅ [LOGIN] Local repository is up to date - no refresh needed');
+          console.log(`   Local: ${localTimestamp || 'N/A'}`);
+          console.log(`   Database: ${dbTimestamp || 'N/A'}`);
+        }
+      }
+    } catch (syncError) {
+      console.error('⚠️ Error syncing repository (will retry later):', syncError);
+      // Don't fail login if sync fails - user can still use app offline
     }
     
     return auth;

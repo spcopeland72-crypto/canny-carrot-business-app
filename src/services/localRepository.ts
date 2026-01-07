@@ -317,7 +317,74 @@ export const customersRepository = {
 };
 
 /**
- * DOWNLOAD ALL DATA FROM REDIS (First Login)
+ * Check if local repository exists (has business profile)
+ */
+export const repositoryExists = async (): Promise<boolean> => {
+  try {
+    const profile = await businessRepository.get();
+    return profile !== null;
+  } catch (error) {
+    console.error('Error checking repository existence:', error);
+    return false;
+  }
+};
+
+/**
+ * Get local repository last update timestamp
+ */
+export const getLocalRepositoryTimestamp = async (): Promise<string | null> => {
+  try {
+    const profile = await businessRepository.get();
+    return profile?.updatedAt || null;
+  } catch (error) {
+    console.error('Error getting local repository timestamp:', error);
+    return null;
+  }
+};
+
+/**
+ * Get database record timestamp from API
+ */
+export const getDatabaseRecordTimestamp = async (businessId: string, apiBaseUrl: string = 'https://api.cannycarrot.com'): Promise<string | null> => {
+  try {
+    const response = await fetch(`${apiBaseUrl}/api/v1/businesses/${businessId}`);
+    if (response.ok) {
+      const result = await response.json();
+      if (result.success && result.data) {
+        const businessData = result.data;
+        // Check both updatedAt locations
+        return businessData.updatedAt || businessData.profile?.updatedAt || null;
+      }
+    }
+    return null;
+  } catch (error) {
+    console.error('Error getting database record timestamp:', error);
+    return null;
+  }
+};
+
+/**
+ * Compare timestamps - returns true if local is older than database
+ */
+export const isLocalOlderThanDatabase = (localTimestamp: string | null, dbTimestamp: string | null): boolean => {
+  if (!localTimestamp || !dbTimestamp) {
+    // If either is missing, consider local as older to trigger refresh
+    return true;
+  }
+  
+  try {
+    const localDate = new Date(localTimestamp);
+    const dbDate = new Date(dbTimestamp);
+    return localDate < dbDate;
+  } catch (error) {
+    console.error('Error comparing timestamps:', error);
+    // On error, assume local is older to trigger refresh
+    return true;
+  }
+};
+
+/**
+ * DOWNLOAD ALL DATA FROM REDIS (First Login or Refresh)
  */
 export const downloadAllData = async (businessId: string, apiBaseUrl: string = 'https://api.cannycarrot.com'): Promise<void> => {
   console.log('📥 [REPOSITORY] Starting data download from Redis for business:', businessId);
