@@ -368,6 +368,18 @@ function App(): React.JSX.Element {
     setScanModalVisible(true);
   };
 
+  const handleLogout = async () => {
+    try {
+      const { logoutBusiness } = await import('./src/services/authService');
+      await logoutBusiness();
+      console.log('✅ Logged out - returning to login screen');
+      setIsAuthenticatedState(false);
+      setCurrentScreen('Login' as ScreenName);
+    } catch (error) {
+      console.error('Error logging out:', error);
+    }
+  };
+
   const handleBarcodeScanned = (data: string, type: string) => {
     console.log('QR Code Scanned:', data, type);
     setScanModalVisible(false);
@@ -399,6 +411,7 @@ function App(): React.JSX.Element {
             currentScreen={currentScreen}
             onNavigate={handleNavigate}
             onScanPress={handleScanPress}
+            onLogout={handleLogout}
             rewards={rewards}
             campaigns={campaigns}
           />

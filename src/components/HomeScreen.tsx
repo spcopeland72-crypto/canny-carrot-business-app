@@ -15,6 +15,7 @@ import {Colors} from '../constants/Colors';
 import BottomNavigation from './BottomNavigation';
 import NotificationsModal from './NotificationsModal';
 import HelpModal from './HelpModal';
+import CompanyMenuModal from './CompanyMenuModal';
 import CircularProgress from './CircularProgress';
 import AnimatedLineChart from './AnimatedLineChart';
 import AnimatedBarChart from './AnimatedBarChart';
@@ -46,6 +47,7 @@ interface HomeScreenProps {
   currentScreen?: string;
   onNavigate?: (screen: string) => void;
   onScanPress?: () => void;
+  onLogout?: () => void;
   rewards?: Reward[];
   campaigns?: Campaign[];
 }
@@ -63,11 +65,13 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   currentScreen = 'Home',
   onNavigate = () => {},
   onScanPress = () => {},
+  onLogout = () => {},
   rewards: propsRewards = [],
   campaigns: propsCampaigns = [],
 }) => {
   const [notificationsModalVisible, setNotificationsModalVisible] = useState(false);
   const [helpModalVisible, setHelpModalVisible] = useState(false);
+  const [companyMenuVisible, setCompanyMenuVisible] = useState(false);
   const [hasUnreadNotifications] = useState(true);
   const [logoError, setLogoError] = useState(false);
   const [businessName, setBusinessName] = useState('Business'); // Default until loaded from repository
@@ -210,8 +214,11 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerTop}>
-          {/* Logo - Use business logo if available, otherwise use default CC logo */}
-          <View style={styles.logoContainer}>
+          {/* Logo - Make it clickable to open company menu */}
+          <TouchableOpacity
+            style={styles.logoContainer}
+            onPress={() => setCompanyMenuVisible(true)}
+            activeOpacity={0.7}>
             {businessLogo ? (
               <Image
                 source={{uri: businessLogo}}
@@ -235,7 +242,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
             ) : (
               <Text style={styles.logoText}>CC</Text>
             )}
-          </View>
+          </TouchableOpacity>
           
           {/* Business Name */}
           <Text style={styles.businessName} numberOfLines={1}>
@@ -599,6 +606,14 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
         visible={notificationsModalVisible}
         onClose={() => setNotificationsModalVisible(false)}
         onNavigate={onNavigate}
+      />
+      <CompanyMenuModal
+        visible={companyMenuVisible}
+        onClose={() => setCompanyMenuVisible(false)}
+        onNavigate={onNavigate}
+        onLogout={onLogout}
+        businessName={businessName}
+        businessLogo={businessLogo}
       />
     </SafeAreaView>
   );
