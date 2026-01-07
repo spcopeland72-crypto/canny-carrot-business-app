@@ -47,7 +47,24 @@
     },
     "web": {
       "bundler": "metro",
-      "favicon": "./assets/favicon-business.png"
+      "favicon": "./assets/favicon-business.png",
+      "name": "Canny Carrot Business",
+      "shortName": "CC Business",
+      "description": "Manage your business rewards and customer engagement",
+      "themeColor": "#2D5A27",
+      "backgroundColor": "#2D5A27",
+      "display": "standalone",
+      "orientation": "portrait",
+      "scope": "/",
+      "startUrl": "/",
+      "lang": "en",
+      "dir": "ltr",
+      "preferRelatedApplications": false,
+      "splash": {
+        "backgroundColor": "#2D5A27",
+        "resizeMode": "contain",
+        "image": "./assets/icon.png"
+      }
     },
     "plugins": [
       [
