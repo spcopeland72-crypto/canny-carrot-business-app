@@ -155,22 +155,10 @@ function App(): React.JSX.Element {
             console.log(`📊 [App] Found ${loadedRewards?.length || 0} rewards in repository`);
             
             if (loadedRewards && loadedRewards.length > 0) {
-              // Transform rewards to ensure they have all required UI fields (count, total, icon)
-              const icons = ['🎁', '⭐', '📱', '👥', '💎', '🎂', '🎉', '🏆', '🎯', '🎊'];
-              const transformedRewards = loadedRewards.map((reward: any, index: number) => {
-                const transformed = {
-                  ...reward,
-                  // Ensure required UI fields exist - database format may not have these
-                  count: reward.count ?? 0,
-                  total: reward.total ?? reward.requirement ?? 10,
-                  icon: reward.icon || icons[index % icons.length],
-                };
-                console.log(`  - Reward ${transformed.id}: ${transformed.name} (count: ${transformed.count}, total: ${transformed.total}, icon: ${transformed.icon})`);
-                return transformed;
-              });
-              const rewardsWithQRCodes = ensureRewardsHaveQRCodes(transformedRewards);
+              // Rewards are already in app format from repository - just ensure QR codes
+              const rewardsWithQRCodes = ensureRewardsHaveQRCodes(loadedRewards);
               setRewards(rewardsWithQRCodes);
-              console.log(`✅ [App] Loaded ${loadedRewards.length} rewards from local repository (transformed for UI)`);
+              console.log(`✅ [App] Loaded ${loadedRewards.length} rewards from repository (already in app format)`);
             } else {
               console.log('ℹ️ [App] No rewards found in local repository');
               setRewards([]);
@@ -355,24 +343,16 @@ function App(): React.JSX.Element {
     try {
       const loadedRewards = await rewardsRepository.getAll();
       if (loadedRewards && loadedRewards.length > 0) {
-        // Transform rewards to ensure they have all required UI fields (count, total, icon)
-        const icons = ['🎁', '⭐', '📱', '👥', '💎', '🎂', '🎉', '🏆', '🎯', '🎊'];
-        const transformedRewards = loadedRewards.map((reward: any, index: number) => ({
-          ...reward,
-          // Ensure required UI fields exist - database format may not have these
-          count: reward.count ?? 0,
-          total: reward.total ?? reward.requirement ?? 10,
-          icon: reward.icon || icons[index % icons.length],
-        }));
-        const rewardsWithQRCodes = ensureRewardsHaveQRCodes(transformedRewards);
+        // Rewards are already in app format - just ensure QR codes
+        const rewardsWithQRCodes = ensureRewardsHaveQRCodes(loadedRewards);
         setRewards(rewardsWithQRCodes);
-        console.log(`✅ Reloaded ${loadedRewards.length} rewards from repository (transformed for UI)`);
+        console.log(`✅ [App] Reloaded ${loadedRewards.length} rewards from repository`);
       } else {
         setRewards([]);
-        console.log('ℹ️ No rewards in repository');
+        console.log('ℹ️ [App] No rewards in repository');
       }
     } catch (error) {
-      console.error('Error reloading rewards:', error);
+      console.error('❌ [App] Error reloading rewards:', error);
     }
   };
 
@@ -382,7 +362,22 @@ function App(): React.JSX.Element {
     
     // Reload rewards when navigating to Home to ensure carousel is up-to-date
     if (screen === 'Home') {
+      console.log('🏠 [App] Navigating to Home - reloading rewards from repository...');
       await reloadRewards();
+      
+      // Also reload campaigns
+      try {
+        const loadedCampaigns = await campaignsRepository.getAll();
+        if (loadedCampaigns && loadedCampaigns.length > 0) {
+          setCampaigns(loadedCampaigns);
+          console.log(`✅ [App] Reloaded ${loadedCampaigns.length} campaigns for Home screen`);
+        } else {
+          setCampaigns([]);
+          console.log('ℹ️ [App] No campaigns found in repository');
+        }
+      } catch (error) {
+        console.error('❌ [App] Error reloading campaigns:', error);
+      }
     }
   };
 

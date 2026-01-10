@@ -572,23 +572,58 @@ export const downloadAllData = async (businessId: string, apiBaseUrl: string = '
     }
 
     // 2. Download rewards
+    // API returns DB format, transform to app format ONCE here, then store in repository
+    console.log(`📥 [REPOSITORY] Fetching rewards from API...`);
     const rewardsResponse = await fetch(`${apiBaseUrl}/api/v1/rewards?businessId=${businessId}`);
+    
     if (rewardsResponse.ok) {
       const rewardsResult = await rewardsResponse.json();
+      
       if (rewardsResult.success && Array.isArray(rewardsResult.data)) {
-        // Transform rewards from database format to UI format
-        // Database format doesn't have count, total, icon - need to add defaults
+        console.log(`📊 [REPOSITORY] API returned ${rewardsResult.data.length} rewards (DB format)`);
+        
+        // Transform DB format → App format ONCE
+        // DB format: { id, name, stampsRequired, type, isActive, ... }
+        // App format: { id, name, count, total, icon, type, requirement, rewardType, ... }
         const icons = ['🎁', '⭐', '📱', '👥', '💎', '🎂', '🎉', '🏆', '🎯', '🎊'];
-        const transformedRewards = rewardsResult.data.map((reward: any, index: number) => ({
-          ...reward,
-          // Add UI-required fields if missing
-          count: reward.count || 0, // Default to 0 for new rewards
-          total: reward.total || reward.requirement || 10, // Use requirement as total
-          icon: reward.icon || icons[index % icons.length], // Assign icon from pool
-        }));
-        await rewardsRepository.saveAll(transformedRewards);
-        console.log(`✅ ${transformedRewards.length} rewards downloaded and transformed`);
+        const appFormatRewards = rewardsResult.data.map((dbReward: any, index: number) => {
+          // Map DB fields to app fields
+          const requirement = dbReward.requirement || dbReward.stampsRequired || dbReward.costStamps || 10;
+          const rewardType = dbReward.rewardType || 
+            (dbReward.type === 'freebie' || dbReward.type === 'product' ? 'free_product' : 
+             dbReward.type === 'discount' ? 'discount' : 'other');
+          const uiType = dbReward.type === 'action' ? 'action' : 'product';
+          
+          return {
+            id: dbReward.id,
+            name: dbReward.name || 'Unnamed Reward',
+            count: 0, // Business app doesn't track customer progress here
+            total: requirement,
+            icon: icons[index % icons.length],
+            type: uiType,
+            requirement: requirement,
+            rewardType: rewardType,
+            selectedProducts: dbReward.selectedProducts || [],
+            selectedActions: dbReward.selectedActions || [],
+            qrCode: dbReward.qrCode,
+            pinCode: dbReward.pinCode,
+            description: dbReward.description || '',
+            status: dbReward.status || (dbReward.isActive ? 'live' : 'draft'),
+            createdAt: dbReward.createdAt,
+            updatedAt: dbReward.updatedAt,
+          };
+        });
+        
+        // Store in app format - UI will read this directly
+        await rewardsRepository.saveAll(appFormatRewards);
+        console.log(`✅ [REPOSITORY] ${appFormatRewards.length} rewards transformed (DB→App) and saved`);
+      } else {
+        console.log('⚠️ [REPOSITORY] API response invalid - saving empty array');
+        await rewardsRepository.saveAll([]);
       }
+    } else {
+      console.error(`❌ [REPOSITORY] API error ${rewardsResponse.status}`);
+      // Don't clear existing rewards on API error
     }
 
     // 3. Download campaigns

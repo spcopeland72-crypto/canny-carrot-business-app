@@ -21,7 +21,7 @@ import AnimatedLineChart from './AnimatedLineChart';
 import AnimatedBarChart from './AnimatedBarChart';
 import AnimatedDonutChart from './AnimatedDonutChart';
 import AnimatedAreaChart from './AnimatedAreaChart';
-import {businessRepository} from '../services/localRepository';
+import {businessRepository, rewardsRepository} from '../services/localRepository';
 
 // Logo will use fallback text instead of dynamic requires
 const logoImage = null;
@@ -77,6 +77,9 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   const [businessName, setBusinessName] = useState('Business'); // Default until loaded from repository
   const [businessLogo, setBusinessLogo] = useState<string | null>(null); // Business logo from profile
 
+  // Local state for rewards as fallback if props are empty
+  const [localRewards, setLocalRewards] = useState<Reward[]>([]);
+
   // Load business name and logo from local repository on mount
   useEffect(() => {
     const loadBusinessData = async () => {
@@ -105,11 +108,53 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
     loadBusinessData();
   }, []);
 
-  // Use rewards from props, fallback to empty array
-  const rewards = propsRewards.length > 0 ? propsRewards : [];
+  // Fallback: Load rewards directly from repository if props are empty
+  useEffect(() => {
+    const loadRewardsFromRepository = async () => {
+      // Only load if props are empty
+      if (propsRewards.length === 0) {
+        try {
+          console.log('[HomeScreen] Props rewards empty - loading directly from repository...');
+          const loadedRewards = await rewardsRepository.getAll();
+          console.log(`[HomeScreen] Found ${loadedRewards?.length || 0} rewards in repository`);
+          
+          if (loadedRewards && loadedRewards.length > 0) {
+            // Rewards are already in app format - use directly
+            setLocalRewards(loadedRewards);
+            console.log(`[HomeScreen] Loaded ${loadedRewards.length} rewards directly from repository`);
+          }
+        } catch (error) {
+          console.error('[HomeScreen] Error loading rewards from repository:', error);
+        }
+      }
+    };
+    
+    loadRewardsFromRepository();
+  }, [propsRewards.length]); // Only run when propsRewards length changes
+
+  // Debug: Log when rewards props change
+  useEffect(() => {
+    console.log('[HomeScreen] Rewards props updated:', {
+      count: propsRewards.length,
+      rewards: propsRewards.map(r => ({ id: r.id, name: r.name })),
+    });
+  }, [propsRewards]);
+
+  // Use rewards from props, fallback to local state, then empty array
+  const rewards = propsRewards.length > 0 ? propsRewards : (localRewards.length > 0 ? localRewards : []);
   
   // Use campaigns from props, fallback to empty array
   const campaigns = propsCampaigns.length > 0 ? propsCampaigns : [];
+  
+  // Log current state for debugging
+  useEffect(() => {
+    console.log('[HomeScreen] Current render state:', {
+      rewardsCount: rewards.length,
+      campaignsCount: campaigns.length,
+      propsRewardsCount: propsRewards.length,
+      propsCampaignsCount: propsCampaigns.length,
+    });
+  }, [rewards, campaigns, propsRewards, propsCampaigns]);
 
   // 2x2 Box Elements (matching customer app Features section)
   const boxElements = [
