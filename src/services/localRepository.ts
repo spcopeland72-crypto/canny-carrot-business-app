@@ -17,7 +17,13 @@ const REPOSITORY_KEYS = {
   CUSTOMERS: 'local_repo:customers',
   SYNC_METADATA: 'local_repo:sync_metadata',
   LAST_SYNC: 'local_repo:last_sync',
+  CURRENT_BUSINESS_ID: 'local_repo:current_business_id', // Track which business the primary repo belongs to
 } as const;
+
+// Archived repository key pattern: archived_repo:{businessId}:{key}
+const getArchivedKey = (businessId: string, key: string): string => {
+  return `archived_repo:${businessId}:${key}`;
+};
 
 /**
  * Sync metadata for tracking changes
@@ -330,6 +336,151 @@ export const repositoryExists = async (): Promise<boolean> => {
 };
 
 /**
+ * Check if local repository matches the given businessId
+ */
+export const repositoryMatchesBusiness = async (businessId: string): Promise<boolean> => {
+  try {
+    const profile = await businessRepository.get();
+    if (!profile) {
+      return false;
+    }
+    return profile.id === businessId;
+  } catch (error) {
+    console.error('Error checking repository business match:', error);
+    return false;
+  }
+};
+
+/**
+ * Get the businessId that the current primary repository belongs to
+ */
+export const getCurrentRepositoryBusinessId = async (): Promise<string | null> => {
+  try {
+    const businessId = await AsyncStorage.getItem(REPOSITORY_KEYS.CURRENT_BUSINESS_ID);
+    return businessId;
+  } catch (error) {
+    console.error('Error getting current repository business ID:', error);
+    return null;
+  }
+};
+
+/**
+ * Set the businessId for the current primary repository
+ */
+const setCurrentRepositoryBusinessId = async (businessId: string): Promise<void> => {
+  try {
+    await AsyncStorage.setItem(REPOSITORY_KEYS.CURRENT_BUSINESS_ID, businessId);
+  } catch (error) {
+    console.error('Error setting current repository business ID:', error);
+  }
+};
+
+/**
+ * Archive the current primary repository for a specific businessId
+ * Archives the primary repository and clears it to make room for new primary
+ */
+export const archiveRepository = async (businessId: string): Promise<void> => {
+  try {
+    console.log(`📦 [ARCHIVE] Archiving repository for business: ${businessId}`);
+    
+    // Get all current repository data
+    const profile = await businessRepository.get();
+    const rewards = await rewardsRepository.getAll();
+    const campaigns = await campaignsRepository.getAll();
+    const customers = await customersRepository.getAll();
+    const syncMetadata = await getSyncMetadata();
+    
+    if (!profile) {
+      console.log('⚠️ [ARCHIVE] No repository to archive');
+      return;
+    }
+    
+    // Store each piece in archived location
+    await AsyncStorage.setItem(getArchivedKey(businessId, 'business_profile'), JSON.stringify(profile));
+    await AsyncStorage.setItem(getArchivedKey(businessId, 'rewards'), JSON.stringify(rewards));
+    await AsyncStorage.setItem(getArchivedKey(businessId, 'campaigns'), JSON.stringify(campaigns));
+    await AsyncStorage.setItem(getArchivedKey(businessId, 'customers'), JSON.stringify(customers));
+    await AsyncStorage.setItem(getArchivedKey(businessId, 'sync_metadata'), JSON.stringify(syncMetadata));
+    
+    // Clear primary repository after archiving (to make room for new primary)
+    await AsyncStorage.multiRemove([
+      REPOSITORY_KEYS.BUSINESS_PROFILE,
+      REPOSITORY_KEYS.REWARDS,
+      REPOSITORY_KEYS.CAMPAIGNS,
+      REPOSITORY_KEYS.CUSTOMERS,
+      REPOSITORY_KEYS.SYNC_METADATA,
+      REPOSITORY_KEYS.LAST_SYNC,
+      REPOSITORY_KEYS.CURRENT_BUSINESS_ID,
+    ]);
+    
+    console.log(`✅ [ARCHIVE] Repository archived for business: ${businessId} and primary repository cleared`);
+  } catch (error) {
+    console.error('❌ [ARCHIVE] Error archiving repository:', error);
+    throw error;
+  }
+};
+
+/**
+ * Check if archived repository exists for a specific businessId
+ */
+export const archivedRepositoryExists = async (businessId: string): Promise<boolean> => {
+  try {
+    const archivedProfile = await AsyncStorage.getItem(getArchivedKey(businessId, 'business_profile'));
+    return archivedProfile !== null;
+  } catch (error) {
+    console.error('Error checking archived repository existence:', error);
+    return false;
+  }
+};
+
+/**
+ * Restore archived repository for a specific businessId to primary repository
+ */
+export const restoreArchivedRepository = async (businessId: string): Promise<void> => {
+  try {
+    console.log(`📥 [RESTORE] Restoring archived repository for business: ${businessId}`);
+    
+    // Check if archived repository exists
+    const hasArchived = await archivedRepositoryExists(businessId);
+    if (!hasArchived) {
+      throw new Error(`No archived repository found for business: ${businessId}`);
+    }
+    
+    // Get archived data
+    const archivedProfile = await AsyncStorage.getItem(getArchivedKey(businessId, 'business_profile'));
+    const archivedRewards = await AsyncStorage.getItem(getArchivedKey(businessId, 'rewards'));
+    const archivedCampaigns = await AsyncStorage.getItem(getArchivedKey(businessId, 'campaigns'));
+    const archivedCustomers = await AsyncStorage.getItem(getArchivedKey(businessId, 'customers'));
+    const archivedSyncMetadata = await AsyncStorage.getItem(getArchivedKey(businessId, 'sync_metadata'));
+    
+    // Restore to primary repository
+    if (archivedProfile) {
+      await AsyncStorage.setItem(REPOSITORY_KEYS.BUSINESS_PROFILE, archivedProfile);
+    }
+    if (archivedRewards) {
+      await AsyncStorage.setItem(REPOSITORY_KEYS.REWARDS, archivedRewards);
+    }
+    if (archivedCampaigns) {
+      await AsyncStorage.setItem(REPOSITORY_KEYS.CAMPAIGNS, archivedCampaigns);
+    }
+    if (archivedCustomers) {
+      await AsyncStorage.setItem(REPOSITORY_KEYS.CUSTOMERS, archivedCustomers);
+    }
+    if (archivedSyncMetadata) {
+      await AsyncStorage.setItem(REPOSITORY_KEYS.SYNC_METADATA, archivedSyncMetadata);
+    }
+    
+    // Set current business ID
+    await setCurrentRepositoryBusinessId(businessId);
+    
+    console.log(`✅ [RESTORE] Repository restored for business: ${businessId}`);
+  } catch (error) {
+    console.error('❌ [RESTORE] Error restoring archived repository:', error);
+    throw error;
+  }
+};
+
+/**
  * Get local repository last update timestamp
  */
 export const getLocalRepositoryTimestamp = async (): Promise<string | null> => {
@@ -456,6 +607,9 @@ export const downloadAllData = async (businessId: string, apiBaseUrl: string = '
       hasUnsyncedChanges: false,
     });
 
+    // Set current business ID for this repository
+    await setCurrentRepositoryBusinessId(businessId);
+
     console.log('✅ [REPOSITORY] All data downloaded successfully');
   } catch (error) {
     console.error('❌ [REPOSITORY] Error downloading data:', error);
@@ -472,6 +626,7 @@ export const getSyncStatus = async (): Promise<SyncMetadata> => {
 
 /**
  * CLEAR ALL DATA (for testing/logout)
+ * Clears primary repository but keeps archived repositories
  */
 export const clearRepository = async (): Promise<void> => {
   try {
@@ -482,10 +637,31 @@ export const clearRepository = async (): Promise<void> => {
       REPOSITORY_KEYS.CUSTOMERS,
       REPOSITORY_KEYS.SYNC_METADATA,
       REPOSITORY_KEYS.LAST_SYNC,
+      REPOSITORY_KEYS.CURRENT_BUSINESS_ID,
     ]);
     console.log('✅ Repository cleared');
   } catch (error) {
     console.error('Error clearing repository:', error);
+    throw error;
+  }
+};
+
+/**
+ * DELETE ARCHIVED REPOSITORY (optional cleanup)
+ */
+export const deleteArchivedRepository = async (businessId: string): Promise<void> => {
+  try {
+    console.log(`🗑️ [ARCHIVE] Deleting archived repository for business: ${businessId}`);
+    await AsyncStorage.multiRemove([
+      getArchivedKey(businessId, 'business_profile'),
+      getArchivedKey(businessId, 'rewards'),
+      getArchivedKey(businessId, 'campaigns'),
+      getArchivedKey(businessId, 'customers'),
+      getArchivedKey(businessId, 'sync_metadata'),
+    ]);
+    console.log(`✅ [ARCHIVE] Archived repository deleted for business: ${businessId}`);
+  } catch (error) {
+    console.error('❌ [ARCHIVE] Error deleting archived repository:', error);
     throw error;
   }
 };

@@ -219,39 +219,100 @@ export const loginBusiness = async (email: string, password: string): Promise<Bu
       // Password verified - now check repository sync
       console.log('✅ Subsequent login successful - using local credentials');
       
-      // REPOSITORY SYNC LOGIC: Check if repository exists and sync if needed
+      // REPOSITORY SYNC LOGIC: Check if repository exists and matches login credentials
       try {
-        const { 
-          repositoryExists, 
-          downloadAllData, 
-          getLocalRepositoryTimestamp,
-          getDatabaseRecordTimestamp,
-          isLocalOlderThanDatabase 
-        } = await import('./localRepository');
+        const repoModule = await import('./localRepository');
         
-        const repoExists = await repositoryExists();
+        const repoExists = await repoModule.repositoryExists();
         
         if (!repoExists) {
-          // NO REPOSITORY: Create local repository AND pull account record from database
-          console.log('📥 [LOGIN] No local repository found - creating and downloading from database');
-          await downloadAllData(existingAuth.businessId, API_BASE_URL);
-          console.log('✅ [LOGIN] Local repository created and populated from database');
-        } else {
-          // REPOSITORY EXISTS: Check timestamps and refresh if local is older
-          console.log('📊 [LOGIN] Local repository exists - checking timestamps');
-          const localTimestamp = await getLocalRepositoryTimestamp();
-          const dbTimestamp = await getDatabaseRecordTimestamp(existingAuth.businessId, API_BASE_URL);
+          // STEP 1: NO REPOSITORY EXISTS
+          // Check for archived repository matching login credentials
+          const hasArchived = await repoModule.archivedRepositoryExists(existingAuth.businessId);
           
-          if (isLocalOlderThanDatabase(localTimestamp, dbTimestamp)) {
-            console.log('🔄 [LOGIN] Local repository is older than database - refreshing from database');
-            console.log(`   Local: ${localTimestamp || 'N/A'}`);
-            console.log(`   Database: ${dbTimestamp || 'N/A'}`);
-            await downloadAllData(existingAuth.businessId, API_BASE_URL);
-            console.log('✅ [LOGIN] Local repository refreshed from database');
+          if (hasArchived) {
+            // RESTORE ARCHIVED REPOSITORY
+            console.log(`📥 [LOGIN] No primary repository - restoring archived repository for business: ${existingAuth.businessId}`);
+            await repoModule.restoreArchivedRepository(existingAuth.businessId);
+            
+            // Check timestamps after restore
+            const localTimestamp = await repoModule.getLocalRepositoryTimestamp();
+            const dbTimestamp = await repoModule.getDatabaseRecordTimestamp(existingAuth.businessId, API_BASE_URL);
+            
+            if (repoModule.isLocalOlderThanDatabase(localTimestamp, dbTimestamp)) {
+              console.log('🔄 [LOGIN] Restored repository is older than database - refreshing from database');
+              await repoModule.downloadAllData(existingAuth.businessId, API_BASE_URL);
+              console.log('✅ [LOGIN] Repository refreshed from database after restore');
+            } else {
+              console.log('✅ [LOGIN] Restored repository is up to date');
+            }
           } else {
-            console.log('✅ [LOGIN] Local repository is up to date - no refresh needed');
-            console.log(`   Local: ${localTimestamp || 'N/A'}`);
-            console.log(`   Database: ${dbTimestamp || 'N/A'}`);
+            // NO ARCHIVED REPOSITORY: Download from database
+            console.log(`📥 [LOGIN] No repository found - downloading from database for business: ${existingAuth.businessId}`);
+            await repoModule.downloadAllData(existingAuth.businessId, API_BASE_URL);
+            console.log('✅ [LOGIN] Repository created and populated from database');
+          }
+        } else {
+          // STEP 2: REPOSITORY EXISTS - Check if it matches login credentials
+          const matchesBusiness = await repoModule.repositoryMatchesBusiness(existingAuth.businessId);
+          
+          if (matchesBusiness) {
+            // REPOSITORY MATCHES: Check timestamps and refresh if needed
+            console.log(`📊 [LOGIN] Repository exists and matches business ${existingAuth.businessId} - checking timestamps`);
+            const localTimestamp = await repoModule.getLocalRepositoryTimestamp();
+            const dbTimestamp = await repoModule.getDatabaseRecordTimestamp(existingAuth.businessId, API_BASE_URL);
+            
+            if (repoModule.isLocalOlderThanDatabase(localTimestamp, dbTimestamp)) {
+              console.log('🔄 [LOGIN] Local repository is older than database - refreshing from database');
+              console.log(`   Local: ${localTimestamp || 'N/A'}`);
+              console.log(`   Database: ${dbTimestamp || 'N/A'}`);
+              await repoModule.downloadAllData(existingAuth.businessId, API_BASE_URL);
+              console.log('✅ [LOGIN] Local repository refreshed from database');
+            } else {
+              console.log('✅ [LOGIN] Local repository is up to date - no refresh needed');
+              console.log(`   Local: ${localTimestamp || 'N/A'}`);
+              console.log(`   Database: ${dbTimestamp || 'N/A'}`);
+            }
+          } else {
+            // REPOSITORY DOESN'T MATCH: Archive current repo, check for archived repo OR download
+            console.log(`🔄 [LOGIN] Repository exists but doesn't match business ${existingAuth.businessId} - switching repositories`);
+            
+            // Get current repository's businessId (from profile or stored ID)
+            const currentProfile = await repoModule.businessRepository.get();
+            const currentBusinessId = currentProfile?.id || await repoModule.getCurrentRepositoryBusinessId();
+            
+            if (currentBusinessId && currentBusinessId !== existingAuth.businessId) {
+              // Archive the current repository
+              console.log(`📦 [LOGIN] Archiving current repository for business: ${currentBusinessId}`);
+              await repoModule.archiveRepository(currentBusinessId);
+              console.log(`✅ [LOGIN] Current repository archived for business: ${currentBusinessId}`);
+            }
+            
+            // Check for archived repository matching login credentials
+            const hasArchived = await repoModule.archivedRepositoryExists(existingAuth.businessId);
+            
+            if (hasArchived) {
+              // RESTORE ARCHIVED REPOSITORY
+              console.log(`📥 [LOGIN] Restoring archived repository for business: ${existingAuth.businessId}`);
+              await repoModule.restoreArchivedRepository(existingAuth.businessId);
+              
+              // Check timestamps after restore
+              const localTimestamp = await repoModule.getLocalRepositoryTimestamp();
+              const dbTimestamp = await repoModule.getDatabaseRecordTimestamp(existingAuth.businessId, API_BASE_URL);
+              
+              if (repoModule.isLocalOlderThanDatabase(localTimestamp, dbTimestamp)) {
+                console.log('🔄 [LOGIN] Restored repository is older than database - refreshing from database');
+                await repoModule.downloadAllData(existingAuth.businessId, API_BASE_URL);
+                console.log('✅ [LOGIN] Repository refreshed from database after restore');
+              } else {
+                console.log('✅ [LOGIN] Restored repository is up to date');
+              }
+            } else {
+              // NO ARCHIVED REPOSITORY: Download from database
+              console.log(`📥 [LOGIN] No archived repository found - downloading from database for business: ${existingAuth.businessId}`);
+              await repoModule.downloadAllData(existingAuth.businessId, API_BASE_URL);
+              console.log('✅ [LOGIN] Repository created and populated from database');
+            }
           }
         }
       } catch (syncError) {
@@ -330,39 +391,100 @@ export const loginBusiness = async (email: string, password: string): Promise<Bu
 
     console.log('✅ First login successful - credentials stored locally for subsequent logins');
     
-    // REPOSITORY SYNC LOGIC: Check if repository exists and sync if needed
+    // REPOSITORY SYNC LOGIC: Check if repository exists and matches login credentials
     try {
-      const { 
-        repositoryExists, 
-        downloadAllData, 
-        getLocalRepositoryTimestamp,
-        getDatabaseRecordTimestamp,
-        isLocalOlderThanDatabase 
-      } = await import('./localRepository');
+      const repoModule = await import('./localRepository');
       
-      const repoExists = await repositoryExists();
+      const repoExists = await repoModule.repositoryExists();
       
       if (!repoExists) {
-        // NO REPOSITORY: Create local repository AND pull account record from database
-        console.log('📥 [LOGIN] No local repository found - creating and downloading from database');
-        await downloadAllData(businessId, API_BASE_URL);
-        console.log('✅ [LOGIN] Local repository created and populated from database');
-      } else {
-        // REPOSITORY EXISTS: Check timestamps and refresh if local is older
-        console.log('📊 [LOGIN] Local repository exists - checking timestamps');
-        const localTimestamp = await getLocalRepositoryTimestamp();
-        const dbTimestamp = await getDatabaseRecordTimestamp(businessId, API_BASE_URL);
+        // STEP 1: NO REPOSITORY EXISTS
+        // Check for archived repository matching login credentials
+        const hasArchived = await repoModule.archivedRepositoryExists(businessId);
         
-        if (isLocalOlderThanDatabase(localTimestamp, dbTimestamp)) {
-          console.log('🔄 [LOGIN] Local repository is older than database - refreshing from database');
-          console.log(`   Local: ${localTimestamp || 'N/A'}`);
-          console.log(`   Database: ${dbTimestamp || 'N/A'}`);
-          await downloadAllData(businessId, API_BASE_URL);
-          console.log('✅ [LOGIN] Local repository refreshed from database');
+        if (hasArchived) {
+          // RESTORE ARCHIVED REPOSITORY
+          console.log(`📥 [LOGIN] No primary repository - restoring archived repository for business: ${businessId}`);
+          await repoModule.restoreArchivedRepository(businessId);
+          
+          // Check timestamps after restore
+          const localTimestamp = await repoModule.getLocalRepositoryTimestamp();
+          const dbTimestamp = await repoModule.getDatabaseRecordTimestamp(businessId, API_BASE_URL);
+          
+          if (repoModule.isLocalOlderThanDatabase(localTimestamp, dbTimestamp)) {
+            console.log('🔄 [LOGIN] Restored repository is older than database - refreshing from database');
+            await repoModule.downloadAllData(businessId, API_BASE_URL);
+            console.log('✅ [LOGIN] Repository refreshed from database after restore');
+          } else {
+            console.log('✅ [LOGIN] Restored repository is up to date');
+          }
         } else {
-          console.log('✅ [LOGIN] Local repository is up to date - no refresh needed');
-          console.log(`   Local: ${localTimestamp || 'N/A'}`);
-          console.log(`   Database: ${dbTimestamp || 'N/A'}`);
+          // NO ARCHIVED REPOSITORY: Download from database
+          console.log(`📥 [LOGIN] No repository found - downloading from database for business: ${businessId}`);
+          await repoModule.downloadAllData(businessId, API_BASE_URL);
+          console.log('✅ [LOGIN] Repository created and populated from database');
+        }
+      } else {
+        // STEP 2: REPOSITORY EXISTS - Check if it matches login credentials
+        const matchesBusiness = await repoModule.repositoryMatchesBusiness(businessId);
+        
+        if (matchesBusiness) {
+          // REPOSITORY MATCHES: Check timestamps and refresh if needed
+          console.log(`📊 [LOGIN] Repository exists and matches business ${businessId} - checking timestamps`);
+          const localTimestamp = await repoModule.getLocalRepositoryTimestamp();
+          const dbTimestamp = await repoModule.getDatabaseRecordTimestamp(businessId, API_BASE_URL);
+          
+          if (repoModule.isLocalOlderThanDatabase(localTimestamp, dbTimestamp)) {
+            console.log('🔄 [LOGIN] Local repository is older than database - refreshing from database');
+            console.log(`   Local: ${localTimestamp || 'N/A'}`);
+            console.log(`   Database: ${dbTimestamp || 'N/A'}`);
+            await repoModule.downloadAllData(businessId, API_BASE_URL);
+            console.log('✅ [LOGIN] Local repository refreshed from database');
+          } else {
+            console.log('✅ [LOGIN] Local repository is up to date - no refresh needed');
+            console.log(`   Local: ${localTimestamp || 'N/A'}`);
+            console.log(`   Database: ${dbTimestamp || 'N/A'}`);
+          }
+        } else {
+          // REPOSITORY DOESN'T MATCH: Archive current repo, check for archived repo OR download
+          console.log(`🔄 [LOGIN] Repository exists but doesn't match business ${businessId} - switching repositories`);
+          
+          // Get current repository's businessId (from profile or stored ID)
+          const currentProfile = await repoModule.businessRepository.get();
+          const currentBusinessId = currentProfile?.id || await repoModule.getCurrentRepositoryBusinessId();
+          
+          if (currentBusinessId && currentBusinessId !== businessId) {
+            // Archive the current repository
+            console.log(`📦 [LOGIN] Archiving current repository for business: ${currentBusinessId}`);
+            await repoModule.archiveRepository(currentBusinessId);
+            console.log(`✅ [LOGIN] Current repository archived for business: ${currentBusinessId}`);
+          }
+          
+          // Check for archived repository matching login credentials
+          const hasArchived = await repoModule.archivedRepositoryExists(businessId);
+          
+          if (hasArchived) {
+            // RESTORE ARCHIVED REPOSITORY
+            console.log(`📥 [LOGIN] Restoring archived repository for business: ${businessId}`);
+            await repoModule.restoreArchivedRepository(businessId);
+            
+            // Check timestamps after restore
+            const localTimestamp = await repoModule.getLocalRepositoryTimestamp();
+            const dbTimestamp = await repoModule.getDatabaseRecordTimestamp(businessId, API_BASE_URL);
+            
+            if (repoModule.isLocalOlderThanDatabase(localTimestamp, dbTimestamp)) {
+              console.log('🔄 [LOGIN] Restored repository is older than database - refreshing from database');
+              await repoModule.downloadAllData(businessId, API_BASE_URL);
+              console.log('✅ [LOGIN] Repository refreshed from database after restore');
+            } else {
+              console.log('✅ [LOGIN] Restored repository is up to date');
+            }
+          } else {
+            // NO ARCHIVED REPOSITORY: Download from database
+            console.log(`📥 [LOGIN] No archived repository found - downloading from database for business: ${businessId}`);
+            await repoModule.downloadAllData(businessId, API_BASE_URL);
+            console.log('✅ [LOGIN] Repository created and populated from database');
+          }
         }
       }
     } catch (syncError) {
