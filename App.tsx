@@ -145,39 +145,61 @@ function App(): React.JSX.Element {
       if (authenticated) {
         const auth = await getStoredAuth();
         if (auth?.businessId) {
+          // Small delay to ensure repository write operations from login are complete
+          await new Promise(resolve => setTimeout(resolve, 100));
+          
           // Load data from local repository (single source of truth)
           try {
+            console.log('📥 [App] Loading rewards from repository after login...');
             const loadedRewards = await rewardsRepository.getAll();
+            console.log(`📊 [App] Found ${loadedRewards?.length || 0} rewards in repository`);
+            
             if (loadedRewards && loadedRewards.length > 0) {
-              const rewardsWithQRCodes = ensureRewardsHaveQRCodes(loadedRewards);
+              // Transform rewards to ensure they have all required UI fields (count, total, icon)
+              const icons = ['🎁', '⭐', '📱', '👥', '💎', '🎂', '🎉', '🏆', '🎯', '🎊'];
+              const transformedRewards = loadedRewards.map((reward: any, index: number) => {
+                const transformed = {
+                  ...reward,
+                  // Ensure required UI fields exist - database format may not have these
+                  count: reward.count ?? 0,
+                  total: reward.total ?? reward.requirement ?? 10,
+                  icon: reward.icon || icons[index % icons.length],
+                };
+                console.log(`  - Reward ${transformed.id}: ${transformed.name} (count: ${transformed.count}, total: ${transformed.total}, icon: ${transformed.icon})`);
+                return transformed;
+              });
+              const rewardsWithQRCodes = ensureRewardsHaveQRCodes(transformedRewards);
               setRewards(rewardsWithQRCodes);
-              console.log(`✅ Loaded ${loadedRewards.length} rewards from local repository`);
+              console.log(`✅ [App] Loaded ${loadedRewards.length} rewards from local repository (transformed for UI)`);
             } else {
-              console.log('ℹ️ No rewards in local repository');
+              console.log('ℹ️ [App] No rewards found in local repository');
               setRewards([]);
             }
             
+            console.log('📥 [App] Loading campaigns from repository after login...');
             const loadedCampaigns = await campaignsRepository.getAll();
+            console.log(`📊 [App] Found ${loadedCampaigns?.length || 0} campaigns in repository`);
+            
             if (loadedCampaigns && loadedCampaigns.length > 0) {
               setCampaigns(loadedCampaigns);
-              console.log(`✅ Loaded ${loadedCampaigns.length} campaigns from local repository`);
+              console.log(`✅ [App] Loaded ${loadedCampaigns.length} campaigns from local repository`);
             } else {
-              console.log('ℹ️ No campaigns in local repository');
+              console.log('ℹ️ [App] No campaigns found in local repository');
               setCampaigns([]);
             }
           } catch (repoError) {
-            console.error('Error loading data from repository:', repoError);
+            console.error('❌ [App] Error loading data from repository:', repoError);
             setRewards([]);
             setCampaigns([]);
           }
           
           // Start daily sync service
           startDailySync(auth.businessId);
-          console.log('✅ Daily sync service started');
+          console.log('✅ [App] Daily sync service started');
         }
       }
     } catch (error) {
-      console.error('Error after login:', error);
+      console.error('❌ [App] Error after login:', error);
       setIsAuthenticatedState(false);
     }
   };
@@ -333,9 +355,18 @@ function App(): React.JSX.Element {
     try {
       const loadedRewards = await rewardsRepository.getAll();
       if (loadedRewards && loadedRewards.length > 0) {
-        const rewardsWithQRCodes = ensureRewardsHaveQRCodes(loadedRewards);
+        // Transform rewards to ensure they have all required UI fields (count, total, icon)
+        const icons = ['🎁', '⭐', '📱', '👥', '💎', '🎂', '🎉', '🏆', '🎯', '🎊'];
+        const transformedRewards = loadedRewards.map((reward: any, index: number) => ({
+          ...reward,
+          // Ensure required UI fields exist - database format may not have these
+          count: reward.count ?? 0,
+          total: reward.total ?? reward.requirement ?? 10,
+          icon: reward.icon || icons[index % icons.length],
+        }));
+        const rewardsWithQRCodes = ensureRewardsHaveQRCodes(transformedRewards);
         setRewards(rewardsWithQRCodes);
-        console.log(`✅ Reloaded ${loadedRewards.length} rewards from repository`);
+        console.log(`✅ Reloaded ${loadedRewards.length} rewards from repository (transformed for UI)`);
       } else {
         setRewards([]);
         console.log('ℹ️ No rewards in repository');

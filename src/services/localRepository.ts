@@ -576,8 +576,18 @@ export const downloadAllData = async (businessId: string, apiBaseUrl: string = '
     if (rewardsResponse.ok) {
       const rewardsResult = await rewardsResponse.json();
       if (rewardsResult.success && Array.isArray(rewardsResult.data)) {
-        await rewardsRepository.saveAll(rewardsResult.data);
-        console.log(`✅ ${rewardsResult.data.length} rewards downloaded`);
+        // Transform rewards from database format to UI format
+        // Database format doesn't have count, total, icon - need to add defaults
+        const icons = ['🎁', '⭐', '📱', '👥', '💎', '🎂', '🎉', '🏆', '🎯', '🎊'];
+        const transformedRewards = rewardsResult.data.map((reward: any, index: number) => ({
+          ...reward,
+          // Add UI-required fields if missing
+          count: reward.count || 0, // Default to 0 for new rewards
+          total: reward.total || reward.requirement || 10, // Use requirement as total
+          icon: reward.icon || icons[index % icons.length], // Assign icon from pool
+        }));
+        await rewardsRepository.saveAll(transformedRewards);
+        console.log(`✅ ${transformedRewards.length} rewards downloaded and transformed`);
       }
     }
 
