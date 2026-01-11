@@ -13,6 +13,9 @@ import {
 } from 'react-native';
 import {Colors} from '../constants/Colors';
 import {businessApi, rewardApi} from '../services/api';
+import {rewardsRepository} from '../services/localRepository';
+import {generateRewardQRCode} from '../utils/qrCodeUtils';
+import {businessRepository} from '../services/localRepository';
 
 interface OnboardingFlowProps {
   onComplete: (businessId: string) => void;
@@ -114,20 +117,94 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({onComplete, onSkip}) => 
     setIsLoading(true);
     
     try {
-      const result = await rewardApi.create({
-        businessId,
-        name: rewardName,
-        description: rewardDescription,
-        stampsRequired: parseInt(stampsRequired),
-        type: 'freebie',
-      });
+      const requirementValue = parseInt(stampsRequired, 10);
+      const rewardId = Date.now().toString();
+      const now = new Date().toISOString();
       
-      if (result.success) {
-        setCurrentStep('complete');
-      } else {
-        Alert.alert('Error', result.error || 'Failed to create reward');
+      // Get business profile for QR code generation
+      const profile = await businessRepository.get();
+      
+      // Generate QR code
+      let qrCodeValue: string;
+      try {
+        qrCodeValue = generateRewardQRCode(
+          rewardId,
+          rewardName,
+          requirementValue,
+          'free_product',
+          undefined,
+          undefined,
+          '0000', // Default PIN - can be changed later
+          profile ? {
+            name: profile.name || businessName,
+            address: profile.address || profile.addressLine1,
+            addressLine1: profile.addressLine1,
+            addressLine2: profile.addressLine2,
+            city: profile.city,
+            postcode: profile.postcode,
+            country: profile.country,
+            phone: profile.phone,
+            email: profile.email,
+            website: profile.website,
+            socialMedia: profile.socialMedia,
+          } : undefined,
+          1 // points per purchase
+        );
+      } catch (qrError) {
+        console.error('[Onboarding] Error generating QR code:', qrError);
+        Alert.alert('Error', 'Failed to generate QR code. Please try again.');
+        setIsLoading(false);
+        return;
       }
+      
+      const icons = ['🎁', '⭐', '📱', '👥', '💎', '🎂', '🎉', '🏆', '🎯', '🎊'];
+      const randomIcon = icons[Math.floor(Math.random() * icons.length)];
+      
+      // Create reward object in app format
+      const rewardToSave: any = {
+        id: rewardId,
+        name: rewardName,
+        count: 0,
+        total: requirementValue,
+        icon: randomIcon,
+        type: 'product',
+        requirement: requirementValue,
+        rewardType: 'free_product',
+        description: rewardDescription || '',
+        pinCode: '0000', // Default PIN - can be changed later
+        qrCode: qrCodeValue,
+        status: 'live',
+        createdAt: now,
+        updatedAt: now,
+        pointsPerPurchase: 1,
+      };
+      
+      // IMMEDIATELY save to local repository
+      console.log(`[Onboarding] Immediately saving reward to local repository: ${rewardId}`);
+      await rewardsRepository.save(rewardToSave);
+      console.log(`✅ [Onboarding] Reward saved to local repository: ${rewardId}`);
+      
+      // Also sync to API (async, won't block)
+      try {
+        const result = await rewardApi.create({
+          businessId,
+          name: rewardName,
+          description: rewardDescription,
+          stampsRequired: requirementValue,
+          type: 'freebie',
+        });
+        
+        if (result.success) {
+          console.log('✅ [Onboarding] Reward also synced to API');
+        }
+      } catch (apiError) {
+        console.warn('⚠️ [Onboarding] Failed to sync reward to API (will retry on sync):', apiError);
+        // Don't block - reward is saved locally
+      }
+      
+      setCurrentStep('complete');
     } catch (error) {
+      console.error('[Onboarding] Error creating reward:', error);
       Alert.alert('Error', 'Something went wrong. Please try again.');
     } finally {
       setIsLoading(false);

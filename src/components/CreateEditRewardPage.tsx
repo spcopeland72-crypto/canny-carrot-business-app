@@ -15,21 +15,8 @@ import QRCodeModal from './QRCodeModal';
 import {saveProducts, loadProducts} from '../utils/dataStorage';
 import {generateRewardQRCode} from '../utils/qrCodeUtils';
 import {businessRepository, rewardsRepository} from '../services/localRepository';
-import type {BusinessProfile} from '../types';
-
-interface Reward {
-  id: string;
-  name: string;
-  count: number;
-  total: number;
-  icon: string;
-  type: 'product' | 'action';
-  requirement: number;
-  pointsPerPurchase?: number; // Points allocated per purchase/action
-  rewardType: 'free_product' | 'discount' | 'other';
-  selectedProducts?: string[];
-  selectedActions?: string[];
-}
+import {getStoredAuth} from '../services/authService';
+import type {BusinessProfile, Reward} from '../types';
 
 interface CreateEditRewardPageProps {
   currentScreen: string;
@@ -59,16 +46,14 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
   onSave,
 }) => {
   const isEdit = !!rewardId;
-  const [name, setName] = useState(reward?.name || '');
-  const [type, setType] = useState<'product' | 'action'>(reward?.type || 'product');
-  const [requirement, setRequirement] = useState(reward?.requirement?.toString() || '');
-  const [pointsPerPurchase, setPointsPerPurchase] = useState(reward?.pointsPerPurchase?.toString() || '1');
-  const [rewardType, setRewardType] = useState<
-    'free_product' | 'discount' | 'other'
-  >(reward?.rewardType || 'free_product');
-  const [selectedProducts, setSelectedProducts] = useState<string[]>(reward?.selectedProducts || []);
-  const [selectedActions, setSelectedActions] = useState<string[]>(reward?.selectedActions || []);
-  const [pinCode, setPinCode] = useState(reward?.pinCode || '');
+  const [name, setName] = useState('');
+  const [type, setType] = useState<'product' | 'action'>('product');
+  const [requirement, setRequirement] = useState('');
+  const [pointsPerPurchase, setPointsPerPurchase] = useState('1');
+  const [rewardType, setRewardType] = useState<'free_product' | 'discount' | 'other'>('free_product');
+  const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
+  const [selectedActions, setSelectedActions] = useState<string[]>([]);
+  const [pinCode, setPinCode] = useState('');
   const [businessProfile, setBusinessProfile] = useState<BusinessProfile | null>(null);
   
   // Product management state
@@ -82,6 +67,53 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
   const [createdRewardQrCode, setCreatedRewardQrCode] = useState('');
   const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
 
+  // Load reward data and form fields on mount (if editing)
+  useEffect(() => {
+    const loadRewardData = async () => {
+      if (isEdit && rewardId) {
+        try {
+          // Load reward from repository (DB format)
+          const loadedReward = await rewardsRepository.getById(rewardId);
+          if (loadedReward) {
+            // Map DB format to UI form fields
+            setName(loadedReward.name || '');
+            setRequirement((loadedReward.stampsRequired || loadedReward.costStamps || 10).toString());
+            setPointsPerPurchase((loadedReward.pointsPerPurchase || 1).toString());
+            
+            // Map DB type to UI rewardType
+            if (loadedReward.type === 'discount') {
+              setRewardType('discount');
+            } else if (loadedReward.type === 'freebie' || loadedReward.type === 'product') {
+              setRewardType('free_product');
+            } else {
+              setRewardType('other');
+            }
+            
+            // Default to 'product' for UI type (DB doesn't have product/action distinction)
+            setType('product');
+            
+            setSelectedProducts(loadedReward.selectedProducts || []);
+            setSelectedActions(loadedReward.selectedActions || []);
+            setPinCode(loadedReward.pinCode || '');
+          }
+        } catch (error) {
+          console.error('Error loading reward data:', error);
+        }
+      } else if (reward) {
+        // Fallback: use reward prop if provided (legacy support)
+        setName(reward.name || '');
+        setRequirement((reward as any).requirement?.toString() || (reward as any).stampsRequired?.toString() || '10');
+        setPointsPerPurchase((reward as any).pointsPerPurchase?.toString() || '1');
+        setType((reward as any).type === 'action' ? 'action' : 'product');
+        setRewardType((reward as any).rewardType || 'free_product');
+        setSelectedProducts((reward as any).selectedProducts || []);
+        setSelectedActions((reward as any).selectedActions || []);
+        setPinCode((reward as any).pinCode || '');
+      }
+    };
+    loadRewardData();
+  }, [isEdit, rewardId, reward]);
+  
   // Load products and business profile on mount
   useEffect(() => {
     const loadInitialData = async () => {
@@ -120,7 +152,7 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
     'Post Mentioning Business',
   ];
 
-  const handleSave = () => {
+  const handleSave = async () => {
     try {
       if (!name || !requirement || !pointsPerPurchase) {
         Alert.alert('Error', 'Please fill in all required fields');
@@ -170,8 +202,6 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
         // If it throws an error, it means the data is too large even after optimization
         const qrCodeSize = qrCodeValue.length;
         console.log(`[CreateEditReward] QR code generated successfully: ${qrCodeSize} bytes`);
-        
-        console.log(`[CreateEditReward] QR code generated successfully: ${qrCodeSize} bytes`);
       } catch (qrError) {
         console.error('[CreateEditReward] Error generating QR code:', qrError);
         Alert.alert(
@@ -181,6 +211,79 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
         return;
       }
       
+      const now = new Date().toISOString();
+      
+      // Get business ID for reward
+      const auth = await getStoredAuth();
+      if (!auth?.businessId) {
+        Alert.alert('Error', 'No business ID found - cannot save reward');
+        return;
+      }
+      
+      // Map UI fields to DB format
+      // UI: type='product'|'action', rewardType='free_product'|'discount'|'other'
+      // DB: type='product'|'discount'|'freebie'|'experience'|'voucher'|'upgrade'
+      let dbType: 'product' | 'discount' | 'freebie' | 'experience' | 'voucher' | 'upgrade' = 'freebie';
+      if (rewardType === 'discount') {
+        dbType = 'discount';
+      } else if (rewardType === 'free_product') {
+        dbType = type === 'action' ? 'freebie' : 'freebie';
+      } else {
+        dbType = 'freebie';
+      }
+      
+      // Create reward in DB format directly
+      const rewardToSave: Reward = {
+        id: rewardId,
+        businessId: auth.businessId,
+        name,
+        description: '', // Can be added later if needed
+        stampsRequired: requirementValue,
+        costStamps: requirementValue,
+        type: dbType,
+        isActive: true,
+        validFrom: now,
+        validTo: undefined,
+        expiresAt: undefined,
+        createdAt: isEdit ? reward?.createdAt || now : now,
+        updatedAt: now,
+        currentRedemptions: 0,
+        // App-specific fields (stored but not in core DB type)
+        pinCode,
+        qrCode: qrCodeValue,
+        selectedProducts: type === 'product' ? selectedProducts : undefined,
+        selectedActions: type === 'action' ? selectedActions : undefined,
+        pointsPerPurchase: pointsValue,
+      };
+      
+      // IMMEDIATELY save to local repository (DB format)
+      console.log(`[CreateEditReward] Immediately saving reward to local repository: ${rewardId}`);
+      await rewardsRepository.save(rewardToSave);
+      console.log(`✅ [CreateEditReward] Reward saved to local repository: ${rewardId}`);
+      
+      // IMMEDIATELY write to Redis database (DB format)
+      try {
+        console.log(`[CreateEditReward] Immediately writing reward to Redis: ${rewardId}`);
+        const API_BASE_URL = 'https://api.cannycarrot.com';
+        const response = await fetch(`${API_BASE_URL}/api/v1/rewards`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(rewardToSave),
+        });
+        
+        if (response.ok) {
+          const result = await response.json();
+          console.log(`✅ [CreateEditReward] Reward written to Redis: ${rewardId}`);
+        } else {
+          const errorText = await response.text();
+          console.error(`❌ [CreateEditReward] Failed to write to Redis: ${response.status} ${errorText.substring(0, 200)}`);
+        }
+      } catch (redisError: any) {
+        console.error('[CreateEditReward] Error writing to Redis:', redisError.message);
+        // Don't fail the save if Redis write fails - local save already succeeded
+      }
+      
+      // Call onSave callback if provided (for parent component notifications)
       const rewardData = {
         name,
         type,
@@ -189,11 +292,10 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
         rewardType,
         selectedProducts: type === 'product' ? selectedProducts : undefined,
         selectedActions: type === 'action' ? selectedActions : undefined,
-        pinCode: pinCode, // Include PIN code in reward data
-        qrCode: qrCodeValue, // Include QR code in reward data
+        pinCode,
+        qrCode: qrCodeValue,
       };
       
-      // Call onSave callback if provided
       if (onSave) {
         onSave(rewardData);
       }
@@ -201,9 +303,8 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
       // If creating new reward, show QR code modal with success message
       if (!isEdit) {
         setCreatedRewardName(name);
-        setCreatedRewardQrCode(qrCodeValue); // Store QR code value for display in modal
-        // The reward will be saved with QR code via onSave callback
-        setQrCodeModalVisible(true); // Show QR code modal with success message
+        setCreatedRewardQrCode(qrCodeValue);
+        setQrCodeModalVisible(true);
       } else {
         Alert.alert('Success', 'Reward updated successfully');
         onBack?.();

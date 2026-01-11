@@ -33,46 +33,84 @@ interface SyncMetadata {
   lastDownloadedAt: string | null;
   hasUnsyncedChanges: boolean;
   version: number;
+  lastModified: string | null; // Top-level timestamp: last time ANY part of repository was updated
 }
 
 /**
  * Get sync metadata
+ * CRITICAL: ALWAYS returns a timestamp - if none exists, creates one with current time
  */
 export const getSyncMetadata = async (): Promise<SyncMetadata> => {
   try {
     const data = await AsyncStorage.getItem(REPOSITORY_KEYS.SYNC_METADATA);
     if (data) {
-      return JSON.parse(data);
+      const metadata = JSON.parse(data);
+      // ENSURE timestamp always exists - if null or missing, set to current time
+      if (!metadata.lastModified) {
+        metadata.lastModified = new Date().toISOString();
+        await AsyncStorage.setItem(REPOSITORY_KEYS.SYNC_METADATA, JSON.stringify(metadata));
+      }
+      return metadata;
     }
   } catch (error) {
     console.error('Error getting sync metadata:', error);
   }
-  return {
+  // If no metadata exists, create it with current timestamp
+  const now = new Date().toISOString();
+  const initialMetadata = {
     lastSyncedAt: null,
     lastDownloadedAt: null,
     hasUnsyncedChanges: false,
     version: 0,
+    lastModified: now, // ALWAYS set timestamp on creation
   };
+  // Save initial metadata
+  try {
+    await AsyncStorage.setItem(REPOSITORY_KEYS.SYNC_METADATA, JSON.stringify(initialMetadata));
+  } catch (e) {
+    console.error('Error initializing sync metadata:', e);
+  }
+  return initialMetadata;
 };
 
 /**
  * Update sync metadata
+ * CRITICAL: If updating lastModified, ensures it's never null
  */
 export const updateSyncMetadata = async (updates: Partial<SyncMetadata>): Promise<void> => {
   try {
     const current = await getSyncMetadata();
     const updated = { ...current, ...updates };
+    // ENSURE lastModified is never null - if being set, must be a valid ISO string
+    if (updated.lastModified === null || updated.lastModified === undefined) {
+      console.warn('⚠️ [REPOSITORY] Attempted to set lastModified to null - using current time instead');
+      updated.lastModified = new Date().toISOString();
+    }
     await AsyncStorage.setItem(REPOSITORY_KEYS.SYNC_METADATA, JSON.stringify(updated));
+    console.log(`✅ [REPOSITORY] Sync metadata updated - lastModified: ${updated.lastModified}`);
   } catch (error) {
     console.error('Error updating sync metadata:', error);
+    throw error; // Don't silently fail - this is critical
   }
 };
 
 /**
- * Mark repository as having unsynced changes
+ * Mark repository as having unsynced changes and update lastModified timestamp
+ * CRITICAL: ALWAYS sets timestamp - never allows null
  */
 const markDirty = async (): Promise<void> => {
-  await updateSyncMetadata({ hasUnsyncedChanges: true });
+  const now = new Date().toISOString();
+  console.log(`[REPOSITORY] Marking dirty with timestamp: ${now}`);
+  await updateSyncMetadata({ 
+    hasUnsyncedChanges: true,
+    lastModified: now  // ALWAYS set - never null
+  });
+  // Verify timestamp was set
+  const metadata = await getSyncMetadata();
+  if (!metadata.lastModified) {
+    console.error('❌ [REPOSITORY] CRITICAL: Timestamp was not set! Forcing update...');
+    await updateSyncMetadata({ lastModified: now });
+  }
 };
 
 /**
@@ -116,8 +154,10 @@ export const businessRepository = {
     if (!current) {
       throw new Error('Business profile not found in repository');
     }
-    const updated = { ...current, ...updates, updatedAt: new Date().toISOString() };
+    const now = new Date().toISOString();
+    const updated = { ...current, ...updates, updatedAt: now };
     await businessRepository.save(updated);
+    // Top-level timestamp is updated by markDirty() in save()
   },
 };
 
@@ -131,7 +171,7 @@ export const rewardsRepository = {
   saveAll: async (rewards: Reward[]): Promise<void> => {
     try {
       await AsyncStorage.setItem(REPOSITORY_KEYS.REWARDS, JSON.stringify(rewards));
-      await markDirty();
+      await markDirty(); // Updates top-level lastModified timestamp
       console.log(`✅ ${rewards.length} rewards saved to local repository`);
     } catch (error) {
       console.error('Error saving rewards:', error);
@@ -168,13 +208,15 @@ export const rewardsRepository = {
   save: async (reward: Reward): Promise<void> => {
     const rewards = await rewardsRepository.getAll();
     const index = rewards.findIndex(r => r.id === reward.id);
+    const now = new Date().toISOString();
     
     if (index >= 0) {
-      rewards[index] = { ...reward, updatedAt: new Date().toISOString() };
+      rewards[index] = { ...reward, updatedAt: now };
     } else {
-      rewards.push({ ...reward, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
+      rewards.push({ ...reward, createdAt: now, updatedAt: now });
     }
     
+    // saveAll() will call markDirty() which updates top-level lastModified timestamp
     await rewardsRepository.saveAll(rewards);
   },
 
@@ -482,19 +524,44 @@ export const restoreArchivedRepository = async (businessId: string): Promise<voi
 
 /**
  * Get local repository last update timestamp
+ * Returns the top-level lastModified timestamp from sync metadata
+ * This timestamp indicates when ANY part of the repository was last updated
  */
-export const getLocalRepositoryTimestamp = async (): Promise<string | null> => {
+/**
+ * Get local repository timestamp
+ * CRITICAL: NEVER returns null - if timestamp doesn't exist, creates one and returns it
+ */
+export const getLocalRepositoryTimestamp = async (): Promise<string> => {
   try {
-    const profile = await businessRepository.get();
-    return profile?.updatedAt || null;
+    const metadata = await getSyncMetadata();
+    // getSyncMetadata() now guarantees a timestamp, but double-check
+    if (metadata.lastModified) {
+      return metadata.lastModified;
+    }
+    // If somehow still null, create timestamp now
+    console.warn('⚠️ [REPOSITORY] Timestamp was null - creating new timestamp');
+    const now = new Date().toISOString();
+    await updateSyncMetadata({ lastModified: now });
+    return now;
   } catch (error) {
     console.error('Error getting local repository timestamp:', error);
-    return null;
+    // Even on error, return a timestamp - use current time
+    const now = new Date().toISOString();
+    console.warn(`⚠️ [REPOSITORY] Error getting timestamp - using current time: ${now}`);
+    // Try to save it
+    try {
+      await updateSyncMetadata({ lastModified: now });
+    } catch (e) {
+      console.error('Failed to save timestamp after error:', e);
+    }
+    return now;
   }
 };
 
 /**
- * Get database record timestamp from API
+ * Get database repository timestamp from API
+ * Returns the business.updatedAt timestamp which represents the last time ANY part 
+ * of the repository was updated in Redis (this is the top-level repository timestamp)
  */
 export const getDatabaseRecordTimestamp = async (businessId: string, apiBaseUrl: string = 'https://api.cannycarrot.com'): Promise<string | null> => {
   try {
@@ -503,13 +570,14 @@ export const getDatabaseRecordTimestamp = async (businessId: string, apiBaseUrl:
       const result = await response.json();
       if (result.success && result.data) {
         const businessData = result.data;
-        // Check both updatedAt locations
+        // Business.updatedAt is the top-level repository timestamp in Redis
+        // It should be updated whenever any entity (rewards, campaigns, customers) is modified
         return businessData.updatedAt || businessData.profile?.updatedAt || null;
       }
     }
     return null;
   } catch (error) {
-    console.error('Error getting database record timestamp:', error);
+    console.error('Error getting database repository timestamp:', error);
     return null;
   }
 };
@@ -541,12 +609,17 @@ export const downloadAllData = async (businessId: string, apiBaseUrl: string = '
   console.log('📥 [REPOSITORY] Starting data download from Redis for business:', businessId);
   
   try {
-    // 1. Download business profile
+    // 1. Download business profile and capture repository timestamp
+    let dbRepositoryTimestamp: string | null = null;
     const businessResponse = await fetch(`${apiBaseUrl}/api/v1/businesses/${businessId}`);
     if (businessResponse.ok) {
       const businessResult = await businessResponse.json();
       if (businessResult.success && businessResult.data) {
         const businessData = businessResult.data;
+        // Capture business.updatedAt as the top-level repository timestamp
+        // This represents when ANY part of the repository was last updated in Redis
+        dbRepositoryTimestamp = businessData.updatedAt || businessData.profile?.updatedAt || null;
+        
         const profile: BusinessProfile = {
           id: businessData.id || businessId,
           name: businessData.name || businessData.profile?.name || '',
@@ -566,13 +639,14 @@ export const downloadAllData = async (businessId: string, apiBaseUrl: string = '
           createdAt: businessData.createdAt || businessData.profile?.createdAt,
           updatedAt: businessData.updatedAt || businessData.profile?.updatedAt,
         };
-        await businessRepository.save(profile);
+        // Save profile without marking as dirty (we're downloading, not modifying)
+        await AsyncStorage.setItem(REPOSITORY_KEYS.BUSINESS_PROFILE, JSON.stringify(profile));
         console.log('✅ Business profile downloaded');
       }
     }
 
     // 2. Download rewards
-    // API returns DB format, transform to app format ONCE here, then store in repository
+    // Store DB format directly - no transformation needed
     console.log(`📥 [REPOSITORY] Fetching rewards from API...`);
     const rewardsResponse = await fetch(`${apiBaseUrl}/api/v1/rewards?businessId=${businessId}`);
     
@@ -582,48 +656,18 @@ export const downloadAllData = async (businessId: string, apiBaseUrl: string = '
       if (rewardsResult.success && Array.isArray(rewardsResult.data)) {
         console.log(`📊 [REPOSITORY] API returned ${rewardsResult.data.length} rewards (DB format)`);
         
-        // Transform DB format → App format ONCE
-        // DB format: { id, name, stampsRequired, type, isActive, ... }
-        // App format: { id, name, count, total, icon, type, requirement, rewardType, ... }
-        const icons = ['🎁', '⭐', '📱', '👥', '💎', '🎂', '🎉', '🏆', '🎯', '🎊'];
-        const appFormatRewards = rewardsResult.data.map((dbReward: any, index: number) => {
-          // Map DB fields to app fields
-          const requirement = dbReward.requirement || dbReward.stampsRequired || dbReward.costStamps || 10;
-          const rewardType = dbReward.rewardType || 
-            (dbReward.type === 'freebie' || dbReward.type === 'product' ? 'free_product' : 
-             dbReward.type === 'discount' ? 'discount' : 'other');
-          const uiType = dbReward.type === 'action' ? 'action' : 'product';
-          
-          return {
-            id: dbReward.id,
-            name: dbReward.name || 'Unnamed Reward',
-            count: 0, // Business app doesn't track customer progress here
-            total: requirement,
-            icon: icons[index % icons.length],
-            type: uiType,
-            requirement: requirement,
-            rewardType: rewardType,
-            selectedProducts: dbReward.selectedProducts || [],
-            selectedActions: dbReward.selectedActions || [],
-            qrCode: dbReward.qrCode,
-            pinCode: dbReward.pinCode,
-            description: dbReward.description || '',
-            status: dbReward.status || (dbReward.isActive ? 'live' : 'draft'),
-            createdAt: dbReward.createdAt,
-            updatedAt: dbReward.updatedAt,
-          };
-        });
-        
-        // Store in app format - UI will read this directly
-        await rewardsRepository.saveAll(appFormatRewards);
-        console.log(`✅ [REPOSITORY] ${appFormatRewards.length} rewards transformed (DB→App) and saved`);
+        // Store DB format directly - UI will compute convenience fields at render time
+        await rewardsRepository.saveAll(rewardsResult.data);
+        console.log(`✅ [REPOSITORY] ${rewardsResult.data.length} rewards saved (DB format)`);
       } else {
-        console.log('⚠️ [REPOSITORY] API response invalid - saving empty array');
-        await rewardsRepository.saveAll([]);
+        console.log('⚠️ [REPOSITORY] API response invalid - NOT overwriting local rewards');
+        // CRITICAL: Don't overwrite local rewards with empty array if API response is invalid
+        // This could wipe out local changes that haven't synced yet
+        // Only log warning, keep existing local rewards
       }
     } else {
-      console.error(`❌ [REPOSITORY] API error ${rewardsResponse.status}`);
-      // Don't clear existing rewards on API error
+      console.error(`❌ [REPOSITORY] API error ${rewardsResponse.status} - NOT overwriting local rewards`);
+      // Don't clear existing rewards on API error - preserve local data
     }
 
     // 3. Download campaigns
@@ -646,9 +690,13 @@ export const downloadAllData = async (businessId: string, apiBaseUrl: string = '
       }
     }
 
-    // Update sync metadata
+    // Update sync metadata with database timestamp as the repository timestamp
+    // The business.updatedAt from Redis represents the top-level repository timestamp
+    // Use current time if we couldn't get the database timestamp
+    const finalTimestamp = dbRepositoryTimestamp || new Date().toISOString();
     await updateSyncMetadata({
       lastDownloadedAt: new Date().toISOString(),
+      lastModified: finalTimestamp, // Set top-level timestamp to database timestamp
       hasUnsyncedChanges: false,
     });
 

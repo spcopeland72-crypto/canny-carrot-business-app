@@ -10,6 +10,8 @@ import {
 } from 'react-native';
 import {Colors} from '../constants/Colors';
 import PageTemplate from './PageTemplate';
+import {customersRepository} from '../services/localRepository';
+import type {Customer} from '../types';
 
 interface AddEditCustomerPageProps {
   currentScreen: string;
@@ -32,13 +34,45 @@ const AddEditCustomerPage: React.FC<AddEditCustomerPageProps> = ({
     isEdit ? '8' : '0',
   );
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!name || !email) {
       Alert.alert('Error', 'Please fill in all required fields');
       return;
     }
-    Alert.alert('Success', `Customer ${isEdit ? 'updated' : 'added'} successfully`);
-    onBack?.();
+    
+    try {
+      const now = new Date().toISOString();
+      const newCustomerId = customerId || `customer-${Date.now()}`;
+      const stamps = parseInt(stampsCollected, 10) || 0;
+      const stamps = parseInt(stampsCollected, 10) || 0;
+      
+      // Get existing customer if editing
+      let existingCustomer: Customer | null = null;
+      if (isEdit && customerId) {
+        existingCustomer = await customersRepository.getById(customerId);
+      }
+      
+      // Create or update customer object
+      const customer: Customer = {
+        id: newCustomerId,
+        name,
+        email,
+        phone: phone || undefined,
+        stamps: stamps, // Note: Customer type uses 'stamps' not 'stampsCollected'
+        lastVisit: existingCustomer?.lastVisit, // Preserve last visit on edit
+      };
+      
+      // IMMEDIATELY save to local repository (save method handles create/update)
+      console.log(`[AddEditCustomer] Immediately saving customer to local repository: ${newCustomerId}`);
+      await customersRepository.save(customer);
+      console.log(`✅ [AddEditCustomer] Customer saved to local repository: ${newCustomerId}`);
+      
+      Alert.alert('Success', `Customer ${isEdit ? 'updated' : 'added'} successfully`);
+      onBack?.();
+    } catch (error) {
+      console.error('[AddEditCustomer] Error saving customer:', error);
+      Alert.alert('Error', 'Failed to save customer. Please try again.');
+    }
   };
 
   return (

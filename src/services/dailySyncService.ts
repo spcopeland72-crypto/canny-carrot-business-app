@@ -34,30 +34,46 @@ const syncBusinessProfile = async (profile: BusinessProfile, businessId: string)
 
 /**
  * Sync rewards to Redis
+ * Sends DB format directly - no transformation needed
  */
 const syncRewards = async (rewards: Reward[], businessId: string): Promise<number> => {
   let synced = 0;
+  console.log(`🔄 [SYNC] Syncing ${rewards.length} rewards to Redis...`);
+  
   for (const reward of rewards) {
     try {
-      const url = reward.id 
-        ? `${API_BASE_URL}/api/v1/rewards/${reward.id}`
-        : `${API_BASE_URL}/api/v1/rewards`;
+      // Ensure businessId is set
+      const rewardToSync = {
+        ...reward,
+        businessId: businessId,
+      };
       
-      const method = reward.id ? 'PUT' : 'POST';
+      console.log(`  📤 Syncing reward "${reward.name}" (${reward.id}) to Redis...`);
+      
+      // Always use POST for syncing - the POST endpoint handles both create and update (upsert)
+      // It checks if reward exists and updates, or creates new if not found
+      const url = `${API_BASE_URL}/api/v1/rewards`;
       
       const response = await fetch(url, {
-        method,
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...reward, businessId }),
+        body: JSON.stringify(rewardToSync),
       });
       
       if (response.ok) {
+        const result = await response.json();
+        console.log(`  ✅ Successfully synced reward "${reward.name}" to Redis`);
         synced++;
+      } else {
+        const errorText = await response.text();
+        console.error(`  ❌ Failed to sync reward "${reward.name}": ${response.status} ${errorText.substring(0, 200)}`);
       }
-    } catch (error) {
-      console.error(`Error syncing reward ${reward.id}:`, error);
+    } catch (error: any) {
+      console.error(`  ❌ Error syncing reward ${reward.id} ("${reward.name}"):`, error.message);
     }
   }
+  
+  console.log(`✅ [SYNC] Synced ${synced}/${rewards.length} rewards to Redis`);
   return synced;
 };
 
@@ -121,8 +137,10 @@ const syncCustomers = async (customers: Customer[], businessId: string): Promise
 
 /**
  * Perform daily sync of all repository data to Redis
+ * @param businessId - Business ID to sync
+ * @param forceSync - If true, sync even if hasUnsyncedChanges is false (used on login when local is newer)
  */
-export const performDailySync = async (businessId: string): Promise<{
+export const performDailySync = async (businessId: string, forceSync: boolean = false): Promise<{
   success: boolean;
   synced: {
     profile: boolean;
@@ -150,18 +168,22 @@ export const performDailySync = async (businessId: string): Promise<{
   };
 
   try {
-    console.log('🔄 [DAILY SYNC] Starting daily sync for business:', businessId);
+    console.log(`🔄 [DAILY SYNC] Starting ${forceSync ? 'forced' : 'daily'} sync for business: ${businessId}`);
 
-    // Check if there are unsynced changes
-    const syncStatus = await getSyncStatus();
-    if (!syncStatus.hasUnsyncedChanges) {
-      console.log('ℹ️ [DAILY SYNC] No unsynced changes, skipping sync');
-      isSyncing = false;
-      return {
-        success: true,
-        synced: result,
-        errors: [],
-      };
+    // Check if there are unsynced changes (unless force sync)
+    if (!forceSync) {
+      const syncStatus = await getSyncStatus();
+      if (!syncStatus.hasUnsyncedChanges) {
+        console.log('ℹ️ [DAILY SYNC] No unsynced changes, skipping sync');
+        isSyncing = false;
+        return {
+          success: true,
+          synced: result,
+          errors: [],
+        };
+      }
+    } else {
+      console.log('🔄 [DAILY SYNC] Force sync enabled - syncing all data regardless of dirty flag');
     }
 
     // Sync business profile
@@ -194,11 +216,58 @@ export const performDailySync = async (businessId: string): Promise<{
       errors.push(`Failed to sync ${customers.length - result.customers} customers`);
     }
 
-    // Update sync metadata
-    await updateSyncMetadata({
-      lastSyncedAt: new Date().toISOString(),
-      hasUnsyncedChanges: false,
-    });
+    // IMPORTANT: Update business profile timestamp in Redis to reflect repository update
+    // Since API is a transparent forwarder, we must explicitly update business.updatedAt
+    // This makes business.updatedAt the top-level repository timestamp indicator in Redis
+    const syncTime = new Date().toISOString();
+    const hadSuccessfulSyncs = errors.length === 0 && (result.rewards > 0 || result.campaigns > 0 || result.customers > 0 || result.profile);
+    
+    if (hadSuccessfulSyncs) {
+      // Update business profile timestamp after successful sync to reflect repository state in Redis
+      console.log('🔄 [SYNC] Updating business profile timestamp in Redis to reflect repository sync...');
+      const profile = await businessRepository.get();
+      if (profile) {
+        const updatedProfile = { ...profile, updatedAt: syncTime };
+        const profileSyncSuccess = await syncBusinessProfile(updatedProfile, businessId);
+        if (!profileSyncSuccess) {
+          console.warn('⚠️ [SYNC] Failed to update business profile timestamp in Redis');
+          errors.push('Failed to update business profile timestamp');
+        } else {
+          console.log('✅ [SYNC] Business profile timestamp updated in Redis');
+        }
+      }
+    } else if (errors.length === 0) {
+      console.log('ℹ️ [SYNC] No entities were synced, skipping business profile timestamp update');
+    }
+
+    // Update sync metadata after sync
+    // CRITICAL: Only update lastModified if sync was actually successful
+    // If rewards failed to sync, keep the local timestamp to preserve local data
+    const allRewardsSynced = result.rewards === rewards.length;
+    const allCampaignsSynced = result.campaigns === campaigns.length;
+    const allCustomersSynced = result.customers === customers.length;
+    const syncFullySuccessful = allRewardsSynced && allCampaignsSynced && allCustomersSynced && errors.length === 0;
+    
+    if (syncFullySuccessful) {
+      // All data synced successfully - update timestamp to sync time
+      await updateSyncMetadata({
+        lastSyncedAt: syncTime,
+        lastModified: syncTime, // Repository is now in sync with Redis
+        hasUnsyncedChanges: false,
+      });
+      console.log(`✅ [SYNC] Sync metadata updated - timestamp: ${syncTime}`);
+    } else {
+      // Some data failed to sync - keep local timestamp and mark as dirty
+      // This ensures local data is preserved and will be retried
+      const currentMetadata = await getSyncStatus();
+      await updateSyncMetadata({
+        lastSyncedAt: syncTime,
+        lastModified: currentMetadata.lastModified || syncTime, // Keep existing timestamp
+        hasUnsyncedChanges: true, // Still has unsynced changes
+      });
+      console.warn(`⚠️ [SYNC] Sync incomplete - preserving local timestamp: ${currentMetadata.lastModified || syncTime}`);
+      console.warn(`   Rewards: ${result.rewards}/${rewards.length}, Campaigns: ${result.campaigns}/${campaigns.length}, Customers: ${result.customers}/${customers.length}`);
+    }
 
     console.log('✅ [DAILY SYNC] Sync completed:', result);
     

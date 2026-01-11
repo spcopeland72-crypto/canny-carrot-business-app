@@ -133,7 +133,7 @@ const CompanyMenuModal: React.FC<CompanyMenuModalProps> = ({
             <TouchableOpacity
               style={styles.menuItem}
               onPress={() => handleMenuAction('Business')}>
-              <Text style={styles.menuItemText}>Account Settings</Text>
+              <Text style={styles.menuItemText}>View Account</Text>
               <Text style={styles.menuItemIcon}>→</Text>
             </TouchableOpacity>
 

@@ -257,3 +257,6 @@ canny-carrot-business-app/
 - [ ] Daily sync service starts after login
 - [ ] CORS allows localhost:8082 to connect to API
 
+
+
+

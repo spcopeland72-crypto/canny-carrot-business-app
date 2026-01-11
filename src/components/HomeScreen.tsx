@@ -347,40 +347,64 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
             </View>
           </View>
           
+          {/* Debug: Show rewards count */}
+          {rewards.length === 0 && (
+            <View style={{ padding: 16, backgroundColor: '#fff3cd', borderRadius: 8, marginBottom: 8 }}>
+              <Text style={{ color: '#856404', fontSize: 12 }}>
+                ⚠️ DEBUG: No rewards to display. Props: {propsRewards.length}, Local: {localRewards.length}, Total: {rewards.length}
+              </Text>
+            </View>
+          )}
+          
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.carouselContent}>
-            {rewards.map((reward) => {
-              const progress = ((reward.total - reward.count) / reward.total) * 100;
-              const progressColor = Colors.secondary;
-              return (
-                <TouchableOpacity
-                  key={reward.id}
-                  style={styles.rewardCard}
-                  onPress={() => onNavigate(`EditReward${reward.id}`)}>
-                  <View style={styles.rewardTitleContainer}>
-                    <Text style={styles.rewardTitle}>{reward.name}</Text>
-                  </View>
-                  <View style={styles.rewardProgressContainer}>
-                    <CircularProgress
-                      key={`progress-${reward.id}`}
-                      size={80}
-                      strokeWidth={6}
-                      progress={progress}
-                      color={progressColor}
-                      backgroundColor={Colors.neutral[200]}
-                    />
-                    <View style={styles.rewardIconOverlay}>
-                      <Text style={styles.rewardIcon}>{reward.icon}</Text>
+            {rewards.length > 0 ? (
+              rewards.map((reward) => {
+                const progress = ((reward.total - reward.count) / reward.total) * 100;
+                const progressColor = Colors.secondary;
+                console.log('[HomeScreen] Rendering reward:', { id: reward.id, name: reward.name, count: reward.count, total: reward.total, icon: reward.icon });
+                return (
+                  <TouchableOpacity
+                    key={reward.id}
+                    style={styles.rewardCard}
+                    onPress={() => onNavigate(`EditReward${reward.id}`)}>
+                    <View style={styles.rewardTitleContainer}>
+                      <Text style={styles.rewardTitle}>{reward.name}</Text>
                     </View>
-                  </View>
-                  <Text style={styles.rewardCount}>
-                    {reward.count} / {reward.total}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
+                    <View style={styles.rewardProgressContainer}>
+                      <CircularProgress
+                        key={`progress-${reward.id}`}
+                        size={80}
+                        strokeWidth={6}
+                        progress={progress}
+                        color={progressColor}
+                        backgroundColor={Colors.neutral[200]}
+                      />
+                      <View style={styles.rewardIconOverlay}>
+                        {businessLogo ? (
+                          <Image
+                            source={{uri: businessLogo}}
+                            style={styles.rewardIconImage}
+                            resizeMode="cover"
+                          />
+                        ) : (
+                          <Text style={styles.rewardIcon}>🎁</Text>
+                        )}
+                      </View>
+                    </View>
+                    <Text style={styles.rewardCount}>
+                      {reward.count} / {reward.total}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })
+            ) : (
+              <View style={{ padding: 16, alignItems: 'center' }}>
+                <Text style={{ color: Colors.text.secondary }}>No rewards available</Text>
+              </View>
+            )}
           </ScrollView>
         </View>
 
@@ -886,6 +910,11 @@ const styles = StyleSheet.create({
   },
   rewardIcon: {
     fontSize: 32,
+  },
+  rewardIconImage: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
   },
   rewardCount: {
     fontSize: 11,

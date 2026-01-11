@@ -20,25 +20,33 @@ export interface Customer {
 // REWARD TYPES
 // ============================================
 
-export type RewardStatus = 'live' | 'draft' | 'archived';
-
+// Reward type matches DB format exactly - no transformation needed
 export interface Reward {
   id: string;
+  businessId: string;
   name: string;
-  type: 'product' | 'action';
-  requirement: number;
-  pointsPerPurchase?: number; // Points allocated per purchase/action (default: 1)
-  rewardType: 'free_product' | 'discount' | 'other';
-  productId?: string;
-  action?: string;
-  description?: string;
-  status?: RewardStatus; // live, draft, or archived
-  qrCode?: string;
-  pinCode?: string; // 4-digit PIN code required for redemption
-  selectedProducts?: string[];
-  selectedActions?: string[];
-  createdAt?: string;
-  updatedAt?: string;
+  description: string;
+  stampsRequired: number;        // Required stamps to earn reward
+  costStamps?: number;            // Alias for stampsRequired
+  type: 'product' | 'discount' | 'freebie' | 'experience' | 'voucher' | 'upgrade';
+  value?: number;                 // For discounts, the amount off
+  isActive: boolean;              // Active status (true/false instead of status enum)
+  validFrom: string;              // When reward becomes available
+  validTo?: string;               // When reward expires
+  expiresAt?: string;             // Legacy field (maps to validTo)
+  maxRedemptions?: number;
+  currentRedemptions: number;
+  createdAt: string;
+  updatedAt: string;
+  // App-specific fields (computed at render time, not stored):
+  // - icon (randomly assigned for UI)
+  // - count, total (UI convenience, computed from stampsRequired)
+  // Business app specific fields (stored in DB but not in core type):
+  qrCode?: string;                // QR code data
+  pinCode?: string;               // 4-digit PIN for redemption
+  selectedProducts?: string[];    // Product IDs for product rewards
+  selectedActions?: string[];     // Action types for action rewards
+  pointsPerPurchase?: number;     // Points per purchase/action
 }
 
 // ============================================

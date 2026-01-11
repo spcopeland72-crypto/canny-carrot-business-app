@@ -23,3 +23,6 @@ fs.writeFileSync(path.join(publicDir, 'icon-512.svg'), createSVGIcon(512, '#2D5A
 console.log('✅ Icons generated in public/ directory');
 console.log('Note: SVG icons work for PWA. For PNG, use an image editor or online converter.');
 
+
+
+

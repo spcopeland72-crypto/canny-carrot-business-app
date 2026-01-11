@@ -45,6 +45,7 @@ import {generateRewardQRCode} from './src/utils/qrCodeUtils';
 import {isAuthenticated, getStoredAuth} from './src/services/authService';
 import {rewardsRepository, campaignsRepository, customersRepository} from './src/services/localRepository';
 import {startDailySync} from './src/services/dailySyncService';
+import {dumpRepository} from './src/utils/dumpRepository';
 
 function App(): React.JSX.Element {
   const [currentScreen, setCurrentScreen] = useState<ScreenName>('Home');
@@ -159,8 +160,11 @@ function App(): React.JSX.Element {
               const rewardsWithQRCodes = ensureRewardsHaveQRCodes(loadedRewards);
               setRewards(rewardsWithQRCodes);
               console.log(`✅ [App] Loaded ${loadedRewards.length} rewards from repository (already in app format)`);
+              console.log('📦 [App] Loaded rewards:', loadedRewards.map(r => ({ id: r.id, name: r.name, total: r.total, count: r.count })));
             } else {
               console.log('ℹ️ [App] No rewards found in local repository');
+              console.log('⚠️ [App] DUMPING REPOSITORY TO DEBUG...');
+              await dumpRepository();
               setRewards([]);
             }
             
@@ -247,8 +251,30 @@ function App(): React.JSX.Element {
     };
     const updatedRewards = [...rewards, newReward];
     setRewards(updatedRewards);
-    // Save to local repository (source of truth)
+    
+    // Save to local repository (source of truth) - this marks as dirty
+    console.log(`💾 [App] Saving new reward "${newReward.name}" to local repository...`);
     await rewardsRepository.save(newReward);
+    
+    // Mark repository as having unsynced changes
+    const { updateSyncMetadata } = await import('./src/services/localRepository');
+    await updateSyncMetadata({ hasUnsyncedChanges: true });
+    console.log(`✅ [App] Reward saved to local repository and marked as dirty`);
+    
+    // IMPORTANT: Immediately sync to Redis so it's available on other devices
+    try {
+      const auth = await getStoredAuth();
+      if (auth?.businessId) {
+        console.log(`🔄 [App] Immediately syncing reward to Redis...`);
+        const { performDailySync } = await import('./src/services/dailySyncService');
+        await performDailySync(auth.businessId);
+        console.log(`✅ [App] Reward synced to Redis - should now appear on other devices`);
+      }
+    } catch (syncError) {
+      console.error('❌ [App] Failed to immediately sync reward to Redis:', syncError);
+      // Don't fail reward creation if sync fails - it will retry on daily sync
+    }
+    
     // Also save to legacy storage for backward compatibility
     saveRewards(updatedRewards);
   };
@@ -432,6 +458,11 @@ function App(): React.JSX.Element {
   const renderScreen = () => {
     switch (currentScreen) {
       case 'Home':
+        console.log('[App] Rendering HomeScreen with rewards:', {
+          rewardsCount: rewards.length,
+          rewards: rewards.map(r => ({ id: r.id, name: r.name })),
+          campaignsCount: campaigns.length,
+        });
         return (
           <HomeScreen
             currentScreen={currentScreen}
