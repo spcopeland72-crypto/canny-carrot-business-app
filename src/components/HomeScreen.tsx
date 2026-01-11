@@ -22,6 +22,7 @@ import AnimatedBarChart from './AnimatedBarChart';
 import AnimatedDonutChart from './AnimatedDonutChart';
 import AnimatedAreaChart from './AnimatedAreaChart';
 import {businessRepository, rewardsRepository} from '../services/localRepository';
+import type {Reward} from '../types';
 
 // Logo will use fallback text instead of dynamic requires
 const logoImage = null;
@@ -30,18 +31,7 @@ const SCREEN_WIDTH = Dimensions.get('window').width || 375;
 const CARD_WIDTH = SCREEN_WIDTH * 0.25; // Match customer app width
 const BOX_WIDTH = (SCREEN_WIDTH - 48) / 2; // 16px padding on each side + 16px gap
 
-interface Reward {
-  id: string;
-  name: string;
-  count: number; // Current progress
-  total: number; // Total needed
-  icon: string;
-  type?: 'product' | 'action';
-  requirement?: number;
-  rewardType?: 'free_product' | 'discount' | 'other';
-  selectedProducts?: string[];
-  selectedActions?: string[];
-}
+// Reward type is imported from types/index.ts (DB format)
 
 interface HomeScreenProps {
   currentScreen?: string;
@@ -119,9 +109,18 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
           console.log(`[HomeScreen] Found ${loadedRewards?.length || 0} rewards in repository`);
           
           if (loadedRewards && loadedRewards.length > 0) {
-            // Rewards are already in app format - use directly
+            // Rewards are in DB format - use directly
             setLocalRewards(loadedRewards);
-            console.log(`[HomeScreen] Loaded ${loadedRewards.length} rewards directly from repository`);
+            console.log(`[HomeScreen] Loaded ${loadedRewards.length} rewards directly from repository (DB format)`);
+            console.log(`[HomeScreen] Reward details:`, loadedRewards.map(r => ({ 
+              id: r.id, 
+              name: r.name, 
+              stampsRequired: r.stampsRequired, 
+              isActive: r.isActive,
+              type: r.type 
+            })));
+          } else {
+            console.log(`[HomeScreen] ⚠️ No rewards found in repository`);
           }
         } catch (error) {
           console.error('[HomeScreen] Error loading rewards from repository:', error);
@@ -361,10 +360,13 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.carouselContent}>
             {rewards.length > 0 ? (
-              rewards.map((reward) => {
-                const progress = ((reward.total - reward.count) / reward.total) * 100;
+              rewards.map((reward: Reward) => {
+                // Compute UI fields from DB format
+                const total = reward.stampsRequired || reward.costStamps || 10;
+                const count = 0; // Business app doesn't track customer progress
+                const progress = total > 0 ? ((total - count) / total) * 100 : 0;
                 const progressColor = Colors.secondary;
-                console.log('[HomeScreen] Rendering reward:', { id: reward.id, name: reward.name, count: reward.count, total: reward.total, icon: reward.icon });
+                console.log('[HomeScreen] Rendering reward:', { id: reward.id, name: reward.name, stampsRequired: reward.stampsRequired });
                 return (
                   <TouchableOpacity
                     key={reward.id}
@@ -395,7 +397,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                       </View>
                     </View>
                     <Text style={styles.rewardCount}>
-                      {reward.count} / {reward.total}
+                      {count} / {total}
                     </Text>
                   </TouchableOpacity>
                 );

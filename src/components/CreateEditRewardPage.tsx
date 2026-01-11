@@ -256,32 +256,8 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
         pointsPerPurchase: pointsValue,
       };
       
-      // IMMEDIATELY save to local repository (DB format)
-      console.log(`[CreateEditReward] Immediately saving reward to local repository: ${rewardId}`);
+      // Save to local repository (DB format) - this will also write to Redis
       await rewardsRepository.save(rewardToSave);
-      console.log(`✅ [CreateEditReward] Reward saved to local repository: ${rewardId}`);
-      
-      // IMMEDIATELY write to Redis database (DB format)
-      try {
-        console.log(`[CreateEditReward] Immediately writing reward to Redis: ${rewardId}`);
-        const API_BASE_URL = 'https://api.cannycarrot.com';
-        const response = await fetch(`${API_BASE_URL}/api/v1/rewards`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(rewardToSave),
-        });
-        
-        if (response.ok) {
-          const result = await response.json();
-          console.log(`✅ [CreateEditReward] Reward written to Redis: ${rewardId}`);
-        } else {
-          const errorText = await response.text();
-          console.error(`❌ [CreateEditReward] Failed to write to Redis: ${response.status} ${errorText.substring(0, 200)}`);
-        }
-      } catch (redisError: any) {
-        console.error('[CreateEditReward] Error writing to Redis:', redisError.message);
-        // Don't fail the save if Redis write fails - local save already succeeded
-      }
       
       // Call onSave callback if provided (for parent component notifications)
       const rewardData = {

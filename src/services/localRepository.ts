@@ -204,6 +204,7 @@ export const rewardsRepository = {
 
   /**
    * Add or update a reward
+   * IMMEDIATELY writes to Redis after saving locally
    */
   save: async (reward: Reward): Promise<void> => {
     const rewards = await rewardsRepository.getAll();
@@ -218,6 +219,30 @@ export const rewardsRepository = {
     
     // saveAll() will call markDirty() which updates top-level lastModified timestamp
     await rewardsRepository.saveAll(rewards);
+    
+    // IMMEDIATELY write to Redis
+    try {
+      const { getStoredAuth } = await import('./authService');
+      const auth = await getStoredAuth();
+      if (auth?.businessId && reward.businessId) {
+        const API_BASE_URL = 'https://api.cannycarrot.com';
+        const response = await fetch(`${API_BASE_URL}/api/v1/rewards`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(reward),
+        });
+        
+        if (response.ok) {
+          console.log(`✅ [REPOSITORY] Reward "${reward.name}" written to Redis`);
+        } else {
+          const errorText = await response.text();
+          console.error(`❌ [REPOSITORY] Failed to write reward to Redis: ${response.status} ${errorText.substring(0, 200)}`);
+        }
+      }
+    } catch (redisError: any) {
+      console.error('[REPOSITORY] Error writing reward to Redis:', redisError.message);
+      // Don't fail the save if Redis write fails - local save already succeeded
+    }
   },
 
   /**
