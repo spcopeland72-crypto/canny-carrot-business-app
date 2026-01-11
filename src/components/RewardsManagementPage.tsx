@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   ScrollView,
   Alert,
+  Modal,
 } from 'react-native';
 import {Colors} from '../constants/Colors';
 import PageTemplate from './PageTemplate';
@@ -24,13 +25,17 @@ const RewardsManagementPage: React.FC<RewardsManagementPageProps> = ({
   onBack,
 }) => {
   const [rewards, setRewards] = useState<Reward[]>([]);
+  const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
+  const [rewardToDelete, setRewardToDelete] = useState<Reward | null>(null);
 
   // Load rewards from repository on mount and when screen is focused
   useEffect(() => {
     const loadRewards = async () => {
       try {
-        const loadedRewards = await rewardsRepository.getAll();
+        // Only load active rewards (excludes trashed/inactive)
+        const loadedRewards = await rewardsRepository.getActive();
         setRewards(loadedRewards);
+        console.log(`[RewardsManagement] Loaded ${loadedRewards.length} active rewards`);
       } catch (error) {
         console.error('Error loading rewards:', error);
       }
@@ -43,8 +48,10 @@ const RewardsManagementPage: React.FC<RewardsManagementPageProps> = ({
     if (currentScreen === 'RewardsManagement') {
       const loadRewards = async () => {
         try {
-          const loadedRewards = await rewardsRepository.getAll();
+          // Only load active rewards (excludes trashed/inactive)
+          const loadedRewards = await rewardsRepository.getActive();
           setRewards(loadedRewards);
+          console.log(`[RewardsManagement] Reloaded ${loadedRewards.length} active rewards`);
         } catch (error) {
           console.error('Error loading rewards:', error);
         }
@@ -53,30 +60,32 @@ const RewardsManagementPage: React.FC<RewardsManagementPageProps> = ({
     }
   }, [currentScreen]);
 
-  const handleDelete = async (id: string) => {
-    Alert.alert(
-      'Delete Reward',
-      'Are you sure you want to delete this reward?',
-      [
-        {text: 'Cancel', style: 'cancel'},
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await rewardsRepository.delete(id);
-              // Reload rewards from repository to update UI
-              const loadedRewards = await rewardsRepository.getAll();
-              setRewards(loadedRewards);
-              Alert.alert('Success', 'Reward deleted successfully');
-            } catch (error) {
-              console.error('Error deleting reward:', error);
-              Alert.alert('Error', 'Failed to delete reward. Please try again.');
-            }
-          },
-        },
-      ],
-    );
+  const handleDelete = (reward: Reward) => {
+    console.log(`[RewardsManagement] Delete button clicked for reward: ${reward.id} - ${reward.name}`);
+    setRewardToDelete(reward);
+    setDeleteConfirmVisible(true);
+  };
+
+  const confirmDeleteReward = async () => {
+    if (!rewardToDelete) return;
+    
+    try {
+      console.log(`[RewardsManagement] Confirming deletion of reward: ${rewardToDelete.id}`);
+      await rewardsRepository.delete(rewardToDelete.id);
+      
+      // Reload active rewards from repository to update UI
+      const loadedRewards = await rewardsRepository.getActive();
+      setRewards(loadedRewards);
+      console.log(`[RewardsManagement] Reward deleted, ${loadedRewards.length} active rewards remaining`);
+      
+      setDeleteConfirmVisible(false);
+      setRewardToDelete(null);
+    } catch (error) {
+      console.error('[RewardsManagement] Error deleting reward:', error);
+      Alert.alert('Error', 'Failed to delete reward. Please try again.');
+      setDeleteConfirmVisible(false);
+      setRewardToDelete(null);
+    }
   };
 
   return (
@@ -125,7 +134,10 @@ const RewardsManagementPage: React.FC<RewardsManagementPageProps> = ({
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={styles.deleteButton}
-                    onPress={() => handleDelete(reward.id)}>
+                    onPress={() => {
+                      console.log(`[RewardsManagement] Delete button pressed for: ${reward.name}`);
+                      handleDelete(reward);
+                    }}>
                     <Text style={styles.deleteButtonText}>Delete</Text>
                   </TouchableOpacity>
                 </View>
@@ -134,6 +146,37 @@ const RewardsManagementPage: React.FC<RewardsManagementPageProps> = ({
           )}
         </ScrollView>
       </View>
+
+      {/* Delete Confirmation Modal - same as CreateEditRewardPage */}
+      <Modal
+        visible={deleteConfirmVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setDeleteConfirmVisible(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.deleteModal}>
+            <Text style={styles.deleteModalTitle}>Delete Reward?</Text>
+            <Text style={styles.deleteModalMessage}>
+              Are you sure you want to delete "{rewardToDelete?.name}"? This action cannot be undone.
+            </Text>
+            <View style={styles.deleteModalButtons}>
+              <TouchableOpacity
+                style={[styles.deleteModalButton, styles.deleteModalButtonCancel]}
+                onPress={() => {
+                  setDeleteConfirmVisible(false);
+                  setRewardToDelete(null);
+                }}>
+                <Text style={styles.deleteModalButtonTextCancel}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.deleteModalButton, styles.deleteModalButtonDelete]}
+                onPress={confirmDeleteReward}>
+                <Text style={styles.deleteModalButtonTextDelete}>Delete</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </PageTemplate>
   );
 };
@@ -232,6 +275,59 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: Colors.text.secondary,
     textAlign: 'center',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  deleteModal: {
+    backgroundColor: Colors.background,
+    borderRadius: 16,
+    padding: 24,
+    width: '85%',
+    maxWidth: 400,
+    alignItems: 'center',
+  },
+  deleteModalTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: Colors.text.primary,
+    marginBottom: 12,
+  },
+  deleteModalMessage: {
+    fontSize: 16,
+    color: Colors.text.secondary,
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  deleteModalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    width: '100%',
+  },
+  deleteModalButton: {
+    flex: 1,
+    padding: 14,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  deleteModalButtonCancel: {
+    backgroundColor: Colors.neutral[200],
+  },
+  deleteModalButtonDelete: {
+    backgroundColor: '#FF3B30',
+  },
+  deleteModalButtonTextCancel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: Colors.text.primary,
+  },
+  deleteModalButtonTextDelete: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: Colors.background,
   },
 });
 

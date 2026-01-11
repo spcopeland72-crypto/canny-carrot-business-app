@@ -105,13 +105,14 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
       if (propsRewards.length === 0) {
         try {
           console.log('[HomeScreen] Props rewards empty - loading directly from repository...');
-          const loadedRewards = await rewardsRepository.getAll();
-          console.log(`[HomeScreen] Found ${loadedRewards?.length || 0} rewards in repository`);
+          // Only load active rewards (excludes trashed/inactive)
+          const loadedRewards = await rewardsRepository.getActive();
+          console.log(`[HomeScreen] Found ${loadedRewards?.length || 0} active rewards in repository`);
           
           if (loadedRewards && loadedRewards.length > 0) {
             // Rewards are in DB format - use directly
             setLocalRewards(loadedRewards);
-            console.log(`[HomeScreen] Loaded ${loadedRewards.length} rewards directly from repository (DB format)`);
+            console.log(`[HomeScreen] Loaded ${loadedRewards.length} active rewards directly from repository (DB format)`);
             console.log(`[HomeScreen] Reward details:`, loadedRewards.map(r => ({ 
               id: r.id, 
               name: r.name, 
@@ -120,7 +121,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
               type: r.type 
             })));
           } else {
-            console.log(`[HomeScreen] ⚠️ No rewards found in repository`);
+            console.log(`[HomeScreen] ⚠️ No active rewards found in repository`);
           }
         } catch (error) {
           console.error('[HomeScreen] Error loading rewards from repository:', error);

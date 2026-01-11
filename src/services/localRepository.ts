@@ -18,6 +18,7 @@ const REPOSITORY_KEYS = {
   SYNC_METADATA: 'local_repo:sync_metadata',
   LAST_SYNC: 'local_repo:last_sync',
   CURRENT_BUSINESS_ID: 'local_repo:current_business_id', // Track which business the primary repo belongs to
+  REWARDS_TRASH: 'local_repo:rewards_trash', // Trash folder for deleted rewards
 } as const;
 
 // Archived repository key pattern: archived_repo:{businessId}:{key}
@@ -246,13 +247,49 @@ export const rewardsRepository = {
   },
 
   /**
-   * Delete a reward
-   * Only deletes locally - sync to Redis happens on logout or manual sync
+   * Delete a reward - moves to trash and marks as inactive
+   * NO REDIS activity - only local repository changes
    */
   delete: async (rewardId: string): Promise<void> => {
+    console.log(`🗑️ [REPOSITORY] Deleting reward: ${rewardId}`);
     const rewards = await rewardsRepository.getAll();
-    const filtered = rewards.filter(r => r.id !== rewardId);
-    await rewardsRepository.saveAll(filtered);
+    const rewardToDelete = rewards.find(r => r.id === rewardId);
+    
+    if (!rewardToDelete) {
+      console.warn(`⚠️ [REPOSITORY] Reward ${rewardId} not found for deletion`);
+      return;
+    }
+    
+    // Mark reward as inactive instead of removing it
+    const now = new Date().toISOString();
+    rewardToDelete.isActive = false;
+    rewardToDelete.updatedAt = now;
+    
+    // Move to trash folder
+    const trashRewards = await rewardsRepository.getTrash();
+    const existingTrashIndex = trashRewards.findIndex(r => r.id === rewardId);
+    if (existingTrashIndex >= 0) {
+      trashRewards[existingTrashIndex] = rewardToDelete;
+    } else {
+      trashRewards.push(rewardToDelete);
+    }
+    
+    // Save trash folder
+    try {
+      await AsyncStorage.setItem(REPOSITORY_KEYS.REWARDS_TRASH, JSON.stringify(trashRewards));
+      console.log(`✅ [REPOSITORY] Reward "${rewardToDelete.name}" moved to trash`);
+    } catch (error) {
+      console.error('[REPOSITORY] Error saving to trash:', error);
+    }
+    
+    // Update the reward in main rewards list (mark as inactive)
+    const updatedRewards = rewards.map(r => r.id === rewardId ? rewardToDelete : r);
+    await rewardsRepository.saveAll(updatedRewards);
+    
+    // Mark repository as dirty
+    await markDirty();
+    
+    console.log(`✅ [REPOSITORY] Reward "${rewardToDelete.name}" marked as inactive and moved to trash`);
   },
 };
 
