@@ -205,32 +205,16 @@ export const rewardsRepository = {
   /**
    * Add or update a reward
    * IMMEDIATELY writes to Redis after saving locally
-   * Ensures reward is in DB format before saving
    */
   save: async (reward: Reward): Promise<void> => {
     const rewards = await rewardsRepository.getAll();
     const index = rewards.findIndex(r => r.id === reward.id);
     const now = new Date().toISOString();
     
-    // Ensure DB format - handle old format rewards
-    const stampsRequired = reward.stampsRequired || reward.costStamps || (reward as any).requirement || 10;
-    const rewardInDbFormat: Reward = {
-      ...reward,
-      stampsRequired: stampsRequired,
-      costStamps: stampsRequired,
-      type: reward.type || 'freebie',
-      isActive: reward.isActive !== undefined ? reward.isActive : true,
-      currentRedemptions: reward.currentRedemptions !== undefined ? reward.currentRedemptions : 0,
-      createdAt: reward.createdAt || now,
-      updatedAt: now,
-      description: reward.description || '',
-      validFrom: reward.validFrom || now,
-    };
-    
     if (index >= 0) {
-      rewards[index] = { ...rewardInDbFormat, updatedAt: now };
+      rewards[index] = { ...reward, updatedAt: now };
     } else {
-      rewards.push(rewardInDbFormat);
+      rewards.push({ ...reward, createdAt: now, updatedAt: now });
     }
     
     // saveAll() will call markDirty() which updates top-level lastModified timestamp
@@ -240,12 +224,12 @@ export const rewardsRepository = {
     try {
       const { getStoredAuth } = await import('./authService');
       const auth = await getStoredAuth();
-      if (auth?.businessId && rewardInDbFormat.businessId) {
+      if (auth?.businessId && reward.businessId) {
         const API_BASE_URL = 'https://api.cannycarrot.com';
         const response = await fetch(`${API_BASE_URL}/api/v1/rewards`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(rewardInDbFormat),
+          body: JSON.stringify(reward),
         });
         
         if (response.ok) {
