@@ -42,13 +42,25 @@ const syncRewards = async (rewards: Reward[], businessId: string): Promise<numbe
   
   for (const reward of rewards) {
     try {
-      // Ensure businessId is set
-      const rewardToSync = {
+      // Convert to DB format - handle old format rewards that might have 'requirement' instead of 'stampsRequired'
+      const stampsRequired = reward.stampsRequired || reward.costStamps || (reward as any).requirement || 10;
+      
+      const rewardToSync: Reward = {
         ...reward,
         businessId: businessId,
+        stampsRequired: stampsRequired,
+        costStamps: stampsRequired,
+        // Ensure required DB format fields
+        type: reward.type || 'freebie',
+        isActive: reward.isActive !== undefined ? reward.isActive : true,
+        currentRedemptions: reward.currentRedemptions !== undefined ? reward.currentRedemptions : 0,
+        createdAt: reward.createdAt || new Date().toISOString(),
+        updatedAt: reward.updatedAt || new Date().toISOString(),
+        description: reward.description || '',
       };
       
       console.log(`  📤 Syncing reward "${reward.name}" (${reward.id}) to Redis...`);
+      console.log(`     stampsRequired: ${stampsRequired}, type: ${rewardToSync.type}, isActive: ${rewardToSync.isActive}`);
       
       // Always use POST for syncing - the POST endpoint handles both create and update (upsert)
       // It checks if reward exists and updates, or creates new if not found
