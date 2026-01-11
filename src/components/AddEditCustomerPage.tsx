@@ -44,7 +44,6 @@ const AddEditCustomerPage: React.FC<AddEditCustomerPageProps> = ({
       const now = new Date().toISOString();
       const newCustomerId = customerId || `customer-${Date.now()}`;
       const stamps = parseInt(stampsCollected, 10) || 0;
-      const stamps = parseInt(stampsCollected, 10) || 0;
       
       // Get existing customer if editing
       let existingCustomer: Customer | null = null;
