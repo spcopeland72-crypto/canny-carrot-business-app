@@ -247,6 +247,7 @@ export const rewardsRepository = {
 
   /**
    * Delete a reward
+   * Only deletes locally - sync to Redis happens on logout or manual sync
    */
   delete: async (rewardId: string): Promise<void> => {
     const rewards = await rewardsRepository.getAll();

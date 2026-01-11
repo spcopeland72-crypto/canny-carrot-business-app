@@ -11,6 +11,7 @@ import {
 import {Colors} from '../constants/Colors';
 import {businessRepository} from '../services/localRepository';
 import {logoutBusiness, getStoredAuth} from '../services/authService';
+import {performDailySync} from '../services/dailySyncService';
 
 interface CompanyMenuModalProps {
   visible: boolean;
@@ -54,6 +55,21 @@ const CompanyMenuModal: React.FC<CompanyMenuModalProps> = ({
     }
   }, [visible]);
 
+  const handleSync = async () => {
+    try {
+      onClose();
+      const auth = await getStoredAuth();
+      if (auth?.businessId) {
+        await performDailySync(auth.businessId, true);
+        console.log('✅ Sync completed successfully');
+      } else {
+        console.error('No business ID found for sync');
+      }
+    } catch (error) {
+      console.error('Error syncing:', error);
+    }
+  };
+
   const handleLogout = async () => {
     try {
       await logoutBusiness();
@@ -66,16 +82,19 @@ const CompanyMenuModal: React.FC<CompanyMenuModalProps> = ({
   };
 
   const handleMenuAction = (action: string) => {
-    onClose();
     if (action === 'logout') {
       handleLogout();
+    } else if (action === 'sync') {
+      handleSync();
     } else if (action === 'theme') {
       // Toggle theme
       const newTheme = theme === 'light' ? 'dark' : 'light';
       setTheme(newTheme);
       // TODO: Implement theme system
       console.log('Theme changed to:', newTheme);
+      onClose();
     } else {
+      onClose();
       onNavigate(action);
     }
   };
@@ -134,6 +153,13 @@ const CompanyMenuModal: React.FC<CompanyMenuModalProps> = ({
               style={styles.menuItem}
               onPress={() => handleMenuAction('Business')}>
               <Text style={styles.menuItemText}>View Account</Text>
+              <Text style={styles.menuItemIcon}>→</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => handleMenuAction('sync')}>
+              <Text style={styles.menuItemText}>Sync</Text>
               <Text style={styles.menuItemIcon}>→</Text>
             </TouchableOpacity>
 

@@ -425,10 +425,13 @@ function App(): React.JSX.Element {
       const { logoutBusiness } = await import('./src/services/authService');
       await logoutBusiness();
       console.log('✅ Logged out - returning to login screen');
-      setIsAuthenticatedState(false);
-      setCurrentScreen('Login' as ScreenName);
     } catch (error) {
       console.error('Error logging out:', error);
+      // Continue with logout even if logoutBusiness fails
+    } finally {
+      // Always update state to show login screen, even if logoutBusiness fails
+      setIsAuthenticatedState(false);
+      setCurrentScreen('Home');
     }
   };
 

@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useState, useEffect} from 'react';
 import {
   View,
   Text,
@@ -9,15 +9,8 @@ import {
 } from 'react-native';
 import {Colors} from '../constants/Colors';
 import PageTemplate from './PageTemplate';
-
-interface Reward {
-  id: string;
-  name: string;
-  type: 'product' | 'action';
-  requirement: number;
-  rewardType: 'free_product' | 'discount' | 'other';
-  active: boolean;
-}
+import {rewardsRepository} from '../services/localRepository';
+import type {Reward} from '../types';
 
 interface RewardsManagementPageProps {
   currentScreen: string;
@@ -30,26 +23,37 @@ const RewardsManagementPage: React.FC<RewardsManagementPageProps> = ({
   onNavigate,
   onBack,
 }) => {
-  const [rewards, setRewards] = useState<Reward[]>([
-    {
-      id: '1',
-      name: 'Buy 10 Get 1 Free',
-      type: 'product',
-      requirement: 10,
-      rewardType: 'free_product',
-      active: true,
-    },
-    {
-      id: '2',
-      name: 'Write Review Reward',
-      type: 'action',
-      requirement: 1,
-      rewardType: 'discount',
-      active: true,
-    },
-  ]);
+  const [rewards, setRewards] = useState<Reward[]>([]);
 
-  const handleDelete = (id: string) => {
+  // Load rewards from repository on mount and when screen is focused
+  useEffect(() => {
+    const loadRewards = async () => {
+      try {
+        const loadedRewards = await rewardsRepository.getAll();
+        setRewards(loadedRewards);
+      } catch (error) {
+        console.error('Error loading rewards:', error);
+      }
+    };
+    loadRewards();
+  }, []);
+
+  // Reload rewards when screen becomes focused (e.g., after returning from edit page)
+  useEffect(() => {
+    if (currentScreen === 'RewardsManagement') {
+      const loadRewards = async () => {
+        try {
+          const loadedRewards = await rewardsRepository.getAll();
+          setRewards(loadedRewards);
+        } catch (error) {
+          console.error('Error loading rewards:', error);
+        }
+      };
+      loadRewards();
+    }
+  }, [currentScreen]);
+
+  const handleDelete = async (id: string) => {
     Alert.alert(
       'Delete Reward',
       'Are you sure you want to delete this reward?',
@@ -58,8 +62,17 @@ const RewardsManagementPage: React.FC<RewardsManagementPageProps> = ({
         {
           text: 'Delete',
           style: 'destructive',
-          onPress: () => {
-            setRewards(rewards.filter(r => r.id !== id));
+          onPress: async () => {
+            try {
+              await rewardsRepository.delete(id);
+              // Reload rewards from repository to update UI
+              const loadedRewards = await rewardsRepository.getAll();
+              setRewards(loadedRewards);
+              Alert.alert('Success', 'Reward deleted successfully');
+            } catch (error) {
+              console.error('Error deleting reward:', error);
+              Alert.alert('Error', 'Failed to delete reward. Please try again.');
+            }
           },
         },
       ],
@@ -80,42 +93,45 @@ const RewardsManagementPage: React.FC<RewardsManagementPageProps> = ({
         </TouchableOpacity>
 
         <ScrollView style={styles.list}>
-          {rewards.map((reward) => (
-            <View key={reward.id} style={styles.rewardCard}>
-              <View style={styles.rewardInfo}>
-                <Text style={styles.rewardName}>{reward.name}</Text>
-                <Text style={styles.rewardDetail}>
-                  Type: {reward.type === 'product' ? 'Product Purchase' : 'Action'}
-                </Text>
-                <Text style={styles.rewardDetail}>
-                  Requirement: {reward.requirement}{' '}
-                  {reward.type === 'product' ? 'purchases' : 'action(s)'}
-                </Text>
-                <Text style={styles.rewardDetail}>
-                  Reward: {reward.rewardType.replace('_', ' ')}
-                </Text>
-                <Text
-                  style={[
-                    styles.status,
-                    reward.active ? styles.statusActive : styles.statusInactive,
-                  ]}>
-                  {reward.active ? 'Active' : 'Inactive'}
-                </Text>
-              </View>
-              <View style={styles.actions}>
-                <TouchableOpacity
-                  style={styles.editButton}
-                  onPress={() => onNavigate(`EditReward${reward.id}`)}>
-                  <Text style={styles.editButtonText}>Edit</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.deleteButton}
-                  onPress={() => handleDelete(reward.id)}>
-                  <Text style={styles.deleteButtonText}>Delete</Text>
-                </TouchableOpacity>
-              </View>
+          {rewards.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyStateText}>No rewards yet</Text>
+              <Text style={styles.emptyStateSubtext}>Create your first reward to get started</Text>
             </View>
-          ))}
+          ) : (
+            rewards.map((reward) => (
+              <View key={reward.id} style={styles.rewardCard}>
+                <View style={styles.rewardInfo}>
+                  <Text style={styles.rewardName}>{reward.name}</Text>
+                  <Text style={styles.rewardDetail}>
+                    Requirement: {reward.stampsRequired || reward.costStamps || 0} stamps
+                  </Text>
+                  <Text style={styles.rewardDetail}>
+                    Type: {reward.type}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.status,
+                      reward.isActive ? styles.statusActive : styles.statusInactive,
+                    ]}>
+                    {reward.isActive ? 'Active' : 'Inactive'}
+                  </Text>
+                </View>
+                <View style={styles.actions}>
+                  <TouchableOpacity
+                    style={styles.editButton}
+                    onPress={() => onNavigate(`EditReward${reward.id}`)}>
+                    <Text style={styles.editButtonText}>Edit</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.deleteButton}
+                    onPress={() => handleDelete(reward.id)}>
+                    <Text style={styles.deleteButtonText}>Delete</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ))
+          )}
         </ScrollView>
       </View>
     </PageTemplate>
@@ -200,6 +216,22 @@ const styles = StyleSheet.create({
   deleteButtonText: {
     color: Colors.background,
     fontWeight: '600',
+  },
+  emptyState: {
+    padding: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyStateText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: Colors.text.primary,
+    marginBottom: 8,
+  },
+  emptyStateSubtext: {
+    fontSize: 14,
+    color: Colors.text.secondary,
+    textAlign: 'center',
   },
 });
 

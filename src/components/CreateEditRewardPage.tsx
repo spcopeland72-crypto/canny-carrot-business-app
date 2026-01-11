@@ -57,8 +57,7 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
   const [businessProfile, setBusinessProfile] = useState<BusinessProfile | null>(null);
   
   // Product management state
-  const defaultProducts = ['Product 1', 'Product 2', 'Product 3'];
-  const [products, setProducts] = useState<string[]>(defaultProducts);
+  const [products, setProducts] = useState<string[]>([]);
   const [dropdownVisible, setDropdownVisible] = useState(false);
   const [createProductModalVisible, setCreateProductModalVisible] = useState(false);
   const [newProductName, setNewProductName] = useState('');
@@ -120,11 +119,18 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
       try {
         // Load products
         const loadedProducts = await loadProducts();
-        if (loadedProducts && Array.isArray(loadedProducts) && loadedProducts.length > 0) {
-          setProducts(loadedProducts);
+        if (loadedProducts && Array.isArray(loadedProducts)) {
+          // Filter out dummy products if they exist
+          const filteredProducts = loadedProducts.filter(p => 
+            p !== 'Product 1' && p !== 'Product 2' && p !== 'Product 3'
+          );
+          setProducts(filteredProducts);
+          // Save filtered list back if dummy products were removed
+          if (filteredProducts.length !== loadedProducts.length) {
+            await saveProducts(filteredProducts);
+          }
         } else {
-          setProducts(defaultProducts);
-          await saveProducts(defaultProducts);
+          setProducts([]);
         }
         
         // Load business profile
@@ -135,7 +141,7 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
         }
       } catch (error) {
         console.error('Error loading initial data:', error);
-        setProducts(defaultProducts);
+        setProducts([]);
       }
     };
     loadInitialData();
@@ -386,12 +392,6 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
   };
 
   const handleDeleteProduct = async (product: string) => {
-    // Don't allow deleting default products
-    if (defaultProducts.includes(product)) {
-      Alert.alert('Cannot Delete', 'Default products cannot be deleted.');
-      return;
-    }
-
     Alert.alert(
       'Delete Product',
       `Are you sure you want to delete "${product}"? This action cannot be undone.`,
@@ -574,13 +574,11 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
                               {product}
                             </Text>
                           </TouchableOpacity>
-                          {!defaultProducts.includes(product) && (
-                            <TouchableOpacity
-                              style={styles.deleteProductButton}
-                              onPress={() => handleDeleteProduct(product)}>
-                              <Text style={styles.deleteProductButtonText}>🗑️</Text>
-                            </TouchableOpacity>
-                          )}
+                          <TouchableOpacity
+                            style={styles.deleteProductButton}
+                            onPress={() => handleDeleteProduct(product)}>
+                            <Text style={styles.deleteProductButtonText}>🗑️</Text>
+                          </TouchableOpacity>
                         </View>
                       ))}
                     </ScrollView>
@@ -768,13 +766,26 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
       <QRCodeModal
         visible={qrCodeModalVisible}
         title={createdRewardName}
-        qrValue={createdRewardQrCode || reward?.qrCode || (reward?.id ? generateRewardQRCode(
-          reward.id,
-          reward.name,
-          reward.requirement || 1,
-          reward.rewardType || 'free_product',
-          reward.selectedProducts
-        ) : '')}
+        qrValue={createdRewardQrCode || reward?.qrCode || (reward?.id ? (() => {
+          // Map DB type to QR code rewardType format
+          let qrRewardType: 'free_product' | 'discount' | 'other' = 'free_product';
+          if (reward.type === 'discount') {
+            qrRewardType = 'discount';
+          } else if (reward.type === 'freebie' || reward.type === 'product') {
+            qrRewardType = 'free_product';
+          } else {
+            qrRewardType = 'other';
+          }
+          return generateRewardQRCode(
+            reward.id,
+            reward.name,
+            reward.stampsRequired || reward.costStamps || 1,
+            qrRewardType,
+            reward.selectedProducts,
+            reward.selectedActions,
+            reward.pinCode || ''
+          );
+        })() : '')}
         showSuccessMessage={!isEdit} // Show "Reward created!" for new rewards
         onClose={() => {
           setQrCodeModalVisible(false);
