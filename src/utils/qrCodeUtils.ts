@@ -5,7 +5,7 @@
  * for reward codes, campaign codes, and business codes.
  * 
  * Formats:
- * - Reward: REWARD:{id}:{name}:{requirement}:{rewardType}:{products}
+ * - Reward: REWARD:{id}:{name}:{requirement}:{rewardType}:{products}:{pinCode}
  * - Company: COMPANY:{number}:{name}
  * - Campaign: CAMPAIGN:{id}:{name}:{description}
  */
@@ -16,6 +16,7 @@ export interface ParsedRewardQR {
   requirement: number;
   rewardType: string;
   products: string[];
+  pinCode?: string;
 }
 
 export interface ParsedCompanyQR {
@@ -37,7 +38,7 @@ export type ParsedQR =
 
 /**
  * Generate QR code for a reward
- * Format: JSON string containing reward details + business profile data + PIN
+ * Format: REWARD:{id}:{name}:{requirement}:{rewardType}:{products}:{pinCode}
  */
 export const generateRewardQRCode = (
   id: string,
@@ -47,99 +48,14 @@ export const generateRewardQRCode = (
   products?: string[],
   actions?: string[],
   pinCode?: string,
-  businessProfile?: {
-    name: string;
-    address?: string;
-    addressLine1?: string;
-    addressLine2?: string;
-    city?: string;
-    postcode?: string;
-    country?: string;
-    phone?: string;
-    email?: string;
-    website?: string;
-    logo?: string; // Business logo/icon URL or base64
-    socialMedia?: {
-      facebook?: string;
-      instagram?: string;
-      twitter?: string;
-      tiktok?: string;
-      linkedin?: string;
-    };
-  },
-  pointsPerPurchase?: number // Points allocated per purchase/action
+  businessProfile?: any, // Ignored - not used in string format
+  pointsPerPurchase?: number // Ignored - not used in string format
 ): string => {
-  const qrData = {
-    type: 'reward',
-    reward: {
-      id,
-      name,
-      requirement,
-      pointsPerPurchase: pointsPerPurchase || 1, // Default to 1 point per transaction
-      rewardType,
-      products: products || [],
-      actions: actions || [],
-      pinCode: pinCode || '',
-    },
-    business: businessProfile ? {
-      name: businessProfile.name,
-      address: businessProfile.address || 
-        [businessProfile.addressLine1, businessProfile.addressLine2, businessProfile.city, businessProfile.postcode, businessProfile.country]
-          .filter(Boolean)
-          .join(', '),
-      phone: businessProfile.phone || '',
-      email: businessProfile.email || '',
-      website: businessProfile.website || '',
-      // Note: Logo is NOT included in QR code to keep data size manageable
-      // QR codes have limited capacity (~2,953 bytes max), and base64 images are too large
-      // Logo is stored separately in business profile and can be displayed from there
-      // logo: businessProfile.logo || '', // Excluded to prevent QR code data overflow
-      socialMedia: businessProfile.socialMedia || {},
-    } : undefined,
-    version: '1.0',
-    createdAt: new Date().toISOString(),
-  };
+  // Simple string format: REWARD:{id}:{name}:{requirement}:{rewardType}:{products}:{pinCode}
+  const productsStr = (products || []).join(',');
+  const pinCodeStr = pinCode || '';
   
-  const qrCodeString = JSON.stringify(qrData);
-  
-  // Validate QR code size before returning
-  // QR codes have limited capacity:
-  // - Version 1-10: ~100-500 bytes
-  // - Version 40 (max): ~2,953 bytes for alphanumeric
-  // We'll use a conservative limit of 2000 bytes to ensure reliability
-  const MAX_QR_SIZE = 2000;
-  if (qrCodeString.length > MAX_QR_SIZE) {
-    console.error(`[qrCodeUtils] QR code too large: ${qrCodeString.length} bytes (max: ${MAX_QR_SIZE})`);
-    // Remove optional fields to reduce size
-    const minimalQrData = {
-      type: 'reward',
-      reward: {
-        id,
-        name: name.substring(0, 50), // Truncate name if too long
-        requirement,
-        pointsPerPurchase: pointsPerPurchase || 1,
-        rewardType,
-        products: (products || []).slice(0, 5), // Limit products
-        actions: (actions || []).slice(0, 5), // Limit actions
-        pinCode: pinCode || '',
-      },
-      business: businessProfile ? {
-        name: businessProfile.name.substring(0, 50), // Truncate business name
-        // Remove address, phone, email, website to reduce size
-      } : undefined,
-      version: '1.0',
-    };
-    
-    const minimalQrString = JSON.stringify(minimalQrData);
-    if (minimalQrString.length > MAX_QR_SIZE) {
-      throw new Error(`QR code data too large (${qrCodeString.length} bytes). Please reduce reward information (shorter name, fewer products, etc.).`);
-    }
-    
-    console.warn(`[qrCodeUtils] QR code reduced from ${qrCodeString.length} to ${minimalQrString.length} bytes`);
-    return minimalQrString;
-  }
-  
-  return qrCodeString;
+  return `REWARD:${id}:${name}:${requirement}:${rewardType}:${productsStr}:${pinCodeStr}`;
 };
 
 /**
@@ -220,8 +136,30 @@ export const parseQRCode = (qrValue: string): ParsedQR => {
       return { type: 'unknown', data: null };
     }
     
-    if (parts.length >= 5) {
-      // Full format: {id}:{name}:{requirement}:{rewardType}:{products}
+    if (parts.length >= 6) {
+      // Full format with PIN: {id}:{name}:{requirement}:{rewardType}:{products}:{pinCode}
+      const id = parts[0] || 'unknown';
+      const pinCode = parts[parts.length - 1] || '';
+      const productsStr = parts[parts.length - 2] || '';
+      const rewardType = parts[parts.length - 3] || 'free_product';
+      const requirement = parseInt(parts[parts.length - 4], 10) || 1;
+      // Everything between id and requirement is the name
+      const name = parts.slice(1, parts.length - 4).join(':') || 'Unnamed Reward';
+      const products = productsStr ? productsStr.split(',').filter(p => p.trim()) : [];
+      
+      return {
+        type: 'reward',
+        data: {
+          id,
+          name,
+          requirement,
+          rewardType,
+          products,
+          pinCode,
+        },
+      };
+    } else if (parts.length >= 5) {
+      // Format without PIN (legacy): {id}:{name}:{requirement}:{rewardType}:{products}
       const id = parts[0] || 'unknown';
       const productsStr = parts[parts.length - 1] || '';
       const rewardType = parts[parts.length - 2] || 'free_product';
