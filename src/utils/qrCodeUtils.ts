@@ -48,14 +48,14 @@ export const generateRewardQRCode = (
   products?: string[],
   actions?: string[],
   pinCode?: string,
-  businessProfile?: any, // Ignored - not used in string format
-  pointsPerPurchase?: number // Ignored - not used in string format
+  businessProfile?: any,
+  pointsPerPurchase?: number
 ): string => {
-  // Simple string format: REWARD:{id}:{name}:{requirement}:{rewardType}:{products}:{pinCode}
-  const productsStr = (products || []).join(',');
-  const pinCodeStr = pinCode || '';
-  
-  return `REWARD:${id}:${name}:${requirement}:${rewardType}:${productsStr}:${pinCodeStr}`;
+  const productsValue = products && products.length > 0
+    ? products.join(',')
+    : '';
+  const pinCodeValue = pinCode || '';
+  return `REWARD:${id}:${name}:${requirement}:${rewardType}:${productsValue}:${pinCodeValue}`;
 };
 
 /**
@@ -211,14 +211,3 @@ export const isValidQRCode = (qrValue: string): boolean => {
          normalized.startsWith('COMPANY:') || 
          normalized.startsWith('CAMPAIGN:');
 };
-
-
-
-
-
-
-
-
-
-
-
