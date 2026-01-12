@@ -55,6 +55,7 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
   const [selectedActions, setSelectedActions] = useState<string[]>([]);
   const [pinCode, setPinCode] = useState('');
   const [businessProfile, setBusinessProfile] = useState<BusinessProfile | null>(null);
+  const [loadedRewardId, setLoadedRewardId] = useState<string | null>(null);
   
   // Product management state
   const [products, setProducts] = useState<string[]>([]);
@@ -74,6 +75,9 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
           // Load reward from repository (DB format)
           const loadedReward = await rewardsRepository.getById(rewardId);
           if (loadedReward) {
+            // Store the loaded reward ID to prevent duplicate creation
+            setLoadedRewardId(loadedReward.id);
+            
             // Map DB format to UI form fields
             setName(loadedReward.name || '');
             setRequirement((loadedReward.stampsRequired || loadedReward.costStamps || 10).toString());
@@ -192,14 +196,26 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
       }
       
       // Generate QR code value using shared utility with business profile data
-      const rewardId = reward?.id || Date.now().toString();
+      // Use rewardId prop, loadedRewardId, reward prop id, or generate new ID (in that order)
+      const rewardIdToSave = rewardId || loadedRewardId || reward?.id || Date.now().toString();
       const requirementValue = parseInt(requirement, 10);
       const pointsValue = parseInt(pointsPerPurchase, 10) || 1;
+      
+      console.log('[CreateEditReward] Saving reward:', {
+        isEdit,
+        rewardId,
+        loadedRewardId,
+        rewardIdToSave,
+        name,
+        requirementValue,
+        rewardType,
+        stampsRequired: requirementValue,
+      });
       
       let qrCodeValue: string;
       try {
         qrCodeValue = generateRewardQRCode(
-          rewardId,
+          rewardIdToSave,
           name,
           requirementValue,
           rewardType,
@@ -253,14 +269,20 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
       if (rewardType === 'discount') {
         dbType = 'discount';
       } else if (rewardType === 'free_product') {
-        dbType = type === 'action' ? 'freebie' : 'freebie';
+        dbType = 'freebie'; // Both product and action map to freebie for free_product
       } else {
-        dbType = 'freebie';
+        dbType = 'freebie'; // Default to freebie for 'other'
       }
+      
+      console.log('[CreateEditReward] Type mapping:', {
+        rewardType,
+        dbType,
+        type,
+      });
       
       // Create reward in DB format directly
       const rewardToSave: Reward = {
-        id: rewardId,
+        id: rewardIdToSave,
         businessId: auth.businessId,
         name,
         description: '', // Can be added later if needed
