@@ -120,12 +120,37 @@ const markDirty = async (): Promise<void> => {
 export const businessRepository = {
   /**
    * Save business profile to local repository
+   * IMMEDIATELY writes to Redis after saving locally
    */
   save: async (profile: BusinessProfile): Promise<void> => {
     try {
       await AsyncStorage.setItem(REPOSITORY_KEYS.BUSINESS_PROFILE, JSON.stringify(profile));
       await markDirty();
       console.log('✅ Business profile saved to local repository');
+      
+      // IMMEDIATELY write to Redis
+      try {
+        const { getStoredAuth } = await import('./authService');
+        const auth = await getStoredAuth();
+        if (auth?.businessId && profile.id) {
+          const API_BASE_URL = 'https://api.cannycarrot.com';
+          const response = await fetch(`${API_BASE_URL}/api/v1/businesses/${profile.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(profile),
+          });
+          
+          if (response.ok) {
+            console.log(`✅ [REPOSITORY] Business profile written to Redis (${profile.products?.length || 0} products, ${profile.actions?.length || 0} actions)`);
+          } else {
+            const errorText = await response.text();
+            console.error(`❌ [REPOSITORY] Failed to write business profile to Redis: ${response.status} ${errorText.substring(0, 200)}`);
+          }
+        }
+      } catch (redisError: any) {
+        console.error('[REPOSITORY] Error writing business profile to Redis:', redisError.message);
+        // Don't fail the save if Redis write fails - local save already succeeded
+      }
     } catch (error) {
       console.error('Error saving business profile:', error);
       throw error;
@@ -169,10 +194,12 @@ export const rewardsRepository = {
   /**
    * Save all rewards to local repository
    */
-  saveAll: async (rewards: Reward[]): Promise<void> => {
+  saveAll: async (rewards: Reward[], skipMarkDirty: boolean = false): Promise<void> => {
     try {
       await AsyncStorage.setItem(REPOSITORY_KEYS.REWARDS, JSON.stringify(rewards));
-      await markDirty(); // Updates top-level lastModified timestamp
+      if (!skipMarkDirty) {
+        await markDirty(); // Updates top-level lastModified timestamp
+      }
       console.log(`✅ ${rewards.length} rewards saved to local repository`);
     } catch (error) {
       console.error('Error saving rewards:', error);
