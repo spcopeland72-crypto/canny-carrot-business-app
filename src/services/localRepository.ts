@@ -262,6 +262,15 @@ export const rewardsRepository = {
         
         if (response.ok) {
           console.log(`✅ [REPOSITORY] Reward "${reward.name}" written to Redis`);
+          
+          // Update business.updatedAt timestamp to reflect repository update
+          try {
+            const { updateBusinessTimestamp } = await import('./timestampUpdater');
+            await updateBusinessTimestamp(auth.businessId);
+          } catch (timestampError: any) {
+            console.warn(`⚠️ [REPOSITORY] Error updating business timestamp: ${timestampError.message || timestampError}`);
+            // Don't fail the save if timestamp update fails
+          }
         } else {
           const errorText = await response.text();
           console.error(`❌ [REPOSITORY] Failed to write reward to Redis: ${response.status} ${errorText.substring(0, 200)}`);
