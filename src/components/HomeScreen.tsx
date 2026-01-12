@@ -38,6 +38,15 @@ try {
 // Banner image disabled - using green background instead
 let bannerImage: any = null;
 
+// Load CC icon for banner logo
+let ccIconImage: any = null;
+try {
+  ccIconImage = require('../../assets/cc-icon-no-background.png');
+  console.log('[HomeScreen] CC icon loaded from assets');
+} catch (e) {
+  console.log('[HomeScreen] CC icon not found in assets:', e);
+}
+
 // Load social media icons from Images folder
 let facebookIcon: any = null;
 let instagramIcon: any = null;
@@ -458,9 +467,17 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                   </View>
                 </View>
                 <View style={styles.bannerLogoContainer}>
-                  <View style={styles.bannerLogoPlaceholder}>
-                    <Text style={styles.bannerLogoText}>Logo</Text>
-                  </View>
+                  {ccIconImage ? (
+                    <Image
+                      source={ccIconImage}
+                      style={styles.bannerLogoImage}
+                      resizeMode="contain"
+                    />
+                  ) : (
+                    <View style={styles.bannerLogoPlaceholder}>
+                      <Text style={styles.bannerLogoText}>Logo</Text>
+                    </View>
+                  )}
                 </View>
               </View>
             </View>
@@ -1092,6 +1109,11 @@ const styles = StyleSheet.create({
     height: 103,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  bannerLogoImage: {
+    width: 103,
+    height: 103,
+    resizeMode: 'contain',
   },
   bannerLogoPlaceholder: {
     width: 103,
