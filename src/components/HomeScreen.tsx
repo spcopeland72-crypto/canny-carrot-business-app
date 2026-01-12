@@ -10,6 +10,7 @@ import {
   SafeAreaView,
   Image,
   FlatList,
+  Linking,
 } from 'react-native';
 import {Colors} from '../constants/Colors';
 import BottomNavigation from './BottomNavigation';
@@ -32,6 +33,33 @@ try {
 } catch (e) {
   console.log('[HomeScreen] Logo not found in assets:', e);
   logoImage = null;
+}
+
+// Load banner image (same as customer app)
+let bannerImage: any = null;
+try {
+  bannerImage = require('../../assets/banner.png');
+  console.log('[HomeScreen] Banner loaded from assets');
+} catch (e) {
+  console.log('[HomeScreen] Banner not found in assets:', e);
+  bannerImage = null;
+}
+
+// Load social media icons from Images folder
+let facebookIcon: any = null;
+let instagramIcon: any = null;
+let tiktokIcon: any = null;
+let xIcon: any = null;
+let linkedinIcon: any = null;
+
+try {
+  facebookIcon = require('../../Images/facebook.png');
+  instagramIcon = require('../../Images/instagram.png');
+  tiktokIcon = require('../../Images/tiktok.png');
+  xIcon = require('../../Images/x.png');
+  linkedinIcon = require('../../Images/linkedin.png');
+} catch (e) {
+  console.log('[HomeScreen] Social icons not found:', e);
 }
 
 const SCREEN_WIDTH = Dimensions.get('window').width || 375;
@@ -71,8 +99,16 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   const [companyMenuVisible, setCompanyMenuVisible] = useState(false);
   const [hasUnreadNotifications] = useState(true);
   const [logoError, setLogoError] = useState(false);
+  const [bannerError, setBannerError] = useState(false);
   const [businessName, setBusinessName] = useState('Business'); // Default until loaded from repository
   const [businessLogo, setBusinessLogo] = useState<string | null>(null); // Business logo from profile
+  const [socialIcons, setSocialIcons] = useState<{
+    facebook?: any;
+    instagram?: any;
+    tiktok?: any;
+    x?: any;
+    linkedin?: any;
+  }>({});
 
   // Local state for rewards as fallback if props are empty
   const [localRewards, setLocalRewards] = useState<Reward[]>([]);
@@ -103,6 +139,17 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
       }
     };
     loadBusinessData();
+  }, []);
+
+  // Set social media icons from module-level variables
+  useEffect(() => {
+    setSocialIcons({
+      facebook: facebookIcon,
+      instagram: instagramIcon,
+      tiktok: tiktokIcon,
+      x: xIcon,
+      linkedin: linkedinIcon,
+    });
   }, []);
 
   // Fallback: Load rewards directly from repository if props are empty
@@ -337,6 +384,155 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}>
+        
+        {/* Marketing Banner Section - same as customer app */}
+        <View style={styles.bannerSection}>
+          {bannerImage && !bannerError ? (
+            <Image
+              source={bannerImage}
+              style={styles.bannerImage}
+              resizeMode="cover"
+              onError={() => {
+                console.log('Banner image failed to load');
+                setBannerError(true);
+              }}
+            />
+          ) : (
+            <View style={styles.banner}>
+              <View style={styles.bannerContent}>
+                <View style={styles.bannerTextContainer}>
+                  <Text style={styles.bannerTitle}>Canny Carrot</Text>
+                  <Text style={styles.bannerSubtitle}>Rewards</Text>
+                  {/* Social Media Icons */}
+                  <View style={styles.socialIconsContainer}>
+                    {socialIcons.facebook && (
+                      <TouchableOpacity
+                        style={[styles.socialIcon, {marginRight: 7}]}
+                        onPress={() => Linking.openURL('https://www.facebook.com/CannyCarrotRewards')}>
+                        <Image
+                          source={socialIcons.facebook}
+                          style={styles.socialIconImage}
+                          resizeMode="contain"
+                        />
+                      </TouchableOpacity>
+                    )}
+                    {socialIcons.instagram && (
+                      <TouchableOpacity
+                        style={[styles.socialIcon, {marginRight: 7}]}
+                        onPress={() => Linking.openURL('https://www.instagram.com/cannycarrotrewards')}>
+                        <Image
+                          source={socialIcons.instagram}
+                          style={styles.socialIconImage}
+                          resizeMode="contain"
+                        />
+                      </TouchableOpacity>
+                    )}
+                    {socialIcons.tiktok && (
+                      <TouchableOpacity
+                        style={[styles.socialIcon, {marginRight: 7}]}
+                        onPress={() => Linking.openURL('https://www.tiktok.com/@cannycarrotrewards')}>
+                        <Image
+                          source={socialIcons.tiktok}
+                          style={styles.socialIconImage}
+                          resizeMode="contain"
+                        />
+                      </TouchableOpacity>
+                    )}
+                    {socialIcons.x && (
+                      <TouchableOpacity
+                        style={[styles.socialIcon, {marginRight: 7}]}
+                        onPress={() => Linking.openURL('https://twitter.com/CannyCarrotRew')}>
+                        <Image
+                          source={socialIcons.x}
+                          style={styles.socialIconImage}
+                          resizeMode="contain"
+                        />
+                      </TouchableOpacity>
+                    )}
+                    {socialIcons.linkedin && (
+                      <TouchableOpacity
+                        style={styles.socialIcon}
+                        onPress={() => Linking.openURL('https://www.linkedin.com/company/canny-carrot-rewards')}>
+                        <Image
+                          source={socialIcons.linkedin}
+                          style={styles.socialIconImage}
+                          resizeMode="contain"
+                        />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </View>
+                <View style={styles.bannerLogoContainer}>
+                  <View style={styles.bannerLogoPlaceholder}>
+                    <Text style={styles.bannerLogoText}>Logo</Text>
+                  </View>
+                </View>
+              </View>
+            </View>
+          )}
+          {/* Social Media Icons for banner with image */}
+          {bannerImage && !bannerError && (
+            <View style={styles.bannerSocialIconsOverlay}>
+              <View style={styles.socialIconsContainer}>
+                {socialIcons.facebook && (
+                  <TouchableOpacity
+                    style={[styles.socialIcon, {marginRight: 7}]}
+                    onPress={() => Linking.openURL('https://www.facebook.com/CannyCarrotRewards')}>
+                    <Image
+                      source={socialIcons.facebook}
+                      style={styles.socialIconImage}
+                      resizeMode="contain"
+                    />
+                  </TouchableOpacity>
+                )}
+                {socialIcons.instagram && (
+                  <TouchableOpacity
+                    style={[styles.socialIcon, {marginRight: 7}]}
+                    onPress={() => Linking.openURL('https://www.instagram.com/cannycarrotrewards')}>
+                    <Image
+                      source={socialIcons.instagram}
+                      style={styles.socialIconImage}
+                      resizeMode="contain"
+                    />
+                  </TouchableOpacity>
+                )}
+                {socialIcons.tiktok && (
+                  <TouchableOpacity
+                    style={[styles.socialIcon, {marginRight: 7}]}
+                    onPress={() => Linking.openURL('https://www.tiktok.com/@cannycarrotrewards')}>
+                    <Image
+                      source={socialIcons.tiktok}
+                      style={styles.socialIconImage}
+                      resizeMode="contain"
+                    />
+                  </TouchableOpacity>
+                )}
+                {socialIcons.x && (
+                  <TouchableOpacity
+                    style={[styles.socialIcon, {marginRight: 7}]}
+                    onPress={() => Linking.openURL('https://twitter.com/CannyCarrotRew')}>
+                    <Image
+                      source={socialIcons.x}
+                      style={styles.socialIconImage}
+                      resizeMode="contain"
+                    />
+                  </TouchableOpacity>
+                )}
+                {socialIcons.linkedin && (
+                  <TouchableOpacity
+                    style={styles.socialIcon}
+                    onPress={() => Linking.openURL('https://www.linkedin.com/company/canny-carrot-rewards')}>
+                    <Image
+                      source={socialIcons.linkedin}
+                      style={styles.socialIconImage}
+                      resizeMode="contain"
+                    />
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+          )}
+        </View>
         
         {/* Rewards Carousel - Round Elements (matching customer app) */}
         <View style={styles.section}>
@@ -834,6 +1030,87 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingBottom: 100,
+  },
+  bannerSection: {
+    marginBottom: 24,
+    width: '100%',
+    position: 'relative',
+  },
+  bannerImage: {
+    width: '100%',
+    height: 171,
+  },
+  banner: {
+    backgroundColor: Colors.secondary, // Orange background
+    paddingHorizontal: 20,
+    paddingVertical: 17,
+    minHeight: 128,
+    justifyContent: 'center',
+    width: '100%',
+  },
+  bannerContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: '100%',
+  },
+  bannerTextContainer: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  bannerTitle: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: Colors.background,
+    marginBottom: 4,
+  },
+  bannerSubtitle: {
+    fontSize: 21,
+    fontWeight: '600',
+    color: Colors.background,
+    marginBottom: 8,
+  },
+  socialIconsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  socialIcon: {
+    width: 27,
+    height: 27,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  socialIconImage: {
+    width: 27,
+    height: 27,
+  },
+  bannerSocialIconsOverlay: {
+    position: 'absolute',
+    bottom: 12,
+    left: 20,
+    right: 20,
+    zIndex: 10,
+  },
+  bannerLogoContainer: {
+    width: 103,
+    height: 103,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  bannerLogoPlaceholder: {
+    width: 103,
+    height: 103,
+    borderRadius: 51,
+    backgroundColor: Colors.background,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 3,
+    borderColor: Colors.neutral[300],
+  },
+  bannerLogoText: {
+    fontSize: 12,
+    color: Colors.text.secondary,
   },
   section: {
     marginBottom: 32,
