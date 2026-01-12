@@ -136,11 +136,11 @@ const deleteAllCampaigns = async (businessId: string): Promise<void> => {
 
 /**
  * Delete all customers for a business from Redis
- * Note: If DELETE endpoint doesn't exist, we'll overwrite by writing all local customers
+ * Note: Customers are managed via full replacement - we just overwrite with local data
  */
 const deleteAllCustomers = async (businessId: string): Promise<void> => {
   try {
-    console.log(`🗑️ [FULL SYNC] Fetching all customers for business ${businessId}...`);
+    console.log(`🗑️ [FULL SYNC] Checking customers for business ${businessId}...`);
     
     // Get all customer IDs for this business
     const response = await fetch(`${API_BASE_URL}/api/v1/businesses/${businessId}/customers`);
@@ -148,12 +148,18 @@ const deleteAllCustomers = async (businessId: string): Promise<void> => {
       const result = await response.json();
       if (result.success && Array.isArray(result.data)) {
         const customerIds = result.data.map((c: Customer) => c.id);
-        console.log(`🗑️ [FULL SYNC] Found ${customerIds.length} customers in Redis`);
-        console.log(`ℹ️ [FULL SYNC] Customers will be overwritten by local data (DELETE may not be available)`);
+        console.log(`🗑️ [FULL SYNC] Found ${customerIds.length} customers in Redis (will be overwritten by local data)`);
       }
+    } else if (response.status === 404) {
+      // 404 means no customers exist - this is fine, just log it
+      console.log(`ℹ️ [FULL SYNC] No customers found in Redis (404)`);
+    } else {
+      // Other error - log but don't fail
+      const errorText = await response.text();
+      console.warn(`⚠️ [FULL SYNC] Failed to fetch customers: ${response.status} ${errorText.substring(0, 100)}`);
     }
-  } catch (error) {
-    console.error('❌ [FULL SYNC] Error fetching customers:', error);
+  } catch (error: any) {
+    console.warn(`⚠️ [FULL SYNC] Error fetching customers (non-critical):`, error.message || error);
   }
 };
 
