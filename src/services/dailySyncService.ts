@@ -20,14 +20,23 @@ let isSyncing = false;
  */
 const syncBusinessProfile = async (profile: BusinessProfile, businessId: string): Promise<boolean> => {
   try {
+    console.log(`  📤 Syncing business profile for ${businessId} to Redis...`);
     const response = await fetch(`${API_BASE_URL}/api/v1/businesses/${businessId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(profile),
     });
-    return response.ok;
-  } catch (error) {
-    console.error('Error syncing business profile:', error);
+    
+    if (response.ok) {
+      console.log(`  ✅ Successfully synced business profile to Redis`);
+      return true;
+    } else {
+      const errorText = await response.text();
+      console.error(`  ❌ Failed to sync business profile: ${response.status} ${errorText.substring(0, 200)}`);
+      return false;
+    }
+  } catch (error: any) {
+    console.error('  ❌ Error syncing business profile:', error.message || error);
     return false;
   }
 };
@@ -194,8 +203,8 @@ export const performDailySync = async (businessId: string, forceSync: boolean = 
       }
     }
 
-    // Sync rewards
-    const rewards = await rewardsRepository.getAll();
+    // Sync rewards - only sync active rewards (exclude deleted/inactive)
+    const rewards = await rewardsRepository.getActive();
     result.rewards = await syncRewards(rewards, businessId);
     if (result.rewards < rewards.length) {
       errors.push(`Failed to sync ${rewards.length - result.rewards} rewards`);
@@ -215,29 +224,10 @@ export const performDailySync = async (businessId: string, forceSync: boolean = 
       errors.push(`Failed to sync ${customers.length - result.customers} customers`);
     }
 
-    // IMPORTANT: Update business profile timestamp in Redis to reflect repository update
-    // Since API is a transparent forwarder, we must explicitly update business.updatedAt
-    // This makes business.updatedAt the top-level repository timestamp indicator in Redis
-    const syncTime = new Date().toISOString();
-    const hadSuccessfulSyncs = errors.length === 0 && (result.rewards > 0 || result.campaigns > 0 || result.customers > 0 || result.profile);
-    
-    if (hadSuccessfulSyncs) {
-      // Update business profile timestamp after successful sync to reflect repository state in Redis
-      console.log('🔄 [SYNC] Updating business profile timestamp in Redis to reflect repository sync...');
-      const profile = await businessRepository.get();
-      if (profile) {
-        const updatedProfile = { ...profile, updatedAt: syncTime };
-        const profileSyncSuccess = await syncBusinessProfile(updatedProfile, businessId);
-        if (!profileSyncSuccess) {
-          console.warn('⚠️ [SYNC] Failed to update business profile timestamp in Redis');
-          errors.push('Failed to update business profile timestamp');
-        } else {
-          console.log('✅ [SYNC] Business profile timestamp updated in Redis');
-        }
-      }
-    } else if (errors.length === 0) {
-      console.log('ℹ️ [SYNC] No entities were synced, skipping business profile timestamp update');
-    }
+    // CRITICAL: Do NOT update business.updatedAt in Redis during sync
+    // Redis timestamps should ONLY change when admin logs in and makes changes
+    // App syncs should NOT modify Redis timestamps - they only write data
+    // The API is a transparent forwarder and does not update timestamps
 
     // Update sync metadata after sync
     // CRITICAL: Only update lastModified if sync was actually successful

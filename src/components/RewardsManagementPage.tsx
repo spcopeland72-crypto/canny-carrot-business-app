@@ -101,7 +101,7 @@ const RewardsManagementPage: React.FC<RewardsManagementPageProps> = ({
           <Text style={styles.addButtonText}>+ Create New Reward</Text>
         </TouchableOpacity>
 
-        <ScrollView style={styles.list}>
+        <View style={styles.list}>
           {rewards.length === 0 ? (
             <View style={styles.emptyState}>
               <Text style={styles.emptyStateText}>No rewards yet</Text>
@@ -134,8 +134,10 @@ const RewardsManagementPage: React.FC<RewardsManagementPageProps> = ({
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={styles.deleteButton}
+                    activeOpacity={0.7}
                     onPress={() => {
-                      console.log(`[RewardsManagement] Delete button pressed for: ${reward.name}`);
+                      console.log('[RewardsManagement] Delete button TOUCHED');
+                      console.log(`[RewardsManagement] Delete button pressed for: ${reward.name} (ID: ${reward.id})`);
                       handleDelete(reward);
                     }}>
                     <Text style={styles.deleteButtonText}>Delete</Text>
@@ -144,7 +146,7 @@ const RewardsManagementPage: React.FC<RewardsManagementPageProps> = ({
               </View>
             ))
           )}
-        </ScrollView>
+        </View>
       </View>
 
       {/* Delete Confirmation Modal - same as CreateEditRewardPage */}
