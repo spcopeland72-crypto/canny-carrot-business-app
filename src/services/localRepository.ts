@@ -265,8 +265,17 @@ export const rewardsRepository = {
     rewardToDelete.isActive = false;
     rewardToDelete.updatedAt = now;
     
-    // Move to trash folder
-    const trashRewards = await rewardsRepository.getTrash();
+    // Move to trash folder - inline logic to avoid circular reference
+    let trashRewards: Reward[] = [];
+    try {
+      const trashData = await AsyncStorage.getItem(REPOSITORY_KEYS.REWARDS_TRASH);
+      if (trashData) {
+        trashRewards = JSON.parse(trashData);
+      }
+    } catch (error) {
+      console.error('[REPOSITORY] Error reading trash:', error);
+    }
+    
     const existingTrashIndex = trashRewards.findIndex(r => r.id === rewardId);
     if (existingTrashIndex >= 0) {
       trashRewards[existingTrashIndex] = rewardToDelete;
@@ -290,6 +299,29 @@ export const rewardsRepository = {
     await markDirty();
     
     console.log(`✅ [REPOSITORY] Reward "${rewardToDelete.name}" marked as inactive and moved to trash`);
+  },
+
+  /**
+   * Get all active rewards (isActive: true)
+   */
+  getActive: async (): Promise<Reward[]> => {
+    const rewards = await rewardsRepository.getAll();
+    return rewards.filter(r => r.isActive !== false); // Include rewards where isActive is undefined or true
+  },
+
+  /**
+   * Get all rewards from trash
+   */
+  getTrash: async (): Promise<Reward[]> => {
+    try {
+      const data = await AsyncStorage.getItem(REPOSITORY_KEYS.REWARDS_TRASH);
+      if (data) {
+        return JSON.parse(data);
+      }
+    } catch (error) {
+      console.error('[REPOSITORY] Error getting trash:', error);
+    }
+    return [];
   },
 };
 
