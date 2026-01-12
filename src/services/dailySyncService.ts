@@ -51,10 +51,24 @@ const syncRewards = async (rewards: Reward[], businessId: string): Promise<numbe
   
   for (const reward of rewards) {
     try {
+      // Validate required fields before syncing
+      if (!reward.name || !reward.businessId && !businessId) {
+        console.warn(`  ⚠️ Skipping reward ${reward.id} - missing required fields (name: ${!!reward.name}, businessId: ${!!(reward.businessId || businessId)})`);
+        continue;
+      }
+      
+      // Validate stampsRequired - must be a valid number
+      const stampsRequired = reward.stampsRequired || reward.costStamps;
+      if (!stampsRequired || (typeof stampsRequired !== 'number' && isNaN(Number(stampsRequired)))) {
+        console.warn(`  ⚠️ Skipping reward "${reward.name}" (${reward.id}) - missing or invalid stampsRequired`);
+        continue;
+      }
+      
       // Ensure businessId is set
       const rewardToSync = {
         ...reward,
-        businessId: businessId,
+        businessId: reward.businessId || businessId,
+        stampsRequired: stampsRequired, // Ensure stampsRequired is set
       };
       
       console.log(`  📤 Syncing reward "${reward.name}" (${reward.id}) to Redis...`);
