@@ -759,13 +759,14 @@ export const downloadAllData = async (businessId: string, apiBaseUrl: string = '
         // CRITICAL: Don't restore rewards that are locally deleted (in trash)
         // - If a reward is in local trash, keep it deleted (marked inactive)
         // - Only merge rewards from API that aren't locally deleted
-        const mergedRewards: Reward[] = [];
+        // - Deduplicate by ID to prevent duplicates
+        const mergedRewardsMap = new Map<string, Reward>();
         
         // Add downloaded rewards, but skip ones that are locally deleted
         for (const downloadedReward of rewardsResult.data) {
           if (!deletedRewardIds.has(downloadedReward.id)) {
-            // Not locally deleted - add/update from Redis
-            mergedRewards.push(downloadedReward);
+            // Not locally deleted - add/update from Redis (deduplicate by ID)
+            mergedRewardsMap.set(downloadedReward.id, downloadedReward);
           } else {
             // Locally deleted - keep deletion, don't restore from Redis
             console.log(`  🔒 [REPOSITORY] Preserving local deletion, skipping Redis restore: ${downloadedReward.name} (${downloadedReward.id})`);
@@ -774,8 +775,11 @@ export const downloadAllData = async (businessId: string, apiBaseUrl: string = '
         
         // Add local deleted rewards back (marked inactive) to preserve deletion state
         for (const deletedReward of localTrash) {
-          mergedRewards.push(deletedReward);
+          mergedRewardsMap.set(deletedReward.id, deletedReward);
         }
+        
+        // Convert map to array (deduplicated by ID)
+        const mergedRewards = Array.from(mergedRewardsMap.values());
         
         // Store merged rewards
         await rewardsRepository.saveAll(mergedRewards);
