@@ -152,8 +152,8 @@ function App(): React.JSX.Element {
           // Load data from local repository (single source of truth)
           try {
             console.log('📥 [App] Loading rewards from repository after login...');
-            const loadedRewards = await rewardsRepository.getAll();
-            console.log(`📊 [App] Found ${loadedRewards?.length || 0} rewards in repository`);
+            const loadedRewards = await rewardsRepository.getActive(); // Only load active rewards
+            console.log(`📊 [App] Found ${loadedRewards?.length || 0} active rewards in repository`);
             
             if (loadedRewards && loadedRewards.length > 0) {
               // Rewards are already in app format from repository - just ensure QR codes
@@ -367,7 +367,7 @@ function App(): React.JSX.Element {
   // Reload rewards from repository
   const reloadRewards = async () => {
     try {
-      const loadedRewards = await rewardsRepository.getAll();
+      const loadedRewards = await rewardsRepository.getActive(); // Only load active rewards
       if (loadedRewards && loadedRewards.length > 0) {
         // Rewards are already in app format - just ensure QR codes
         const rewardsWithQRCodes = ensureRewardsHaveQRCodes(loadedRewards);

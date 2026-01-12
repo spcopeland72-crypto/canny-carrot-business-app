@@ -380,7 +380,8 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
         {
           text: 'OK',
           onPress: () => {
-            onBack?.();
+            // Navigate to Home to trigger reload of rewards
+            onNavigate('Home');
           },
         },
       ]);

@@ -201,7 +201,9 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   }, [propsRewards]);
 
   // Use rewards from props, fallback to local state, then empty array
-  const rewards = propsRewards.length > 0 ? propsRewards : (localRewards.length > 0 ? localRewards : []);
+  // Filter to only show active rewards (isActive !== false)
+  const allRewards = propsRewards.length > 0 ? propsRewards : (localRewards.length > 0 ? localRewards : []);
+  const rewards = allRewards.filter(r => r.isActive !== false); // Only show active rewards
   
   // Use campaigns from props, fallback to empty array
   const campaigns = propsCampaigns.length > 0 ? propsCampaigns : [];
