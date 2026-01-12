@@ -38,7 +38,10 @@ const deleteAllRewards = async (businessId: string): Promise<void> => {
               body: JSON.stringify({ args: [`reward:${rewardId}`] }),
             });
             if (delResponse.ok) {
-              console.log(`  ✅ Hard deleted reward ${rewardId} from Redis`);
+              const result = await delResponse.json();
+              if (result.data) {
+                console.log(`  ✅ Hard deleted reward ${rewardId} from Redis`);
+              }
             } else {
               console.warn(`  ⚠️ Failed to delete reward ${rewardId} key`);
             }
@@ -55,7 +58,10 @@ const deleteAllRewards = async (businessId: string): Promise<void> => {
             body: JSON.stringify({ args: [`business:${businessId}:rewards`] }),
           });
           if (delSetResponse.ok) {
-            console.log(`  ✅ Deleted business rewards set from Redis`);
+            const result = await delSetResponse.json();
+            if (result.data) {
+              console.log(`  ✅ Deleted business rewards set from Redis`);
+            }
           }
         } catch (error) {
           console.error(`  ❌ Error deleting business rewards set:`, error);
