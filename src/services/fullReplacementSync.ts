@@ -346,6 +346,44 @@ export const performFullReplacementSync = async (businessId: string): Promise<{
       errors.push(`Failed to write ${allCustomers.length - result.customers} customers`);
     }
 
+    // STEP 3: Update business.updatedAt timestamp in Redis to reflect repository update
+    // This is the top-level repository timestamp that indicates when ANY part of the repository was updated
+    const now = new Date().toISOString();
+    try {
+      const businessResponse = await fetch(`${API_BASE_URL}/api/v1/businesses/${businessId}`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      
+      if (businessResponse.ok) {
+        const businessResult = await businessResponse.json();
+        if (businessResult.success && businessResult.data) {
+          const existingBusiness = businessResult.data;
+          // Update business.updatedAt to reflect repository sync
+          const updatedBusiness = {
+            ...existingBusiness,
+            updatedAt: now, // Update timestamp to reflect repository sync
+          };
+          
+          const updateResponse = await fetch(`${API_BASE_URL}/api/v1/businesses/${businessId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(updatedBusiness),
+          });
+          
+          if (updateResponse.ok) {
+            console.log(`✅ [FULL SYNC] Business repository timestamp updated to ${now}`);
+          } else {
+            const errorText = await updateResponse.text();
+            console.warn(`⚠️ [FULL SYNC] Failed to update business timestamp: ${updateResponse.status} ${errorText.substring(0, 100)}`);
+          }
+        }
+      }
+    } catch (error: any) {
+      console.warn(`⚠️ [FULL SYNC] Error updating business timestamp: ${error.message || error}`);
+      // Don't fail the sync if timestamp update fails
+    }
+
     console.log('\n✅ [FULL SYNC] Full replacement sync completed');
     console.log(`   Profile: ${result.profile ? '✅' : '❌'}`);
     console.log(`   Rewards: ${result.rewards}/${activeRewards.length} active (inactive rewards removed from Redis)`);
