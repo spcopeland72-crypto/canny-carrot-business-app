@@ -13,7 +13,8 @@ import type { BusinessProfile, Reward, Campaign, Customer } from '../types';
 const API_BASE_URL = 'https://api.cannycarrot.com';
 
 /**
- * Delete all rewards for a business from Redis
+ * Delete all rewards for a business from Redis (HARD DELETE)
+ * This actually removes the reward keys and clears the business rewards set
  */
 const deleteAllRewards = async (businessId: string): Promise<void> => {
   try {
@@ -25,22 +26,39 @@ const deleteAllRewards = async (businessId: string): Promise<void> => {
       const result = await response.json();
       if (result.success && Array.isArray(result.data)) {
         const rewardIds = result.data.map((r: Reward) => r.id);
-        console.log(`🗑️ [FULL SYNC] Found ${rewardIds.length} rewards in Redis to delete`);
+        console.log(`🗑️ [FULL SYNC] Found ${rewardIds.length} rewards in Redis to hard delete`);
         
-        // Delete each reward
+        // Hard delete each reward key directly via Redis proxy
         for (const rewardId of rewardIds) {
           try {
-            const deleteResponse = await fetch(`${API_BASE_URL}/api/v1/rewards/${rewardId}`, {
-              method: 'DELETE',
+            // Delete the reward key
+            const delResponse = await fetch(`${API_BASE_URL}/api/v1/redis/del`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ args: [`reward:${rewardId}`] }),
             });
-            if (deleteResponse.ok) {
-              console.log(`  ✅ Deleted reward ${rewardId} from Redis`);
+            if (delResponse.ok) {
+              console.log(`  ✅ Hard deleted reward ${rewardId} from Redis`);
             } else {
-              console.warn(`  ⚠️ Failed to delete reward ${rewardId}: ${deleteResponse.status}`);
+              console.warn(`  ⚠️ Failed to delete reward ${rewardId} key`);
             }
           } catch (error) {
             console.error(`  ❌ Error deleting reward ${rewardId}:`, error);
           }
+        }
+        
+        // Delete the entire business rewards set
+        try {
+          const delSetResponse = await fetch(`${API_BASE_URL}/api/v1/redis/del`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ args: [`business:${businessId}:rewards`] }),
+          });
+          if (delSetResponse.ok) {
+            console.log(`  ✅ Deleted business rewards set from Redis`);
+          }
+        } catch (error) {
+          console.error(`  ❌ Error deleting business rewards set:`, error);
         }
       }
     }
