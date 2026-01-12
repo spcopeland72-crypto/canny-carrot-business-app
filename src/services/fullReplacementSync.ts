@@ -20,52 +20,80 @@ const deleteAllRewards = async (businessId: string): Promise<void> => {
   try {
     console.log(`🗑️ [FULL SYNC] Deleting all rewards for business ${businessId}...`);
     
+    const setKey = `business:${businessId}:rewards`;
+    
     // Get all reward IDs from the set using Redis proxy
     const smembersResponse = await fetch(`${API_BASE_URL}/api/v1/redis/smembers`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ args: [`business:${businessId}:rewards`] }),
+      body: JSON.stringify({ args: [setKey] }),
     });
     
-    if (smembersResponse.ok) {
-      const smembersResult = await smembersResponse.json();
-      const rewardIds: string[] = smembersResult.data || [];
-      console.log(`🗑️ [FULL SYNC] Found ${rewardIds.length} rewards in Redis set to delete`);
-      
-      // Delete each reward key directly via Redis proxy
-      for (const rewardId of rewardIds) {
-        try {
-          const delResponse = await fetch(`${API_BASE_URL}/api/v1/redis/del`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ args: [`reward:${rewardId}`] }),
-          });
-          if (delResponse.ok) {
-            console.log(`  ✅ Deleted reward ${rewardId} from Redis`);
+    if (!smembersResponse.ok) {
+      const errorText = await smembersResponse.text();
+      console.error(`❌ [FULL SYNC] Failed to get reward IDs: ${smembersResponse.status} ${errorText}`);
+      return;
+    }
+    
+    const smembersResult = await smembersResponse.json();
+    const rewardIds: string[] = smembersResult.data || [];
+    console.log(`🗑️ [FULL SYNC] Found ${rewardIds.length} reward IDs in set: ${rewardIds.slice(0, 5).join(', ')}${rewardIds.length > 5 ? '...' : ''}`);
+    
+    // Delete each reward key directly via Redis proxy
+    let deletedCount = 0;
+    for (const rewardId of rewardIds) {
+      try {
+        const rewardKey = `reward:${rewardId}`;
+        const delResponse = await fetch(`${API_BASE_URL}/api/v1/redis/del`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ args: [rewardKey] }),
+        });
+        
+        if (delResponse.ok) {
+          const delResult = await delResponse.json();
+          // Redis DEL returns number of keys deleted (0 or 1)
+          if (delResult.data > 0) {
+            deletedCount++;
+            console.log(`  ✅ Deleted reward key ${rewardKey} (${deletedCount}/${rewardIds.length})`);
           } else {
-            console.warn(`  ⚠️ Failed to delete reward ${rewardId} key`);
+            console.warn(`  ⚠️ Reward key ${rewardKey} didn't exist (already deleted?)`);
           }
-        } catch (error) {
-          console.error(`  ❌ Error deleting reward ${rewardId}:`, error);
+        } else {
+          const errorText = await delResponse.text();
+          console.error(`  ❌ Failed to delete reward ${rewardKey}: ${delResponse.status} ${errorText.substring(0, 100)}`);
         }
+      } catch (error: any) {
+        console.error(`  ❌ Error deleting reward ${rewardId}:`, error.message || error);
       }
     }
+    
+    console.log(`🗑️ [FULL SYNC] Deleted ${deletedCount}/${rewardIds.length} reward keys`);
     
     // Delete the business rewards set
     try {
       const delSetResponse = await fetch(`${API_BASE_URL}/api/v1/redis/del`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ args: [`business:${businessId}:rewards`] }),
+        body: JSON.stringify({ args: [setKey] }),
       });
+      
       if (delSetResponse.ok) {
-        console.log(`  ✅ Deleted business rewards set from Redis`);
+        const delSetResult = await delSetResponse.json();
+        if (delSetResult.data > 0) {
+          console.log(`  ✅ Deleted business rewards set ${setKey}`);
+        } else {
+          console.warn(`  ⚠️ Business rewards set ${setKey} didn't exist`);
+        }
+      } else {
+        const errorText = await delSetResponse.text();
+        console.error(`  ❌ Failed to delete set ${setKey}: ${delSetResponse.status} ${errorText.substring(0, 100)}`);
       }
-    } catch (error) {
-      console.error(`  ❌ Error deleting business rewards set:`, error);
+    } catch (error: any) {
+      console.error(`  ❌ Error deleting business rewards set:`, error.message || error);
     }
-  } catch (error) {
-    console.error('❌ [FULL SYNC] Error deleting rewards:', error);
+  } catch (error: any) {
+    console.error('❌ [FULL SYNC] Error deleting rewards:', error.message || error);
   }
 };
 
