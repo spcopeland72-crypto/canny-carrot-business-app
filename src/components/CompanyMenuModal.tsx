@@ -13,6 +13,16 @@ import {businessRepository} from '../services/localRepository';
 import {logoutBusiness, getStoredAuth} from '../services/authService';
 import {performDailySync} from '../services/dailySyncService';
 
+// Load CC logo image (same as customer app header)
+let ccLogoImage: any = null;
+try {
+  ccLogoImage = require('../../assets/logo.png');
+  console.log('[CompanyMenuModal] Logo loaded from assets');
+} catch (e) {
+  console.log('[CompanyMenuModal] Logo not found in assets:', e);
+  ccLogoImage = null;
+}
+
 interface CompanyMenuModalProps {
   visible: boolean;
   onClose: () => void;
@@ -121,6 +131,12 @@ const CompanyMenuModal: React.FC<CompanyMenuModalProps> = ({
                   source={{uri: businessLogo}}
                   style={styles.modalLogo}
                   resizeMode="cover"
+                />
+              ) : ccLogoImage ? (
+                <Image
+                  source={ccLogoImage}
+                  style={styles.modalLogo}
+                  resizeMode="contain"
                 />
               ) : (
                 <View style={styles.logoPlaceholder}>

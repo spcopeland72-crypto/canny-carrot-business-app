@@ -24,8 +24,15 @@ import AnimatedAreaChart from './AnimatedAreaChart';
 import {businessRepository, rewardsRepository} from '../services/localRepository';
 import type {Reward} from '../types';
 
-// Logo will use fallback text instead of dynamic requires
-const logoImage = null;
+// Load CC logo image (same as customer app header)
+let logoImage: any = null;
+try {
+  logoImage = require('../../assets/logo.png');
+  console.log('[HomeScreen] Logo loaded from assets');
+} catch (e) {
+  console.log('[HomeScreen] Logo not found in assets:', e);
+  logoImage = null;
+}
 
 const SCREEN_WIDTH = Dimensions.get('window').width || 375;
 const CARD_WIDTH = SCREEN_WIDTH * 0.25; // Match customer app width
