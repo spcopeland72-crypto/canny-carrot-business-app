@@ -224,10 +224,25 @@ export const performDailySync = async (businessId: string, forceSync: boolean = 
       errors.push(`Failed to sync ${customers.length - result.customers} customers`);
     }
 
-    // CRITICAL: Do NOT update business.updatedAt in Redis during sync
-    // Redis timestamps should ONLY change when admin logs in and makes changes
-    // App syncs should NOT modify Redis timestamps - they only write data
-    // The API is a transparent forwarder and does not update timestamps
+    // Update business.updatedAt in Redis to reflect app changes
+    // Rule: Whoever made the last change owns the timestamp
+    // App changes: app creates timestamp → propagates to DB (app → DB)
+    // API is transparent forwarder - preserves timestamp from request
+    if (errors.length === 0 && (result.rewards > 0 || result.campaigns > 0 || result.customers > 0 || result.profile)) {
+      // Only update timestamp if sync was successful and data was actually synced
+      const profile = await businessRepository.get();
+      if (profile) {
+        const syncTime = new Date().toISOString();
+        // App creates timestamp - propagates app → DB
+        const updatedProfile = { ...profile, updatedAt: syncTime };
+        const profileSyncSuccess = await syncBusinessProfile(updatedProfile, businessId);
+        if (!profileSyncSuccess) {
+          console.warn('⚠️ [SYNC] Failed to update business profile timestamp in Redis');
+        } else {
+          console.log('✅ [SYNC] Business profile timestamp updated in Redis (app → DB)');
+        }
+      }
+    }
 
     // Update sync metadata after sync
     // CRITICAL: Only update lastModified if sync was actually successful
