@@ -38,6 +38,8 @@ export interface Reward {
   currentRedemptions: number;
   createdAt: string;
   updatedAt: string;
+  // Customer progress tracking: customerId -> points collected
+  customerProgress?: Record<string, number>;  // Maps customerId to points earned
   // App-specific fields (computed at render time, not stored):
   // - icon (randomly assigned for UI)
   // - count, total (UI convenience, computed from stampsRequired)
@@ -64,6 +66,8 @@ export interface Campaign {
   status: CampaignStatus; // live, draft, or archived
   description?: string;
   qrCode?: string;
+  // Customer progress tracking: customerId -> points collected
+  customerProgress?: Record<string, number>;  // Maps customerId to points earned
   createdAt?: string;
   updatedAt?: string;
 }
@@ -155,6 +159,8 @@ export interface BusinessProfile {
   };
   category?: string;           // Business category (restaurant, retail, etc.)
   description?: string;
+  products?: string[];        // List of products created by this business
+  actions?: string[];         // List of actions created by this business
   createdAt?: string;
   updatedAt?: string;
 }

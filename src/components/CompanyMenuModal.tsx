@@ -11,7 +11,7 @@ import {
 import {Colors} from '../constants/Colors';
 import {businessRepository} from '../services/localRepository';
 import {logoutBusiness, getStoredAuth} from '../services/authService';
-import {performDailySync} from '../services/dailySyncService';
+import {performFullReplacementSync} from '../services/fullReplacementSync';
 
 // Load CC logo image (same as customer app header)
 let ccLogoImage: any = null;
@@ -70,8 +70,14 @@ const CompanyMenuModal: React.FC<CompanyMenuModalProps> = ({
       onClose();
       const auth = await getStoredAuth();
       if (auth?.businessId) {
-        await performDailySync(auth.businessId, true);
-        console.log('✅ Sync completed successfully');
+        console.log('🔄 [SYNC] Starting full replacement sync...');
+        const syncResult = await performFullReplacementSync(auth.businessId);
+        if (syncResult.success) {
+          console.log('✅ [SYNC] Full replacement sync completed successfully');
+          console.log('   Synced:', syncResult.synced);
+        } else {
+          console.warn('⚠️ [SYNC] Some data failed to sync:', syncResult.errors);
+        }
       } else {
         console.error('No business ID found for sync');
       }

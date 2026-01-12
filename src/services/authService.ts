@@ -219,7 +219,8 @@ export const loginBusiness = async (email: string, password: string): Promise<Bu
       // Password verified - now check repository sync
       console.log('✅ Subsequent login successful - using local credentials');
       
-      // REPOSITORY SYNC LOGIC: Check if repository exists and matches login credentials
+      // REPOSITORY LOAD LOGIC: Check if repository exists and matches login credentials
+      // NO SYNC ON LOGIN - sync only happens on logout or manual sync
       try {
         const repoModule = await import('./localRepository');
         
@@ -231,40 +232,35 @@ export const loginBusiness = async (email: string, password: string): Promise<Bu
           const hasArchived = await repoModule.archivedRepositoryExists(existingAuth.businessId);
           
           if (hasArchived) {
-            // RESTORE ARCHIVED REPOSITORY
+            // RESTORE ARCHIVED REPOSITORY and compare timestamps
             console.log(`📥 [LOGIN] No primary repository - restoring archived repository for business: ${existingAuth.businessId}`);
             await repoModule.restoreArchivedRepository(existingAuth.businessId);
             
-            // Check timestamps after restore
             const localTimestamp = await repoModule.getLocalRepositoryTimestamp();
             const dbTimestamp = await repoModule.getDatabaseRecordTimestamp(existingAuth.businessId, API_BASE_URL);
             
-            // Check timestamps bidirectionally
-            // CRITICAL: getLocalRepositoryTimestamp() ALWAYS returns a timestamp (never null)
-            // Only check if database timestamp exists
-            if (!dbTimestamp) {
-              console.log('⬆️ [LOGIN] Local timestamp exists but no database timestamp - uploading local to Redis');
-              const { performDailySync } = await import('./dailySyncService');
-              await performDailySync(existingAuth.businessId, true);
-              console.log('✅ [LOGIN] Restored repository uploaded to Redis');
-            } else {
+            if (dbTimestamp) {
               const localTime = new Date(localTimestamp).getTime();
               const dbTime = new Date(dbTimestamp).getTime();
               
-              if (localTime > dbTime) {
-                // LOCAL IS NEWER: Upload to Redis (NEVER DOWNLOAD)
-                console.log('⬆️ [LOGIN] Restored repository is newer - uploading to Redis (NOT downloading)');
-                const { performDailySync } = await import('./dailySyncService');
-                await performDailySync(existingAuth.businessId, true);
-                console.log('✅ [LOGIN] Restored repository uploaded to Redis');
-              } else if (localTime < dbTime) {
-                // DATABASE IS NEWER: Download from Redis
-                console.log('⬇️ [LOGIN] Database is newer - refreshing from database');
-                await repoModule.downloadAllData(existingAuth.businessId, API_BASE_URL);
-                console.log('✅ [LOGIN] Repository refreshed from database after restore');
+              console.log(`📊 [LOGIN] Comparing timestamps:`);
+              console.log(`   Local: ${localTimestamp} (${localTime})`);
+              console.log(`   Redis: ${dbTimestamp} (${dbTime})`);
+              
+              if (localTime >= dbTime) {
+                // LOCAL IS NEWER OR EQUAL: Keep restored repository
+                console.log('✅ [LOGIN] Archived repository is newer or equal - using restored repository');
+                console.log('ℹ️ [LOGIN] No sync on login - use manual sync or logout to sync');
               } else {
-                console.log('✅ [LOGIN] Restored repository is in sync');
+                // REDIS IS NEWER: Load from Redis
+                console.log('⬇️ [LOGIN] Redis is newer - downloading from Redis');
+                await repoModule.downloadAllData(existingAuth.businessId, API_BASE_URL);
+                console.log('✅ [LOGIN] Repository downloaded from Redis and stored locally');
               }
+            } else {
+              // NO REDIS TIMESTAMP: Keep restored repository
+              console.log('✅ [LOGIN] No Redis timestamp found - using restored repository');
+              console.log('ℹ️ [LOGIN] No sync on login - use manual sync or logout to sync');
             }
           } else {
             // NO ARCHIVED REPOSITORY: Download from database
@@ -276,58 +272,7 @@ export const loginBusiness = async (email: string, password: string): Promise<Bu
           // STEP 2: REPOSITORY EXISTS - Check if it matches login credentials
           const matchesBusiness = await repoModule.repositoryMatchesBusiness(existingAuth.businessId);
           
-          if (matchesBusiness) {
-            // REPOSITORY MATCHES: Check timestamps and sync bidirectionally
-            console.log(`📊 [LOGIN] Repository exists and matches business ${existingAuth.businessId} - checking timestamps`);
-            const localTimestamp = await repoModule.getLocalRepositoryTimestamp();
-            const dbTimestamp = await repoModule.getDatabaseRecordTimestamp(existingAuth.businessId, API_BASE_URL);
-            
-            // CRITICAL: getLocalRepositoryTimestamp() now NEVER returns null - it always creates a timestamp
-            // So we only check if database timestamp exists
-            if (!dbTimestamp) {
-              // LOCAL EXISTS BUT NO DB TIMESTAMP: Local is newer, upload to Redis
-              console.log('⬆️ [LOGIN] Local repository exists but no database timestamp - uploading local to Redis');
-              console.log(`   Local: ${localTimestamp}`);
-              const { performDailySync } = await import('./dailySyncService');
-              const syncResult = await performDailySync(existingAuth.businessId, true);
-              if (syncResult.success) {
-                console.log('✅ [LOGIN] Local repository uploaded to Redis successfully');
-              } else {
-                console.error('❌ [LOGIN] Failed to upload local repository to Redis:', syncResult.errors);
-              }
-            } else {
-              // BOTH TIMESTAMPS EXIST: Compare and sync appropriately
-              const localTime = new Date(localTimestamp).getTime();
-              const dbTime = new Date(dbTimestamp).getTime();
-              
-              if (localTime > dbTime) {
-                // LOCAL IS NEWER: Upload local to Redis (NEVER DOWNLOAD)
-                console.log('⬆️ [LOGIN] Local repository is newer than database - uploading to Redis (NOT downloading)');
-                console.log(`   Local: ${localTimestamp}`);
-                console.log(`   Database: ${dbTimestamp}`);
-                const { performDailySync } = await import('./dailySyncService');
-                const syncResult = await performDailySync(existingAuth.businessId, true);
-                if (syncResult.success) {
-                  console.log('✅ [LOGIN] Local repository uploaded to Redis successfully');
-                  console.log(`   Synced: ${syncResult.synced.rewards} rewards, ${syncResult.synced.campaigns} campaigns`);
-                } else {
-                  console.error('❌ [LOGIN] Failed to upload local repository to Redis:', syncResult.errors);
-                }
-              } else if (localTime < dbTime) {
-                // DATABASE IS NEWER: Download from Redis
-                console.log('⬇️ [LOGIN] Database is newer than local - downloading from Redis');
-                console.log(`   Local: ${localTimestamp}`);
-                console.log(`   Database: ${dbTimestamp}`);
-                await repoModule.downloadAllData(existingAuth.businessId, API_BASE_URL);
-                console.log('✅ [LOGIN] Local repository refreshed from database');
-              } else {
-                // TIMESTAMPS MATCH: No sync needed
-                console.log('✅ [LOGIN] Local repository and database are in sync - no refresh needed');
-                console.log(`   Local: ${localTimestamp}`);
-                console.log(`   Database: ${dbTimestamp}`);
-              }
-            }
-          } else {
+          if (!matchesBusiness) {
             // REPOSITORY DOESN'T MATCH: Archive current repo, check for archived repo OR download
             console.log(`🔄 [LOGIN] Repository exists but doesn't match business ${existingAuth.businessId} - switching repositories`);
             
@@ -346,39 +291,35 @@ export const loginBusiness = async (email: string, password: string): Promise<Bu
             const hasArchived = await repoModule.archivedRepositoryExists(existingAuth.businessId);
             
             if (hasArchived) {
-              // RESTORE ARCHIVED REPOSITORY
+              // RESTORE ARCHIVED REPOSITORY and compare timestamps
               console.log(`📥 [LOGIN] Restoring archived repository for business: ${existingAuth.businessId}`);
               await repoModule.restoreArchivedRepository(existingAuth.businessId);
               
-              // Check timestamps bidirectionally after restore
-              // CRITICAL: localTimestamp ALWAYS exists (never null)
               const localTimestamp = await repoModule.getLocalRepositoryTimestamp();
               const dbTimestamp = await repoModule.getDatabaseRecordTimestamp(existingAuth.businessId, API_BASE_URL);
               
-              if (!dbTimestamp) {
-                // LOCAL EXISTS BUT NO DB TIMESTAMP: Local is newer, upload to Redis (NEVER DOWNLOAD)
-                console.log('⬆️ [LOGIN] Local timestamp exists but no database timestamp - uploading local to Redis');
-                const { performDailySync } = await import('./dailySyncService');
-                await performDailySync(existingAuth.businessId, true);
-                console.log('✅ [LOGIN] Restored repository uploaded to Redis');
-              } else {
+              if (dbTimestamp) {
                 const localTime = new Date(localTimestamp).getTime();
                 const dbTime = new Date(dbTimestamp).getTime();
                 
-                if (localTime > dbTime) {
-                  // LOCAL IS NEWER: Upload to Redis (NEVER DOWNLOAD)
-                  console.log('⬆️ [LOGIN] Restored repository is newer - uploading to Redis (NOT downloading)');
-                  const { performDailySync } = await import('./dailySyncService');
-                  await performDailySync(existingAuth.businessId, true);
-                  console.log('✅ [LOGIN] Restored repository uploaded to Redis');
-                } else if (localTime < dbTime) {
-                  // DATABASE IS NEWER: Download from Redis
-                  console.log('⬇️ [LOGIN] Database is newer - refreshing from database');
-                  await repoModule.downloadAllData(existingAuth.businessId, API_BASE_URL);
-                  console.log('✅ [LOGIN] Repository refreshed from database after restore');
+                console.log(`📊 [LOGIN] Comparing timestamps:`);
+                console.log(`   Local: ${localTimestamp} (${localTime})`);
+                console.log(`   Redis: ${dbTimestamp} (${dbTime})`);
+                
+                if (localTime >= dbTime) {
+                  // LOCAL IS NEWER OR EQUAL: Keep restored repository
+                  console.log('✅ [LOGIN] Archived repository is newer or equal - using restored repository');
+                  console.log('ℹ️ [LOGIN] No sync on login - use manual sync or logout to sync');
                 } else {
-                  console.log('✅ [LOGIN] Restored repository is in sync');
+                  // REDIS IS NEWER: Load from Redis
+                  console.log('⬇️ [LOGIN] Redis is newer - downloading from Redis');
+                  await repoModule.downloadAllData(existingAuth.businessId, API_BASE_URL);
+                  console.log('✅ [LOGIN] Repository downloaded from Redis and stored locally');
                 }
+              } else {
+                // NO REDIS TIMESTAMP: Keep restored repository
+                console.log('✅ [LOGIN] No Redis timestamp found - using restored repository');
+                console.log('ℹ️ [LOGIN] No sync on login - use manual sync or logout to sync');
               }
             } else {
               // NO ARCHIVED REPOSITORY: Download from database
@@ -386,11 +327,39 @@ export const loginBusiness = async (email: string, password: string): Promise<Bu
               await repoModule.downloadAllData(existingAuth.businessId, API_BASE_URL);
               console.log('✅ [LOGIN] Repository created and populated from database');
             }
+          } else {
+            // REPOSITORY MATCHES: Compare timestamps to decide whether to load locally or from Redis
+            const localTimestamp = await repoModule.getLocalRepositoryTimestamp();
+            const dbTimestamp = await repoModule.getDatabaseRecordTimestamp(existingAuth.businessId, API_BASE_URL);
+            
+            if (dbTimestamp) {
+              const localTime = new Date(localTimestamp).getTime();
+              const dbTime = new Date(dbTimestamp).getTime();
+              
+              console.log(`📊 [LOGIN] Comparing timestamps:`);
+              console.log(`   Local: ${localTimestamp} (${localTime})`);
+              console.log(`   Redis: ${dbTimestamp} (${dbTime})`);
+              
+              if (localTime >= dbTime) {
+                // LOCAL IS NEWER OR EQUAL: Load from local storage
+                console.log('✅ [LOGIN] Local repository is newer or equal - loading from local storage');
+                console.log('ℹ️ [LOGIN] No sync on login - use manual sync or logout to sync');
+              } else {
+                // REDIS IS NEWER: Load from Redis
+                console.log('⬇️ [LOGIN] Redis is newer - downloading from Redis');
+                await repoModule.downloadAllData(existingAuth.businessId, API_BASE_URL);
+                console.log('✅ [LOGIN] Repository downloaded from Redis and stored locally');
+              }
+            } else {
+              // NO REDIS TIMESTAMP: Load from local storage
+              console.log('✅ [LOGIN] No Redis timestamp found - loading from local storage');
+              console.log('ℹ️ [LOGIN] No sync on login - use manual sync or logout to sync');
+            }
           }
         }
-      } catch (syncError) {
-        console.error('⚠️ Error syncing repository (will retry later):', syncError);
-        // Don't fail login if sync fails - user can still use app offline
+      } catch (repoError) {
+        console.error('⚠️ Error loading repository (will retry later):', repoError);
+        // Don't fail login if repo load fails - user can still use app offline
       }
       
       return existingAuth;
@@ -464,176 +433,60 @@ export const loginBusiness = async (email: string, password: string): Promise<Bu
 
     console.log('✅ First login successful - credentials stored locally for subsequent logins');
     
-    // REPOSITORY SYNC LOGIC: Check if repository exists and matches login credentials
+    // REPOSITORY LOAD LOGIC: Load from local storage if exists, otherwise download from database
+    // NO SYNC ON LOGIN - sync only happens on logout or manual sync
     try {
       const repoModule = await import('./localRepository');
       
       const repoExists = await repoModule.repositoryExists();
       
-      if (!repoExists) {
-        // STEP 1: NO REPOSITORY EXISTS
-        // Check for archived repository matching login credentials
-        const hasArchived = await repoModule.archivedRepositoryExists(businessId);
-        
-        if (hasArchived) {
-          // RESTORE ARCHIVED REPOSITORY
-          console.log(`📥 [LOGIN] No primary repository - restoring archived repository for business: ${businessId}`);
-          await repoModule.restoreArchivedRepository(businessId);
-          
-          // Check timestamps after restore
+      if (repoExists) {
+        // Check if repository matches this business
+        const matchesBusiness = await repoModule.repositoryMatchesBusiness(businessId);
+        if (matchesBusiness) {
+          // REPOSITORY MATCHES: Compare timestamps to decide whether to load locally or from Redis
           const localTimestamp = await repoModule.getLocalRepositoryTimestamp();
           const dbTimestamp = await repoModule.getDatabaseRecordTimestamp(businessId, API_BASE_URL);
           
-          // Check timestamps bidirectionally
-          // CRITICAL: localTimestamp ALWAYS exists (never null)
-          if (!dbTimestamp) {
-            // LOCAL EXISTS BUT NO DB TIMESTAMP: Local is newer, upload to Redis (NEVER DOWNLOAD)
-            console.log('⬆️ [LOGIN] Local timestamp exists but no database timestamp - uploading local to Redis');
-            const { performDailySync } = await import('./dailySyncService');
-            await performDailySync(businessId, true);
-            console.log('✅ [LOGIN] Restored repository uploaded to Redis');
-          } else {
+          if (dbTimestamp) {
             const localTime = new Date(localTimestamp).getTime();
             const dbTime = new Date(dbTimestamp).getTime();
             
-            if (localTime > dbTime) {
-              // LOCAL IS NEWER: Upload to Redis (NEVER DOWNLOAD)
-              console.log('⬆️ [LOGIN] Restored repository is newer - uploading to Redis (NOT downloading)');
-              const { performDailySync } = await import('./dailySyncService');
-              await performDailySync(businessId, true);
-              console.log('✅ [LOGIN] Restored repository uploaded to Redis');
-            } else if (localTime < dbTime) {
-              // DATABASE IS NEWER: Download from Redis
-              console.log('⬇️ [LOGIN] Database is newer - refreshing from database');
-              await repoModule.downloadAllData(businessId, API_BASE_URL);
-              console.log('✅ [LOGIN] Repository refreshed from database after restore');
+            console.log(`📊 [LOGIN] Comparing timestamps:`);
+            console.log(`   Local: ${localTimestamp} (${localTime})`);
+            console.log(`   Redis: ${dbTimestamp} (${dbTime})`);
+            
+            if (localTime >= dbTime) {
+              // LOCAL IS NEWER OR EQUAL: Load from local storage
+              console.log('✅ [LOGIN] Local repository is newer or equal - loading from local storage');
+              console.log('ℹ️ [LOGIN] No sync on login - use manual sync or logout to sync');
             } else {
-              console.log('✅ [LOGIN] Restored repository is in sync');
+              // REDIS IS NEWER: Load from Redis
+              console.log('⬇️ [LOGIN] Redis is newer - downloading from Redis');
+              await repoModule.downloadAllData(businessId, API_BASE_URL);
+              console.log('✅ [LOGIN] Repository downloaded from Redis and stored locally');
             }
+          } else {
+            // NO REDIS TIMESTAMP: Load from local storage
+            console.log('✅ [LOGIN] No Redis timestamp found - loading from local storage');
+            console.log('ℹ️ [LOGIN] No sync on login - use manual sync or logout to sync');
           }
         } else {
-          // NO ARCHIVED REPOSITORY: Download from database
-          console.log(`📥 [LOGIN] No repository found - downloading from database for business: ${businessId}`);
+          // Repository exists but for different business - download for this business
+          console.log(`📥 [LOGIN] Local repository exists but for different business - downloading from database for business: ${businessId}`);
           await repoModule.downloadAllData(businessId, API_BASE_URL);
-          console.log('✅ [LOGIN] Repository created and populated from database');
+          console.log('✅ [LOGIN] Repository downloaded from database and stored locally');
         }
       } else {
-        // STEP 2: REPOSITORY EXISTS - Check if it matches login credentials
-        const matchesBusiness = await repoModule.repositoryMatchesBusiness(businessId);
-        
-        if (matchesBusiness) {
-          // REPOSITORY MATCHES: Check timestamps bidirectionally
-          console.log(`📊 [LOGIN] Repository exists and matches business ${businessId} - checking timestamps`);
-          const localTimestamp = await repoModule.getLocalRepositoryTimestamp();
-          const dbTimestamp = await repoModule.getDatabaseRecordTimestamp(businessId, API_BASE_URL);
-          
-          // CRITICAL: localTimestamp ALWAYS exists (never null)
-          if (!dbTimestamp) {
-            // LOCAL EXISTS BUT NO DB TIMESTAMP: Local is newer, upload to Redis (NEVER DOWNLOAD)
-            console.log('⬆️ [LOGIN] Local repository exists but no database timestamp - uploading local to Redis');
-            console.log(`   Local: ${localTimestamp}`);
-            const { performDailySync } = await import('./dailySyncService');
-            const syncResult = await performDailySync(businessId, true);
-            if (syncResult.success) {
-              console.log('✅ [LOGIN] Local repository uploaded to Redis successfully');
-            } else {
-              console.error('❌ [LOGIN] Failed to upload local repository to Redis:', syncResult.errors);
-            }
-          } else {
-            const localTime = new Date(localTimestamp).getTime();
-            const dbTime = new Date(dbTimestamp).getTime();
-            
-            if (localTime > dbTime) {
-              // LOCAL IS NEWER: Upload local to Redis (NEVER DOWNLOAD)
-              console.log('⬆️ [LOGIN] Local repository is newer than database - uploading to Redis (NOT downloading)');
-              console.log(`   Local: ${localTimestamp}`);
-              console.log(`   Database: ${dbTimestamp}`);
-              const { performDailySync } = await import('./dailySyncService');
-              const syncResult = await performDailySync(businessId, true);
-              if (syncResult.success) {
-                console.log('✅ [LOGIN] Local repository uploaded to Redis successfully');
-                console.log(`   Synced: ${syncResult.synced.rewards} rewards, ${syncResult.synced.campaigns} campaigns`);
-              } else {
-                console.error('❌ [LOGIN] Failed to upload local repository to Redis:', syncResult.errors);
-              }
-            } else if (localTime < dbTime) {
-              // DATABASE IS NEWER: Download from Redis
-              console.log('⬇️ [LOGIN] Database is newer than local - downloading from Redis');
-              console.log(`   Local: ${localTimestamp}`);
-              console.log(`   Database: ${dbTimestamp}`);
-              await repoModule.downloadAllData(businessId, API_BASE_URL);
-              console.log('✅ [LOGIN] Local repository refreshed from database');
-            } else {
-              // TIMESTAMPS MATCH: In sync
-              console.log('✅ [LOGIN] Local repository and database are in sync - no refresh needed');
-              console.log(`   Local: ${localTimestamp}`);
-              console.log(`   Database: ${dbTimestamp}`);
-            }
-          }
-        } else {
-          // REPOSITORY DOESN'T MATCH: Archive current repo, check for archived repo OR download
-          console.log(`🔄 [LOGIN] Repository exists but doesn't match business ${businessId} - switching repositories`);
-          
-          // Get current repository's businessId (from profile or stored ID)
-          const currentProfile = await repoModule.businessRepository.get();
-          const currentBusinessId = currentProfile?.id || await repoModule.getCurrentRepositoryBusinessId();
-          
-          if (currentBusinessId && currentBusinessId !== businessId) {
-            // Archive the current repository
-            console.log(`📦 [LOGIN] Archiving current repository for business: ${currentBusinessId}`);
-            await repoModule.archiveRepository(currentBusinessId);
-            console.log(`✅ [LOGIN] Current repository archived for business: ${currentBusinessId}`);
-          }
-          
-          // Check for archived repository matching login credentials
-          const hasArchived = await repoModule.archivedRepositoryExists(businessId);
-          
-          if (hasArchived) {
-            // RESTORE ARCHIVED REPOSITORY
-            console.log(`📥 [LOGIN] Restoring archived repository for business: ${businessId}`);
-            await repoModule.restoreArchivedRepository(businessId);
-            
-            // Check timestamps bidirectionally after restore
-            const localTimestamp = await repoModule.getLocalRepositoryTimestamp();
-            const dbTimestamp = await repoModule.getDatabaseRecordTimestamp(businessId, API_BASE_URL);
-            
-            // CRITICAL: localTimestamp ALWAYS exists (never null)
-            if (!dbTimestamp) {
-              // LOCAL EXISTS BUT NO DB TIMESTAMP: Local is newer, upload to Redis (NEVER DOWNLOAD)
-              console.log('⬆️ [LOGIN] Local timestamp exists but no database timestamp - uploading local to Redis');
-              const { performDailySync } = await import('./dailySyncService');
-              await performDailySync(businessId, true);
-              console.log('✅ [LOGIN] Restored repository uploaded to Redis');
-            } else {
-              const localTime = new Date(localTimestamp).getTime();
-              const dbTime = new Date(dbTimestamp).getTime();
-              
-              if (localTime > dbTime) {
-                // LOCAL IS NEWER: Upload to Redis (NEVER DOWNLOAD)
-                console.log('⬆️ [LOGIN] Restored repository is newer - uploading to Redis (NOT downloading)');
-                const { performDailySync } = await import('./dailySyncService');
-                await performDailySync(businessId, true);
-                console.log('✅ [LOGIN] Restored repository uploaded to Redis');
-              } else if (localTime < dbTime) {
-                // DATABASE IS NEWER: Download from Redis
-                console.log('⬇️ [LOGIN] Database is newer - refreshing from database');
-                await repoModule.downloadAllData(businessId, API_BASE_URL);
-                console.log('✅ [LOGIN] Repository refreshed from database after restore');
-              } else {
-                console.log('✅ [LOGIN] Restored repository is in sync');
-              }
-            }
-          } else {
-            // NO ARCHIVED REPOSITORY: Download from database
-            console.log(`📥 [LOGIN] No archived repository found - downloading from database for business: ${businessId}`);
-            await repoModule.downloadAllData(businessId, API_BASE_URL);
-            console.log('✅ [LOGIN] Repository created and populated from database');
-          }
-        }
+        // No local repository - download from database (first time on this device)
+        console.log(`📥 [LOGIN] No local repository found - downloading from database for business: ${businessId}`);
+        await repoModule.downloadAllData(businessId, API_BASE_URL);
+        console.log('✅ [LOGIN] Repository downloaded from database and stored locally');
+        console.log('ℹ️ [LOGIN] No sync on login - use manual sync or logout to sync');
       }
-    } catch (syncError) {
-      console.error('⚠️ Error syncing repository (will retry later):', syncError);
-      // Don't fail login if sync fails - user can still use app offline
+    } catch (repoError) {
+      console.error('⚠️ Error loading repository from local storage (will retry later):', repoError);
+      // Don't fail login if repo load fails - user can still use app offline
     }
     
     return auth;
@@ -690,20 +543,22 @@ export const logoutBusiness = async (): Promise<void> => {
     const businessId = auth?.businessId;
     
     if (businessId) {
-      // Sync all local changes to Redis before logout
-      console.log('🔄 [LOGOUT] Syncing all changes to Redis before logout...');
+      // Perform FULL REPLACEMENT sync - makes Redis identical to local repository
+      console.log('🔄 [LOGOUT] Performing full replacement sync - Redis will be identical to local repository...');
       try {
-        const { performDailySync } = await import('./dailySyncService');
-        const syncResult = await performDailySync(businessId, true); // Force sync
+        const { performFullReplacementSync } = await import('./fullReplacementSync');
+        const syncResult = await performFullReplacementSync(businessId);
         
         if (syncResult.success) {
-          console.log('✅ [LOGOUT] All changes synced successfully:', syncResult.synced);
+          console.log('✅ [LOGOUT] Full replacement sync completed successfully');
+          console.log('✅ [LOGOUT] Redis is now identical to local repository');
+          console.log('   Synced:', syncResult.synced);
         } else {
-          console.warn('⚠️ [LOGOUT] Some changes failed to sync:', syncResult.errors);
+          console.warn('⚠️ [LOGOUT] Some data failed to sync:', syncResult.errors);
           // Continue with logout even if sync fails (data is still in local repo)
         }
       } catch (syncError) {
-        console.error('❌ [LOGOUT] Error during sync:', syncError);
+        console.error('❌ [LOGOUT] Error during full replacement sync:', syncError);
         // Continue with logout even if sync fails
       }
     }

@@ -12,7 +12,7 @@ import {
 import {Colors} from '../constants/Colors';
 import PageTemplate from './PageTemplate';
 import QRCodeModal from './QRCodeModal';
-import {saveProducts, loadProducts} from '../utils/dataStorage';
+// Products and actions are now stored in business profile, not separate storage
 import {generateRewardQRCode} from '../utils/qrCodeUtils';
 import {businessRepository, rewardsRepository} from '../services/localRepository';
 import {getStoredAuth} from '../services/authService';
@@ -113,31 +113,44 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
     loadRewardData();
   }, [isEdit, rewardId, reward]);
   
-  // Load products and business profile on mount
+  // Load products, actions, and business profile on mount
   useEffect(() => {
     const loadInitialData = async () => {
       try {
-        // Load products
-        const loadedProducts = await loadProducts();
-        if (loadedProducts && Array.isArray(loadedProducts)) {
-          // Filter out dummy products if they exist
-          const filteredProducts = loadedProducts.filter(p => 
-            p !== 'Product 1' && p !== 'Product 2' && p !== 'Product 3'
-          );
-          setProducts(filteredProducts);
-          // Save filtered list back if dummy products were removed
-          if (filteredProducts.length !== loadedProducts.length) {
-            await saveProducts(filteredProducts);
-          }
-        } else {
-          setProducts([]);
-        }
-        
-        // Load business profile
+        // Load business profile (which contains products and actions)
         const profile = await businessRepository.get();
         if (profile) {
           setBusinessProfile(profile);
-          // If profile has logo, it will be included in QR code generation
+          
+          // Load products from business profile
+          if (profile.products && Array.isArray(profile.products)) {
+            // Filter out dummy products if they exist
+            const filteredProducts = profile.products.filter(p => 
+              p !== 'Product 1' && p !== 'Product 2' && p !== 'Product 3'
+            );
+            setProducts(filteredProducts);
+            
+            // Update business profile if dummy products were removed
+            if (filteredProducts.length !== profile.products.length) {
+              const updatedProfile = {
+                ...profile,
+                products: filteredProducts,
+                updatedAt: new Date().toISOString(),
+              };
+              await businessRepository.save(updatedProfile);
+            }
+          } else {
+            setProducts([]);
+          }
+          
+          // Load actions from business profile (or use defaults if none exist)
+          if (profile.actions && Array.isArray(profile.actions) && profile.actions.length > 0) {
+            // Actions are stored in business profile
+            // Note: We'll use the profile.actions, but for now we'll keep the default list
+            // as a fallback until actions are properly managed in the business profile
+          }
+        } else {
+          setProducts([]);
         }
       } catch (error) {
         console.error('Error loading initial data:', error);
@@ -146,7 +159,9 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
     };
     loadInitialData();
   }, []); // Only run on mount
-  const actions = [
+  
+  // Default actions list (can be customized per business)
+  const defaultActions = [
     'Write a Review',
     'Share on Facebook',
     'Share on Instagram',
@@ -157,6 +172,11 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
     'Follow Business',
     'Post Mentioning Business',
   ];
+  
+  // Use business profile actions if available, otherwise use defaults
+  const actions = businessProfile?.actions && businessProfile.actions.length > 0
+    ? businessProfile.actions
+    : defaultActions;
 
   const handleSave = async () => {
     try {
@@ -311,9 +331,8 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
     }
     const newProduct = newProductName.trim();
     
-    // Load existing products from file to ensure we have the complete list
-    const existingProducts = await loadProducts();
-    const allProducts = [...new Set([...existingProducts, ...products, newProduct])];
+    // Add to products list
+    const allProducts = [...products, newProduct];
     
     // Update state first
     setProducts(allProducts);
@@ -322,13 +341,24 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
     setNewProductName('');
     setCreateProductModalVisible(false);
     
-    // Save all products to file (appends new product to the list)
+    // Save all products to business profile
     try {
-      await saveProducts(allProducts);
-      console.log('Product saved successfully:', newProduct);
-      Alert.alert('Success', 'Product created successfully');
+      const profile = await businessRepository.get();
+      if (profile) {
+        const updatedProfile = {
+          ...profile,
+          products: allProducts,
+          updatedAt: new Date().toISOString(),
+        };
+        await businessRepository.save(updatedProfile);
+        setBusinessProfile(updatedProfile);
+        console.log('Product saved to business profile:', newProduct);
+        Alert.alert('Success', 'Product created successfully');
+      } else {
+        throw new Error('Business profile not found');
+      }
     } catch (error) {
-      console.error('Error saving product:', error);
+      console.error('Error saving product to business profile:', error);
       Alert.alert('Warning', 'Product created but failed to save. It may not persist.');
     }
   };
@@ -414,13 +444,24 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
               setSelectedProducts(selectedProducts.filter(p => p !== product));
             }
             
-            // Save updated list to file
+            // Save updated list to business profile
             try {
-              await saveProducts(updatedProducts);
-              console.log('Product deleted successfully:', product);
+              const profile = await businessRepository.get();
+              if (profile) {
+                const updatedProfile = {
+                  ...profile,
+                  products: updatedProducts,
+                  updatedAt: new Date().toISOString(),
+                };
+                await businessRepository.save(updatedProfile);
+                setBusinessProfile(updatedProfile);
+                console.log('Product deleted from business profile:', product);
+              } else {
+                throw new Error('Business profile not found');
+              }
             } catch (error) {
-              console.error('Error deleting product:', error);
-              Alert.alert('Error', 'Failed to delete product from storage.');
+              console.error('Error deleting product from business profile:', error);
+              Alert.alert('Error', 'Failed to delete product from business profile.');
             }
           },
         },
