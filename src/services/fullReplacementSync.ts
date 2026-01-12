@@ -243,6 +243,14 @@ export const performFullReplacementSync = async (businessId: string): Promise<{
     const profile = await businessRepository.get();
     if (profile) {
       try {
+        console.log(`📤 [FULL SYNC] Business profile data:`, {
+          name: profile.name,
+          products: profile.products?.length || 0,
+          actions: profile.actions?.length || 0,
+          hasProducts: !!profile.products,
+          hasActions: !!profile.actions,
+        });
+        
         const response = await fetch(`${API_BASE_URL}/api/v1/businesses/${businessId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
@@ -251,7 +259,7 @@ export const performFullReplacementSync = async (businessId: string): Promise<{
         
         if (response.ok) {
           result.profile = true;
-          console.log('✅ [FULL SYNC] Business profile written to Redis');
+          console.log(`✅ [FULL SYNC] Business profile written to Redis (${profile.products?.length || 0} products, ${profile.actions?.length || 0} actions)`);
         } else {
           const errorText = await response.text();
           console.error(`❌ [FULL SYNC] Failed to write business profile: ${response.status} ${errorText.substring(0, 200)}`);
@@ -263,11 +271,11 @@ export const performFullReplacementSync = async (businessId: string): Promise<{
       }
     }
 
-    // Write all rewards (including inactive/deleted ones - we want exact copy)
-    const allRewards = await rewardsRepository.getAll();
-    result.rewards = await writeAllRewards(allRewards, businessId);
-    if (result.rewards < allRewards.length) {
-      errors.push(`Failed to write ${allRewards.length - result.rewards} rewards`);
+    // Write only active rewards (inactive/deleted ones are removed from Redis in step 1)
+    const activeRewards = await rewardsRepository.getActive();
+    result.rewards = await writeAllRewards(activeRewards, businessId);
+    if (result.rewards < activeRewards.length) {
+      errors.push(`Failed to write ${activeRewards.length - result.rewards} rewards`);
     }
 
     // Write all campaigns
@@ -286,7 +294,7 @@ export const performFullReplacementSync = async (businessId: string): Promise<{
 
     console.log('\n✅ [FULL SYNC] Full replacement sync completed');
     console.log(`   Profile: ${result.profile ? '✅' : '❌'}`);
-    console.log(`   Rewards: ${result.rewards}/${allRewards.length}`);
+    console.log(`   Rewards: ${result.rewards}/${activeRewards.length} active (inactive rewards removed from Redis)`);
     console.log(`   Campaigns: ${result.campaigns}/${allCampaigns.length}`);
     console.log(`   Customers: ${result.customers}/${allCustomers.length}`);
 
