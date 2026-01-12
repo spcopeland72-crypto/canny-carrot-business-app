@@ -18,55 +18,51 @@ const API_BASE_URL = 'https://api.cannycarrot.com';
  */
 const deleteAllRewards = async (businessId: string): Promise<void> => {
   try {
-    console.log(`🗑️ [FULL SYNC] Fetching all rewards for business ${businessId} to delete...`);
+    console.log(`🗑️ [FULL SYNC] Deleting all rewards for business ${businessId}...`);
     
-    // Get all reward IDs for this business
-    const response = await fetch(`${API_BASE_URL}/api/v1/rewards?businessId=${businessId}`);
-    if (response.ok) {
-      const result = await response.json();
-      if (result.success && Array.isArray(result.data)) {
-        const rewardIds = result.data.map((r: Reward) => r.id);
-        console.log(`🗑️ [FULL SYNC] Found ${rewardIds.length} rewards in Redis to hard delete`);
-        
-        // Hard delete each reward key directly via Redis proxy
-        for (const rewardId of rewardIds) {
-          try {
-            // Delete the reward key
-            const delResponse = await fetch(`${API_BASE_URL}/api/v1/redis/del`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ args: [`reward:${rewardId}`] }),
-            });
-            if (delResponse.ok) {
-              const result = await delResponse.json();
-              if (result.data) {
-                console.log(`  ✅ Hard deleted reward ${rewardId} from Redis`);
-              }
-            } else {
-              console.warn(`  ⚠️ Failed to delete reward ${rewardId} key`);
-            }
-          } catch (error) {
-            console.error(`  ❌ Error deleting reward ${rewardId}:`, error);
-          }
-        }
-        
-        // Delete the entire business rewards set
+    // Get all reward IDs from the set using Redis proxy
+    const smembersResponse = await fetch(`${API_BASE_URL}/api/v1/redis/smembers`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ args: [`business:${businessId}:rewards`] }),
+    });
+    
+    if (smembersResponse.ok) {
+      const smembersResult = await smembersResponse.json();
+      const rewardIds: string[] = smembersResult.data || [];
+      console.log(`🗑️ [FULL SYNC] Found ${rewardIds.length} rewards in Redis set to delete`);
+      
+      // Delete each reward key directly via Redis proxy
+      for (const rewardId of rewardIds) {
         try {
-          const delSetResponse = await fetch(`${API_BASE_URL}/api/v1/redis/del`, {
+          const delResponse = await fetch(`${API_BASE_URL}/api/v1/redis/del`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ args: [`business:${businessId}:rewards`] }),
+            body: JSON.stringify({ args: [`reward:${rewardId}`] }),
           });
-          if (delSetResponse.ok) {
-            const result = await delSetResponse.json();
-            if (result.data) {
-              console.log(`  ✅ Deleted business rewards set from Redis`);
-            }
+          if (delResponse.ok) {
+            console.log(`  ✅ Deleted reward ${rewardId} from Redis`);
+          } else {
+            console.warn(`  ⚠️ Failed to delete reward ${rewardId} key`);
           }
         } catch (error) {
-          console.error(`  ❌ Error deleting business rewards set:`, error);
+          console.error(`  ❌ Error deleting reward ${rewardId}:`, error);
         }
       }
+    }
+    
+    // Delete the business rewards set
+    try {
+      const delSetResponse = await fetch(`${API_BASE_URL}/api/v1/redis/del`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ args: [`business:${businessId}:rewards`] }),
+      });
+      if (delSetResponse.ok) {
+        console.log(`  ✅ Deleted business rewards set from Redis`);
+      }
+    } catch (error) {
+      console.error(`  ❌ Error deleting business rewards set:`, error);
     }
   } catch (error) {
     console.error('❌ [FULL SYNC] Error deleting rewards:', error);
