@@ -232,6 +232,7 @@ export const performDailySync = async (businessId: string, forceSync: boolean = 
     // Update sync metadata after sync
     // CRITICAL: Only update lastModified if sync was actually successful
     // If rewards failed to sync, keep the local timestamp to preserve local data
+    const syncTime = new Date().toISOString(); // Local sync timestamp (not written to Redis)
     const allRewardsSynced = result.rewards === rewards.length;
     const allCampaignsSynced = result.campaigns === campaigns.length;
     const allCustomersSynced = result.customers === customers.length;

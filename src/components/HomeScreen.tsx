@@ -35,21 +35,8 @@ try {
   logoImage = null;
 }
 
-// Load banner image (same as customer app)
+// Banner image disabled - using green background instead
 let bannerImage: any = null;
-try {
-  bannerImage = require('../../assets/banner.png');
-  console.log('[HomeScreen] Banner loaded from assets');
-} catch (e) {
-  console.log('[HomeScreen] Banner not found in assets:', e);
-  try {
-    bannerImage = require('../../Images/Banner 1.png');
-    console.log('[HomeScreen] Banner loaded from Images folder');
-  } catch (e2) {
-    console.log('[HomeScreen] Banner not found anywhere:', e2);
-    bannerImage = null;
-  }
-}
 
 // Load social media icons from Images folder
 let facebookIcon: any = null;

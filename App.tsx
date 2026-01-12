@@ -44,7 +44,7 @@ import {saveRewards, loadRewards, saveCampaigns, loadCampaigns, type Reward, typ
 import {generateRewardQRCode} from './src/utils/qrCodeUtils';
 import {isAuthenticated, getStoredAuth} from './src/services/authService';
 import {rewardsRepository, campaignsRepository, customersRepository} from './src/services/localRepository';
-import {startDailySync} from './src/services/dailySyncService';
+// CRITICAL: No automatic daily sync - Redis only accessed on login/logout, create/submit, or manual sync
 import {dumpRepository} from './src/utils/dumpRepository';
 
 function App(): React.JSX.Element {
@@ -185,9 +185,9 @@ function App(): React.JSX.Element {
             setCampaigns([]);
           }
           
-          // Start daily sync service
-          startDailySync(auth.businessId);
-          console.log('✅ [App] Daily sync service started');
+          // CRITICAL: Do NOT start automatic daily sync
+          // Redis should only be accessed on login/logout, create/submit, or manual sync
+          // No automatic sync intervals allowed
         }
       }
     } catch (error) {
