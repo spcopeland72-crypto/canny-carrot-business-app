@@ -196,6 +196,10 @@ export const loginBusiness = async (email: string, password: string): Promise<Bu
       // Use businessId from local storage instead of querying Redis
       console.log('Subsequent login - using local credentials, verifying password');
       
+      // Get device ID for tracking
+      const { getDeviceId } = await import('./localStorage');
+      const deviceId = getDeviceId();
+      
       // Verify password against Redis via API using stored businessId
       // This is faster than querying Redis for businessId first
       const response = await fetch(`${API_BASE_URL}/api/v1/auth/business/login`, {
@@ -206,7 +210,8 @@ export const loginBusiness = async (email: string, password: string): Promise<Bu
         body: JSON.stringify({ 
           email: email.toLowerCase(), 
           password,
-          businessId: existingAuth.businessId // Use stored businessId
+          businessId: existingAuth.businessId, // Use stored businessId
+          deviceId, // Include device ID for tracking
         }),
       });
 
@@ -386,6 +391,10 @@ export const loginBusiness = async (email: string, password: string): Promise<Bu
       throw new Error('Business account not found in database');
     }
 
+    // Get device ID for tracking
+    const { getDeviceId } = await import('./localStorage');
+    const deviceId = getDeviceId();
+    
     // Step 3: Verify password using API endpoint
     // The API will verify password hash against Redis (single source of truth)
     // API endpoint handles bcrypt password verification
@@ -397,7 +406,8 @@ export const loginBusiness = async (email: string, password: string): Promise<Bu
       body: JSON.stringify({ 
         email: email.toLowerCase(), 
         password,
-        businessId 
+        businessId,
+        deviceId, // Include device ID for tracking
       }),
     });
 
