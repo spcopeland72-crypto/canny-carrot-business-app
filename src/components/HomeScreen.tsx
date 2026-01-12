@@ -1049,7 +1049,7 @@ const styles = StyleSheet.create({
     height: 171,
   },
   banner: {
-    backgroundColor: Colors.secondary, // Orange background
+    backgroundColor: '#74A71C', // Green background
     paddingHorizontal: 20,
     paddingVertical: 17,
     minHeight: 128,
