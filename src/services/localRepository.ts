@@ -143,10 +143,33 @@ export const businessRepository = {
           if (response.ok) {
             console.log(`✅ [REPOSITORY] Business profile written to Redis (${profile.products?.length || 0} products, ${profile.actions?.length || 0} actions)`);
             
-            // Update business.updatedAt timestamp to reflect repository update
+            // Update business.updatedAt timestamp to match the local repository's timestamp
+            // The profile's updatedAt should already match the repository timestamp from markDirty()
             try {
-              const { updateBusinessTimestamp } = await import('./timestampUpdater');
-              await updateBusinessTimestamp(auth.businessId);
+              const { getLocalRepositoryTimestamp } = await import('./localRepository');
+              const localTimestamp = await getLocalRepositoryTimestamp();
+              
+              const businessResponse = await fetch(`${API_BASE_URL}/api/v1/businesses/${auth.businessId}`, {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/json' },
+              });
+              
+              if (businessResponse.ok) {
+                const businessResult = await businessResponse.json();
+                if (businessResult.success && businessResult.data) {
+                  const existingBusiness = businessResult.data;
+                  const updatedBusiness = {
+                    ...existingBusiness,
+                    updatedAt: localTimestamp, // Use device's timestamp, not a new one
+                  };
+                  
+                  await fetch(`${API_BASE_URL}/api/v1/businesses/${auth.businessId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(updatedBusiness),
+                  });
+                }
+              }
             } catch (timestampError: any) {
               console.warn(`⚠️ [REPOSITORY] Error updating business timestamp: ${timestampError.message || timestampError}`);
               // Don't fail the save if timestamp update fails
@@ -272,10 +295,32 @@ export const rewardsRepository = {
         if (response.ok) {
           console.log(`✅ [REPOSITORY] Reward "${reward.name}" written to Redis`);
           
-          // Update business.updatedAt timestamp to reflect repository update
+          // Update business.updatedAt timestamp to match the local repository's timestamp
           try {
-            const { updateBusinessTimestamp } = await import('./timestampUpdater');
-            await updateBusinessTimestamp(auth.businessId);
+            const { getLocalRepositoryTimestamp } = await import('./localRepository');
+            const localTimestamp = await getLocalRepositoryTimestamp();
+            
+            const businessResponse = await fetch(`${API_BASE_URL}/api/v1/businesses/${auth.businessId}`, {
+              method: 'GET',
+              headers: { 'Content-Type': 'application/json' },
+            });
+            
+            if (businessResponse.ok) {
+              const businessResult = await businessResponse.json();
+              if (businessResult.success && businessResult.data) {
+                const existingBusiness = businessResult.data;
+                const updatedBusiness = {
+                  ...existingBusiness,
+                  updatedAt: localTimestamp, // Use device's timestamp, not a new one
+                };
+                
+                await fetch(`${API_BASE_URL}/api/v1/businesses/${auth.businessId}`, {
+                  method: 'PUT',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(updatedBusiness),
+                });
+              }
+            }
           } catch (timestampError: any) {
             console.warn(`⚠️ [REPOSITORY] Error updating business timestamp: ${timestampError.message || timestampError}`);
             // Don't fail the save if timestamp update fails
