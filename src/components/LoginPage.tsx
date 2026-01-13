@@ -203,15 +203,17 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
             {/* Login Button */}
             <TouchableOpacity
               style={[styles.loginButton, isLoading && styles.loginButtonDisabled]}
-              onPress={(e) => {
-                console.log('[LoginPage] Login button pressed', e);
-                e?.preventDefault?.();
+              onPress={() => {
+                console.log('[LoginPage] Login button pressed');
                 handleLogin();
               }}
               onPressIn={() => console.log('[LoginPage] Login button press started')}
               disabled={isLoading}
               activeOpacity={0.7}
-              testID="login-button">
+              testID="login-button"
+              accessible={true}
+              accessibilityRole="button"
+              accessibilityLabel="Login">
               <Text style={styles.loginButtonText}>
                 {isLoading ? 'Logging in...' : 'Login'}
               </Text>
