@@ -30,6 +30,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const passwordRef = React.useRef<TextInput>(null);
 
   // Debug: Log component mount
   React.useEffect(() => {
@@ -159,14 +160,23 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
               <TextInput
                 style={styles.input}
                 placeholder="Enter your email"
-                  placeholderTextColor={Colors.text.secondary}
-                  value={email}
-                  onChangeText={setEmail}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  editable={!isLoading}
-                />
+                placeholderTextColor={Colors.text.secondary}
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+                autoComplete="email"
+                textContentType="emailAddress"
+                editable={!isLoading}
+                returnKeyType="next"
+                onSubmitEditing={() => {
+                  // Focus password field on mobile when user presses "next"
+                  if (passwordRef.current) {
+                    passwordRef.current.focus();
+                  }
+                }}
+              />
               </View>
 
               {/* Password Input */}
@@ -174,16 +184,26 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                 <Text style={styles.label}>Password</Text>
                 <View style={styles.passwordContainer}>
                   <TextInput
+                    ref={passwordRef}
                     style={styles.passwordInput}
                     placeholder="Enter your password"
                     placeholderTextColor={Colors.text.secondary}
-                  value={password}
-                  onChangeText={setPassword}
-                  secureTextEntry={!showPassword}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  editable={!isLoading}
-                />
+                    value={password}
+                    onChangeText={setPassword}
+                    secureTextEntry={!showPassword}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    autoComplete="password"
+                    textContentType="password"
+                    editable={!isLoading}
+                    returnKeyType="done"
+                    onSubmitEditing={() => {
+                      // Submit form when user presses "done" on password field
+                      if (!isLoading && email && password) {
+                        handleLogin();
+                      }
+                    }}
+                  />
                 <TouchableOpacity
                   style={styles.showPasswordButton}
                   onPress={() => setShowPassword(!showPassword)}>
