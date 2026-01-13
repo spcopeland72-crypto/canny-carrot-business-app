@@ -46,6 +46,7 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
   onSave,
 }) => {
   const isEdit = !!rewardId;
+  const isCampaign = currentScreen.startsWith('CreateCampaign') || currentScreen.startsWith('EditCampaign');
   const [name, setName] = useState('');
   const [type, setType] = useState<'product' | 'action'>('product');
   const [requirement, setRequirement] = useState('');
@@ -337,7 +338,7 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
       console.error('[CreateEditReward] Unexpected error in handleSave:', error);
       Alert.alert(
         'Error',
-        'An unexpected error occurred while saving the reward. Please try again.'
+        isCampaign ? 'An unexpected error occurred while saving the campaign. Please try again.' : 'An unexpected error occurred while saving the reward. Please try again.'
       );
     }
   };
@@ -397,7 +398,7 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
   // Copy reward - duplicates current reward but clears name
   const handleCopyReward = () => {
     if (!isEdit || !reward) {
-      Alert.alert('Info', 'No reward to copy. Create a reward first.');
+      Alert.alert('Info', isCampaign ? 'No campaign to copy. Create a campaign first.' : 'No reward to copy. Create a reward first.');
       return;
     }
     
@@ -411,13 +412,13 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
     setSelectedActions(reward.selectedActions || []);
     setPinCode(''); // Clear PIN code (user needs to enter new one)
     
-    Alert.alert('Copied', 'Reward details copied. Please enter a new name and PIN code.');
+    Alert.alert('Copied', isCampaign ? 'Campaign details copied. Please enter a new name and PIN code.' : 'Reward details copied. Please enter a new name and PIN code.');
   };
 
   // Delete reward with confirmation
   const handleDeleteReward = () => {
     if (!isEdit || !rewardId) {
-      Alert.alert('Info', 'No reward to delete.');
+      Alert.alert('Info', isCampaign ? 'No campaign to delete.' : 'No reward to delete.');
       return;
     }
     setDeleteConfirmVisible(true);
@@ -428,7 +429,7 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
     
     try {
       await rewardsRepository.delete(rewardId);
-      Alert.alert('Success', 'Reward deleted successfully', [
+      Alert.alert('Success', isCampaign ? 'Campaign deleted successfully' : 'Reward deleted successfully', [
         {
           text: 'OK',
           onPress: () => {
@@ -439,7 +440,7 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
       ]);
     } catch (error) {
       console.error('Error deleting reward:', error);
-      Alert.alert('Error', 'Failed to delete reward. Please try again.');
+      Alert.alert('Error', isCampaign ? 'Failed to delete campaign. Please try again.' : 'Failed to delete reward. Please try again.');
     }
     setDeleteConfirmVisible(false);
   };
@@ -511,14 +512,14 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
 
   return (
     <PageTemplate
-      title={isEdit ? 'Edit Reward' : 'Create Reward'}
+      title={isEdit ? (isCampaign ? 'Edit Campaign' : 'Edit Reward') : (isCampaign ? 'Create Campaign' : 'Create Reward')}
       currentScreen={currentScreen}
       onNavigate={onNavigate}
       onBack={onBack}
       headerRight={headerButtons}>
       <ScrollView style={styles.content}>
         <View style={styles.form}>
-          <Text style={styles.label}>Reward Name *</Text>
+          <Text style={styles.label}>{isCampaign ? 'Campaign Name *' : 'Reward Name *'}</Text>
           <TextInput
             style={styles.input}
             value={name}
@@ -750,7 +751,7 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
             placeholderTextColor={Colors.text.light}
           />
 
-          <Text style={styles.label}>Reward Type *</Text>
+          <Text style={styles.label}>{isCampaign ? 'Campaign Type *' : 'Reward Type *'}</Text>
           <View style={styles.radioGroup}>
             <TouchableOpacity
               style={[
@@ -820,7 +821,7 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
 
           <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
             <Text style={styles.saveButtonText}>
-              {isEdit ? 'Save Changes' : 'Create Reward'}
+              {isEdit ? 'Save Changes' : (isCampaign ? 'Create Campaign' : 'Create Reward')}
             </Text>
           </TouchableOpacity>
         </View>
@@ -865,7 +866,7 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
         onRequestClose={() => setDeleteConfirmVisible(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.deleteModal}>
-            <Text style={styles.deleteModalTitle}>Delete Reward?</Text>
+            <Text style={styles.deleteModalTitle}>{isCampaign ? 'Delete Campaign?' : 'Delete Reward?'}</Text>
             <Text style={styles.deleteModalMessage}>
               Are you sure you want to delete "{reward?.name}"? This action cannot be undone.
             </Text>

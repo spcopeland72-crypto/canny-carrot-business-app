@@ -458,18 +458,76 @@ export const campaignsRepository = {
 
   /**
    * Add or update a campaign
+   * IMMEDIATELY writes to Redis after saving locally
    */
   save: async (campaign: Campaign): Promise<void> => {
     const campaigns = await campaignsRepository.getAll();
     const index = campaigns.findIndex(c => c.id === campaign.id);
+    const now = new Date().toISOString();
     
     if (index >= 0) {
-      campaigns[index] = { ...campaign, updatedAt: new Date().toISOString() };
+      campaigns[index] = { ...campaign, updatedAt: now };
     } else {
-      campaigns.push({ ...campaign, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
+      campaigns.push({ ...campaign, createdAt: now, updatedAt: now });
     }
     
+    // saveAll() will call markDirty() which updates top-level lastModified timestamp
     await campaignsRepository.saveAll(campaigns);
+    
+    // IMMEDIATELY write to Redis
+    try {
+      const { getStoredAuth } = await import('./authService');
+      const auth = await getStoredAuth();
+      if (auth?.businessId && (campaign as any).businessId) {
+        const API_BASE_URL = 'https://api.cannycarrot.com';
+        const response = await fetch(`${API_BASE_URL}/api/v1/campaigns`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(campaign),
+        });
+        
+        if (response.ok) {
+          console.log(`✅ [REPOSITORY] Campaign "${campaign.name}" written to Redis`);
+          
+          // Update business.updatedAt timestamp to match the local repository's timestamp
+          try {
+            const { getLocalRepositoryTimestamp } = await import('./localRepository');
+            const localTimestamp = await getLocalRepositoryTimestamp();
+            
+            const businessResponse = await fetch(`${API_BASE_URL}/api/v1/businesses/${auth.businessId}`, {
+              method: 'GET',
+              headers: { 'Content-Type': 'application/json' },
+            });
+            
+            if (businessResponse.ok) {
+              const businessResult = await businessResponse.json();
+              if (businessResult.success && businessResult.data) {
+                const existingBusiness = businessResult.data;
+                const updatedBusiness = {
+                  ...existingBusiness,
+                  updatedAt: localTimestamp, // Use device's timestamp, not a new one
+                };
+                
+                await fetch(`${API_BASE_URL}/api/v1/businesses/${auth.businessId}`, {
+                  method: 'PUT',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(updatedBusiness),
+                });
+              }
+            }
+          } catch (timestampError: any) {
+            console.warn(`⚠️ [REPOSITORY] Error updating business timestamp: ${timestampError.message || timestampError}`);
+            // Don't fail the save if timestamp update fails
+          }
+        } else {
+          const errorText = await response.text();
+          console.error(`❌ [REPOSITORY] Failed to write campaign to Redis: ${response.status} ${errorText.substring(0, 200)}`);
+        }
+      }
+    } catch (redisError: any) {
+      console.error('[REPOSITORY] Error writing campaign to Redis:', redisError.message);
+      // Don't fail the save if Redis write fails - local save already succeeded
+    }
   },
 
   /**

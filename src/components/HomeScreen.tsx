@@ -22,8 +22,8 @@ import AnimatedLineChart from './AnimatedLineChart';
 import AnimatedBarChart from './AnimatedBarChart';
 import AnimatedDonutChart from './AnimatedDonutChart';
 import AnimatedAreaChart from './AnimatedAreaChart';
-import {businessRepository, rewardsRepository} from '../services/localRepository';
-import type {Reward} from '../types';
+import {businessRepository, rewardsRepository, campaignsRepository} from '../services/localRepository';
+import type {Reward, Campaign} from '../types';
 
 // Load CC logo image (same as customer app header)
 let logoImage: any = null;
@@ -114,6 +114,9 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
 
   // Local state for rewards as fallback if props are empty
   const [localRewards, setLocalRewards] = useState<Reward[]>([]);
+  
+  // Local state for campaigns as fallback if props are empty
+  const [localCampaigns, setLocalCampaigns] = useState<Campaign[]>([]);
 
   // Load business name and logo from local repository on mount
   useEffect(() => {
@@ -201,8 +204,33 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   const allRewards = propsRewards.length > 0 ? propsRewards : (localRewards.length > 0 ? localRewards : []);
   const rewards = allRewards.filter(r => r.isActive !== false); // Only show active rewards
   
-  // Use campaigns from props, fallback to empty array
-  const campaigns = propsCampaigns.length > 0 ? propsCampaigns : [];
+  // Fallback: Load campaigns directly from repository if props are empty
+  useEffect(() => {
+    const loadCampaignsFromRepository = async () => {
+      // Only load if props are empty
+      if (propsCampaigns.length === 0) {
+        try {
+          console.log('[HomeScreen] Props campaigns empty - loading directly from repository...');
+          const loadedCampaigns = await campaignsRepository.getAll();
+          console.log(`[HomeScreen] Found ${loadedCampaigns?.length || 0} campaigns in repository`);
+          
+          if (loadedCampaigns && loadedCampaigns.length > 0) {
+            setLocalCampaigns(loadedCampaigns);
+            console.log(`[HomeScreen] Loaded ${loadedCampaigns.length} campaigns directly from repository`);
+          } else {
+            console.log(`[HomeScreen] ⚠️ No campaigns found in repository`);
+          }
+        } catch (error) {
+          console.error('[HomeScreen] Error loading campaigns from repository:', error);
+        }
+      }
+    };
+    
+    loadCampaignsFromRepository();
+  }, [propsCampaigns.length]); // Only run when propsCampaigns length changes
+  
+  // Use campaigns from props, fallback to local state, then empty array
+  const campaigns = propsCampaigns.length > 0 ? propsCampaigns : (localCampaigns.length > 0 ? localCampaigns : []);
   
   // Log current state for debugging
   useEffect(() => {
@@ -657,7 +685,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                 <TouchableOpacity
                   key={campaign.id}
                   style={styles.rewardCard}
-                  onPress={() => onNavigate(`CampaignDetail${campaign.id}`)}>
+                  onPress={() => onNavigate(`EditCampaign${campaign.id}`)}>
                   <View style={styles.rewardTitleContainer}>
                     <Text style={styles.rewardTitle}>{campaign.name}</Text>
                   </View>
