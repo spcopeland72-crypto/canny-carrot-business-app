@@ -8,6 +8,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { redis } from './redis';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
+import * as repoModule from './localRepository';
 
 // Get API base URL (same logic as redis.ts)
 const getApiBaseUrl = (): string => {
@@ -197,7 +198,7 @@ export const loginBusiness = async (email: string, password: string): Promise<Bu
       console.log('Subsequent login - using local credentials, verifying password');
       
       // Get device ID for tracking
-      const { getDeviceId } = await import('./localStorage');
+      const { getDeviceId } = require('./localStorage');
       const deviceId = getDeviceId();
       
       // Verify password against Redis via API using stored businessId
@@ -227,7 +228,6 @@ export const loginBusiness = async (email: string, password: string): Promise<Bu
       // REPOSITORY LOAD LOGIC: Check if repository exists and matches login credentials
       // NO SYNC ON LOGIN - sync only happens on logout or manual sync
       try {
-        const repoModule = await import('./localRepository');
         
         const repoExists = await repoModule.repositoryExists();
         
@@ -446,7 +446,6 @@ export const loginBusiness = async (email: string, password: string): Promise<Bu
     // REPOSITORY LOAD LOGIC: Load from local storage if exists, otherwise download from database
     // NO SYNC ON LOGIN - sync only happens on logout or manual sync
     try {
-      const repoModule = await import('./localRepository');
       
       const repoExists = await repoModule.repositoryExists();
       
@@ -556,7 +555,7 @@ export const logoutBusiness = async (): Promise<void> => {
       // Perform FULL REPLACEMENT sync - makes Redis identical to local repository
       console.log('🔄 [LOGOUT] Performing full replacement sync - Redis will be identical to local repository...');
       try {
-        const { performFullReplacementSync } = await import('./fullReplacementSync');
+        const { performFullReplacementSync } = require('./fullReplacementSync');
         const syncResult = await performFullReplacementSync(businessId);
         
         if (syncResult.success) {
