@@ -142,6 +142,15 @@ export const businessRepository = {
           
           if (response.ok) {
             console.log(`✅ [REPOSITORY] Business profile written to Redis (${profile.products?.length || 0} products, ${profile.actions?.length || 0} actions)`);
+            
+            // Update business.updatedAt timestamp to reflect repository update
+            try {
+              const { updateBusinessTimestamp } = await import('./timestampUpdater');
+              await updateBusinessTimestamp(auth.businessId);
+            } catch (timestampError: any) {
+              console.warn(`⚠️ [REPOSITORY] Error updating business timestamp: ${timestampError.message || timestampError}`);
+              // Don't fail the save if timestamp update fails
+            }
           } else {
             const errorText = await response.text();
             console.error(`❌ [REPOSITORY] Failed to write business profile to Redis: ${response.status} ${errorText.substring(0, 200)}`);
