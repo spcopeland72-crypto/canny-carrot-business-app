@@ -12,6 +12,7 @@ import {
   FlatList,
   Linking,
   Animated,
+  Easing,
 } from 'react-native';
 import {Colors} from '../constants/Colors';
 import BottomNavigation from './BottomNavigation';
@@ -118,6 +119,34 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   
   // Local state for campaigns as fallback if props are empty
   const [localCampaigns, setLocalCampaigns] = useState<Campaign[]>([]);
+  
+  // Ticker animation
+  const tickerAnim = useRef(new Animated.Value(0)).current;
+  const tickerText = "Canny Carrot welcomes our newest Silver Member Powder Butterfly and our latest Gold Member Blackwells Butchers";
+  
+  useEffect(() => {
+    const screenWidth = Dimensions.get('window').width;
+    const textWidth = tickerText.length * 7; // Approximate character width
+    const translateX = -(textWidth + screenWidth);
+    
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(tickerAnim, {
+          toValue: translateX,
+          duration: 15000,
+          easing: Easing.linear,
+          useNativeDriver: true,
+        }),
+        Animated.timing(tickerAnim, {
+          toValue: 0,
+          duration: 0,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [tickerText]);
 
   // Load business name and logo from local repository on mount
   useEffect(() => {
@@ -577,7 +606,12 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
         
         {/* Ticker */}
         <View style={styles.tickerContainer}>
-          <Text style={styles.tickerText}>Canny Carrot welcomes our newest Silver Member Powder Butterfly and our latest Gold Member Blackwells Butchers</Text>
+          <View style={styles.tickerWrapper}>
+            <Animated.View style={[styles.tickerContent, {transform: [{translateX: tickerAnim}]}]}>
+              <Text style={styles.tickerText}>{tickerText}</Text>
+              <Text style={styles.tickerText}>{' '}{tickerText}</Text>
+            </Animated.View>
+          </View>
         </View>
         
         {/* Rewards Carousel - Round Elements (matching customer app) */}
@@ -1106,14 +1140,23 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderColor: Colors.neutral[200],
     paddingVertical: 8,
-    paddingHorizontal: 16,
     marginBottom: 24,
+    overflow: 'hidden',
+    zIndex: 1,
+  },
+  tickerWrapper: {
+    overflow: 'hidden',
+    height: 20,
+  },
+  tickerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   tickerText: {
     fontSize: 12,
     color: Colors.text.primary,
     fontWeight: '500',
-    textAlign: 'center',
+    paddingHorizontal: 16,
   },
   bannerTextContainer: {
     flex: 1,
