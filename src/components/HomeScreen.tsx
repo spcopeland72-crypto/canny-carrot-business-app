@@ -120,25 +120,26 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   // Local state for campaigns as fallback if props are empty
   const [localCampaigns, setLocalCampaigns] = useState<Campaign[]>([]);
   
-  // Ticker animation - continuous scrolling like CodePen example
+  // Ticker animation - continuous scrolling where each letter reappears on right as it leaves left
   const tickerAnim = useRef(new Animated.Value(0)).current;
   const tickerText = "Canny Carrot welcomes our newest Silver Member Powder Butterfly and our latest Gold Member Blackwells Butchers";
   const spacing = "          "; // 10 spaces
-  // Duplicate text for seamless looping (2 copies: original + duplicate)
-  // When first copy scrolls off left, second copy seamlessly continues from right
+  // Duplicate text for seamless looping: when first copy scrolls off left, second copy continues from right
   const tickerContent = `${tickerText}${spacing}${tickerText}${spacing}`;
   
   useEffect(() => {
-    const screenWidth = Dimensions.get('window').width;
     // Estimate text width (approximate: 7px per character for 12px font)
     const textWidth = tickerText.length * 7;
     const spacingWidth = 10 * 7; // 10 spaces
     const singleInstanceWidth = textWidth + spacingWidth;
-    // Animate from 0 to -singleInstanceWidth (one instance scrolls off left)
-    // When it loops back to 0, the second copy is already in position to seamlessly continue
-    const scrollDistance = -singleInstanceWidth;
+    // Total content width is 2 instances (original + duplicate)
+    const totalContentWidth = singleInstanceWidth * 2;
     
-    // Start animation from 0 (text visible, ready to scroll)
+    // Animate from 0 to -50% of total width (one instance scrolls off)
+    // When it loops back to 0, the second copy is already in position
+    // This creates seamless continuous scroll: each letter reappears on right as it leaves left
+    const scrollDistance = -singleInstanceWidth; // -50% of total content
+    
     tickerAnim.setValue(0);
     
     const animation = Animated.loop(
