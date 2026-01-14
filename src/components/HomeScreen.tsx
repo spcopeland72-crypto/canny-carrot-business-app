@@ -135,9 +135,11 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
     const spacingWidth = 10 * 7; // 10 spaces
     const singleInstanceWidth = textWidth + spacingWidth;
     
-    // Start animation from 0 (text starts offscreen right)
+    // Start from screenWidth (text starts offscreen right)
     // Animate to -singleInstanceWidth (one full instance scrolls off left)
-    // When it loops back, the next copy is already in position
+    // When it loops back to screenWidth, the next copy seamlessly continues
+    tickerAnim.setValue(screenWidth);
+    
     const animation = Animated.loop(
       Animated.timing(tickerAnim, {
         toValue: -singleInstanceWidth,
