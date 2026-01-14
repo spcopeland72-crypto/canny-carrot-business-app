@@ -124,27 +124,27 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   const tickerAnim = useRef(new Animated.Value(0)).current;
   const tickerText = "Canny Carrot welcomes our newest Silver Member Powder Butterfly and our latest Gold Member Blackwells Butchers";
   const spacing = "          "; // 10 spaces
-  // Duplicate text for seamless looping: when first copy scrolls off left, second copy continues from right
-  const tickerContent = `${tickerText}${spacing}${tickerText}${spacing}`;
+  // Create multiple copies for seamless continuous scrolling
+  // Pattern: text + spacing repeated multiple times
+  // As one copy exits left, the next enters from right seamlessly
+  const tickerContent = `${tickerText}${spacing}${tickerText}${spacing}${tickerText}${spacing}${tickerText}${spacing}`;
   
   useEffect(() => {
+    const screenWidth = Dimensions.get('window').width;
     // Estimate text width (approximate: 7px per character for 12px font)
     const textWidth = tickerText.length * 7;
     const spacingWidth = 10 * 7; // 10 spaces
     const singleInstanceWidth = textWidth + spacingWidth;
-    // Total content width is 2 instances (original + duplicate)
-    const totalContentWidth = singleInstanceWidth * 2;
     
-    // Animate from 0 to -50% of total width (one instance scrolls off)
-    // When it loops back to 0, the second copy is already in position
-    // This creates seamless continuous scroll: each letter reappears on right as it leaves left
-    const scrollDistance = -singleInstanceWidth; // -50% of total content
-    
+    // Start from 0 (text visible, ready to scroll)
+    // Animate to -singleInstanceWidth (one full instance scrolls off left)
+    // When animation loops back to 0, the duplicate copy is already positioned to seamlessly continue
+    // This creates the effect where each letter reappears on right as it leaves left
     tickerAnim.setValue(0);
     
     const animation = Animated.loop(
       Animated.timing(tickerAnim, {
-        toValue: scrollDistance,
+        toValue: -singleInstanceWidth,
         duration: 15000,
         easing: Easing.linear,
         useNativeDriver: true,
@@ -614,7 +614,15 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
         {/* Ticker */}
         <View style={styles.tickerContainer}>
           <View style={styles.tickerWrapper}>
-            <Animated.View style={[styles.tickerContent, {transform: [{translateX: tickerAnim}]}]}>
+            <Animated.View 
+              style={[
+                styles.tickerContent, 
+                {
+                  transform: [{translateX: tickerAnim}],
+                  width: '200%', // Ensure content is wide enough for duplicates
+                }
+              ]}
+            >
               <Text style={styles.tickerText} numberOfLines={1}>{tickerContent}</Text>
             </Animated.View>
           </View>
