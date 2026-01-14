@@ -120,13 +120,13 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   // Local state for campaigns as fallback if props are empty
   const [localCampaigns, setLocalCampaigns] = useState<Campaign[]>([]);
   
-  // Ticker animation
+  // Ticker animation - continuous scrolling like CodePen example
   const tickerAnim = useRef(new Animated.Value(0)).current;
   const tickerText = "Canny Carrot welcomes our newest Silver Member Powder Butterfly and our latest Gold Member Blackwells Butchers";
   const spacing = "          "; // 10 spaces
-  // Create multiple copies to ensure seamless endless scrolling
-  // Each copy is: text + 10 spaces, so we need enough copies to cover screen width + one full instance
-  const tickerContent = `${tickerText}${spacing}${tickerText}${spacing}${tickerText}${spacing}${tickerText}${spacing}${tickerText}${spacing}${tickerText}`;
+  // Duplicate text for seamless looping (2 copies: original + duplicate)
+  // When first copy scrolls off left, second copy seamlessly continues from right
+  const tickerContent = `${tickerText}${spacing}${tickerText}${spacing}`;
   
   useEffect(() => {
     const screenWidth = Dimensions.get('window').width;
@@ -134,15 +134,16 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
     const textWidth = tickerText.length * 7;
     const spacingWidth = 10 * 7; // 10 spaces
     const singleInstanceWidth = textWidth + spacingWidth;
+    // Animate from 0 to -singleInstanceWidth (one instance scrolls off left)
+    // When it loops back to 0, the second copy is already in position to seamlessly continue
+    const scrollDistance = -singleInstanceWidth;
     
-    // Start from screenWidth (text starts offscreen right)
-    // Animate to -singleInstanceWidth (one full instance scrolls off left)
-    // When it loops back to screenWidth, the next copy seamlessly continues
-    tickerAnim.setValue(screenWidth);
+    // Start animation from 0 (text visible, ready to scroll)
+    tickerAnim.setValue(0);
     
     const animation = Animated.loop(
       Animated.timing(tickerAnim, {
-        toValue: -singleInstanceWidth,
+        toValue: scrollDistance,
         duration: 15000,
         easing: Easing.linear,
         useNativeDriver: true,
