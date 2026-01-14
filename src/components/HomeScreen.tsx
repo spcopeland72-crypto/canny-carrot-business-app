@@ -11,6 +11,7 @@ import {
   Image,
   FlatList,
   Linking,
+  Animated,
 } from 'react-native';
 import {Colors} from '../constants/Colors';
 import BottomNavigation from './BottomNavigation';
@@ -574,6 +575,11 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
           )}
         </View>
         
+        {/* Ticker */}
+        <View style={styles.tickerContainer}>
+          <Text style={styles.tickerText}>Canny Carrot welcomes our newest Silver Member Powder Butterfly and our latest Gold Member Blackwells Butchers</Text>
+        </View>
+        
         {/* Rewards Carousel - Round Elements (matching customer app) */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
@@ -1072,7 +1078,7 @@ const styles = StyleSheet.create({
     paddingBottom: 100,
   },
   bannerSection: {
-    marginBottom: 24,
+    marginBottom: 0,
     width: '100%',
     position: 'relative',
   },
@@ -1093,6 +1099,21 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     width: '100%',
+  },
+  tickerContainer: {
+    backgroundColor: Colors.neutral[50],
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: Colors.neutral[200],
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    marginBottom: 24,
+  },
+  tickerText: {
+    fontSize: 12,
+    color: Colors.text.primary,
+    fontWeight: '500',
+    textAlign: 'center',
   },
   bannerTextContainer: {
     flex: 1,
