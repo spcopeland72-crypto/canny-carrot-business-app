@@ -422,10 +422,12 @@ export const campaignsRepository = {
   /**
    * Save all campaigns to local repository
    */
-  saveAll: async (campaigns: Campaign[]): Promise<void> => {
+  saveAll: async (campaigns: Campaign[], skipMarkDirty: boolean = false): Promise<void> => {
     try {
       await AsyncStorage.setItem(REPOSITORY_KEYS.CAMPAIGNS, JSON.stringify(campaigns));
-      await markDirty();
+      if (!skipMarkDirty) {
+        await markDirty(); // Updates top-level lastModified timestamp
+      }
       console.log(`✅ ${campaigns.length} campaigns saved to local repository`);
     } catch (error) {
       console.error('Error saving campaigns:', error);
@@ -547,10 +549,12 @@ export const customersRepository = {
   /**
    * Save all customers to local repository
    */
-  saveAll: async (customers: Customer[]): Promise<void> => {
+  saveAll: async (customers: Customer[], skipMarkDirty: boolean = false): Promise<void> => {
     try {
       await AsyncStorage.setItem(REPOSITORY_KEYS.CUSTOMERS, JSON.stringify(customers));
-      await markDirty();
+      if (!skipMarkDirty) {
+        await markDirty(); // Updates top-level lastModified timestamp
+      }
       console.log(`✅ ${customers.length} customers saved to local repository`);
     } catch (error) {
       console.error('Error saving customers:', error);
@@ -929,8 +933,8 @@ export const downloadAllData = async (businessId: string, apiBaseUrl: string = '
         // Convert map to array (deduplicated by ID)
         const mergedRewards = Array.from(mergedRewardsMap.values());
         
-        // Store merged rewards
-        await rewardsRepository.saveAll(mergedRewards);
+        // Store merged rewards without marking as dirty (we're downloading, not modifying)
+        await rewardsRepository.saveAll(mergedRewards, true);
         console.log(`✅ [REPOSITORY] ${mergedRewards.length} rewards merged (${rewardsResult.data.length - localTrash.length} from Redis, ${localTrash.length} preserved deletions)`);
       } else {
         console.log('⚠️ [REPOSITORY] API response invalid - NOT overwriting local rewards');
@@ -944,13 +948,21 @@ export const downloadAllData = async (businessId: string, apiBaseUrl: string = '
     }
 
     // 3. Download campaigns
+    console.log(`📥 [REPOSITORY] Fetching campaigns from API...`);
     const campaignsResponse = await fetch(`${apiBaseUrl}/api/v1/campaigns?businessId=${businessId}`);
     if (campaignsResponse.ok) {
       const campaignsResult = await campaignsResponse.json();
+      console.log(`📊 [REPOSITORY] Campaigns API response:`, {success: campaignsResult.success, dataLength: campaignsResult.data?.length || 0, isArray: Array.isArray(campaignsResult.data)});
       if (campaignsResult.success && Array.isArray(campaignsResult.data)) {
-        await campaignsRepository.saveAll(campaignsResult.data);
-        console.log(`✅ ${campaignsResult.data.length} campaigns downloaded`);
+        // Save without marking as dirty (we're downloading, not modifying)
+        await campaignsRepository.saveAll(campaignsResult.data, true);
+        console.log(`✅ [REPOSITORY] ${campaignsResult.data.length} campaigns downloaded and saved`);
+      } else {
+        console.warn(`⚠️ [REPOSITORY] Campaigns API response invalid: success=${campaignsResult.success}, isArray=${Array.isArray(campaignsResult.data)}`);
       }
+    } else {
+      const errorText = await campaignsResponse.text();
+      console.error(`❌ [REPOSITORY] Campaigns API error ${campaignsResponse.status}: ${errorText.substring(0, 200)}`);
     }
 
     // 4. Download customers (members)
@@ -958,9 +970,12 @@ export const downloadAllData = async (businessId: string, apiBaseUrl: string = '
     if (customersResponse.ok) {
       const customersResult = await customersResponse.json();
       if (customersResult.success && Array.isArray(customersResult.data)) {
-        await customersRepository.saveAll(customersResult.data);
+        // Save without marking as dirty (we're downloading, not modifying)
+        await customersRepository.saveAll(customersResult.data, true);
         console.log(`✅ ${customersResult.data.length} customers downloaded`);
       }
+    } else {
+      console.error(`❌ [REPOSITORY] API error ${customersResponse.status} - customers download failed`);
     }
 
     // Update sync metadata with database timestamp as the repository timestamp
