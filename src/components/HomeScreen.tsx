@@ -123,30 +123,33 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   // Ticker animation
   const tickerAnim = useRef(new Animated.Value(0)).current;
   const tickerText = "Canny Carrot welcomes our newest Silver Member Powder Butterfly and our latest Gold Member Blackwells Butchers";
+  const spacing = "          "; // 10 spaces
+  // Create multiple copies to ensure seamless endless scrolling
+  // Each copy is: text + 10 spaces, so we need enough copies to cover screen width + one full instance
+  const tickerContent = `${tickerText}${spacing}${tickerText}${spacing}${tickerText}${spacing}${tickerText}${spacing}${tickerText}${spacing}${tickerText}`;
   
   useEffect(() => {
     const screenWidth = Dimensions.get('window').width;
-    const textWidth = tickerText.length * 7; // Approximate character width
-    const translateX = -(textWidth + screenWidth);
+    // Estimate text width (approximate: 7px per character for 12px font)
+    const textWidth = tickerText.length * 7;
+    const spacingWidth = 10 * 7; // 10 spaces
+    const singleInstanceWidth = textWidth + spacingWidth;
     
+    // Start animation from 0 (text starts offscreen right)
+    // Animate to -singleInstanceWidth (one full instance scrolls off left)
+    // When it loops back, the next copy is already in position
     const animation = Animated.loop(
-      Animated.sequence([
-        Animated.timing(tickerAnim, {
-          toValue: translateX,
-          duration: 15000,
-          easing: Easing.linear,
-          useNativeDriver: true,
-        }),
-        Animated.timing(tickerAnim, {
-          toValue: 0,
-          duration: 0,
-          useNativeDriver: true,
-        }),
-      ])
+      Animated.timing(tickerAnim, {
+        toValue: -singleInstanceWidth,
+        duration: 15000,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      }),
+      { iterations: -1 } // Infinite loop
     );
     animation.start();
     return () => animation.stop();
-  }, [tickerText]);
+  }, []);
 
   // Load business name and logo from local repository on mount
   useEffect(() => {
@@ -608,8 +611,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
         <View style={styles.tickerContainer}>
           <View style={styles.tickerWrapper}>
             <Animated.View style={[styles.tickerContent, {transform: [{translateX: tickerAnim}]}]}>
-              <Text style={styles.tickerText}>{tickerText}</Text>
-              <Text style={styles.tickerText}>{' '}{tickerText}</Text>
+              <Text style={styles.tickerText} numberOfLines={1}>{tickerContent}</Text>
             </Animated.View>
           </View>
         </View>
@@ -1147,6 +1149,7 @@ const styles = StyleSheet.create({
   tickerWrapper: {
     overflow: 'hidden',
     height: 20,
+    width: '100%',
   },
   tickerContent: {
     flexDirection: 'row',
@@ -1157,6 +1160,7 @@ const styles = StyleSheet.create({
     color: Colors.text.primary,
     fontWeight: '500',
     paddingHorizontal: 16,
+    flexShrink: 0,
   },
   bannerTextContainer: {
     flex: 1,
