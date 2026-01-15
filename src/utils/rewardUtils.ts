@@ -1,10 +1,10 @@
 /**
- * Reward Utility Functions
+ * Reward and Campaign Utility Functions
  * 
- * Helper functions for working with rewards in DB format
+ * Helper functions for working with rewards and campaigns in DB format
  */
 
-import type { Reward } from '../types';
+import type { Reward, Campaign } from '../types';
 
 /**
  * Compute UI display fields from DB format reward
@@ -48,6 +48,47 @@ export const mapDbRewardToFormFields = (reward: Reward) => {
     selectedActions: reward.selectedActions || [],
     pinCode: reward.pinCode || '',
     pointsPerPurchase: reward.pointsPerPurchase?.toString() || '1',
+  };
+};
+
+/**
+ * Campaign icon pool - randomly assigned for UI display
+ */
+const CAMPAIGN_ICONS = ['🎄', '🎆', '💝', '🌸', '🎃', '🎁', '🎉', '🏆', '🎯', '🎊', '🌟', '⭐', '🎪', '🎨', '🎭'];
+
+/**
+ * Compute UI display fields from DB format campaign
+ * Note: icon is NOT stored - randomly assigned for UI consistency
+ */
+export const getCampaignDisplayFields = (campaign: Campaign): {
+  icon: string;
+  count: number;
+  total: number;
+} => {
+  // Use campaign ID to deterministically assign icon (consistent per campaign)
+  const iconIndex = parseInt(campaign.id.slice(-2) || '0', 10) % CAMPAIGN_ICONS.length;
+  const icon = CAMPAIGN_ICONS[iconIndex];
+  
+  // Get total from rewardData if available, otherwise default
+  const total = campaign.conditions?.rewardData?.stampsRequired || 10;
+  
+  // Count is from customerProgress (sum of all customer points)
+  // customerProgress is Record<string, { points: number; actions: Record<string, number> }>
+  let count = 0;
+  if (campaign.customerProgress) {
+    count = Object.values(campaign.customerProgress).reduce((sum, progress) => {
+      if (typeof progress === 'object' && progress !== null && 'points' in progress) {
+        return sum + (progress.points || 0);
+      }
+      // Backward compatibility: if it's just a number
+      return sum + (typeof progress === 'number' ? progress : 0);
+    }, 0);
+  }
+  
+  return {
+    icon,
+    count,
+    total,
   };
 };
 

@@ -26,6 +26,7 @@ import AnimatedBarChart from './AnimatedBarChart';
 import AnimatedDonutChart from './AnimatedDonutChart';
 import AnimatedAreaChart from './AnimatedAreaChart';
 import {businessRepository, rewardsRepository, campaignsRepository} from '../services/localRepository';
+import {getCampaignDisplayFields} from '../utils/rewardUtils';
 import type {Reward, Campaign} from '../types';
 
 // Load CC logo image (same as customer app header)
@@ -758,12 +759,17 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.carouselContent}>
             {campaigns.map((campaign) => {
-              const progress = (campaign.count / campaign.total) * 100;
+              // Compute display fields from DB format campaign
+              const displayFields = getCampaignDisplayFields(campaign as Campaign);
+              const progress = displayFields.total > 0 ? (displayFields.count / displayFields.total) * 100 : 0;
               const progressColor = campaign.status === 'active' 
                 ? Colors.accent 
                 : campaign.status === 'completed' 
                 ? Colors.secondary 
                 : Colors.neutral[300];
+              
+              console.log('[HomeScreen] Rendering campaign:', { id: campaign.id, name: campaign.name, status: campaign.status });
+              
               return (
                 <TouchableOpacity
                   key={campaign.id}
@@ -782,11 +788,11 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                       backgroundColor={Colors.neutral[200]}
                     />
                     <View style={styles.rewardIconOverlay}>
-                      <Text style={styles.rewardIcon}>{campaign.icon}</Text>
+                      <Text style={styles.rewardIcon}>{displayFields.icon}</Text>
                     </View>
                   </View>
                   <Text style={styles.rewardCount}>
-                    {campaign.count} / {campaign.total}
+                    {displayFields.count} / {displayFields.total}
                   </Text>
                   <Text style={styles.campaignStatus}>
                     {campaign.status.toUpperCase()}

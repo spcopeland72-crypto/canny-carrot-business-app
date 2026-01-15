@@ -241,12 +241,37 @@ export const rewardsRepository = {
 
   /**
    * Get all rewards from local repository
+   * Validates that items are actually rewards (not campaigns)
    */
   getAll: async (): Promise<Reward[]> => {
     try {
       const data = await AsyncStorage.getItem(REPOSITORY_KEYS.REWARDS);
       if (data) {
-        return JSON.parse(data);
+        const parsed = JSON.parse(data);
+        // Validate: rewards must have 'isActive' or 'stampsRequired' field
+        // Campaigns have 'type' (CampaignType: 'double_stamps', 'bonus_reward', etc.) and 'status' (CampaignStatus: 'active', 'draft', etc.)
+        const campaignTypes = ['double_stamps', 'bonus_reward', 'flash_sale', 'referral', 'birthday', 'happy_hour', 'loyalty_tier'];
+        const campaignStatuses = ['draft', 'scheduled', 'active', 'paused', 'completed', 'cancelled'];
+        
+        const validRewards = parsed.filter((item: any) => {
+          // Check if it's a campaign: has CampaignType 'type' field or CampaignStatus 'status' field
+          const hasCampaignType = item.type && campaignTypes.includes(item.type);
+          const hasCampaignStatus = item.status && campaignStatuses.includes(item.status) && item.isActive === undefined;
+          
+          // If it looks like a campaign, filter it out
+          if (hasCampaignType || hasCampaignStatus) {
+            console.warn(`⚠️ [REPOSITORY] Filtered out campaign from rewards (moved to campaigns): ${item.id} - ${item.name}`);
+            return false;
+          }
+          
+          // Reward must have isActive or stampsRequired
+          const isReward = item.isActive !== undefined || item.stampsRequired || item.costStamps;
+          if (!isReward) {
+            console.warn(`⚠️ [REPOSITORY] Filtered out invalid reward item: ${item.id} - ${item.name}`);
+          }
+          return isReward;
+        });
+        return validRewards;
       }
     } catch (error) {
       console.error('Error getting rewards:', error);
@@ -437,12 +462,37 @@ export const campaignsRepository = {
 
   /**
    * Get all campaigns from local repository
+   * Validates that items are actually campaigns (not rewards)
    */
   getAll: async (): Promise<Campaign[]> => {
     try {
       const data = await AsyncStorage.getItem(REPOSITORY_KEYS.CAMPAIGNS);
       if (data) {
-        return JSON.parse(data);
+        const parsed = JSON.parse(data);
+        // Validate: campaigns must have 'type' field (CampaignType) and 'status' field (CampaignStatus)
+        // Rewards have 'isActive' field instead of 'status', and 'stampsRequired' instead of 'type'
+        const campaignTypes = ['double_stamps', 'bonus_reward', 'flash_sale', 'referral', 'birthday', 'happy_hour', 'loyalty_tier'];
+        const campaignStatuses = ['draft', 'scheduled', 'active', 'paused', 'completed', 'cancelled'];
+        
+        const validCampaigns = parsed.filter((item: any) => {
+          // Check if it's a reward: has 'isActive' or 'stampsRequired' fields
+          const isReward = item.isActive !== undefined || item.stampsRequired || item.costStamps;
+          if (isReward) {
+            console.warn(`⚠️ [REPOSITORY] Filtered out reward from campaigns (should be in rewards): ${item.id} - ${item.name}`);
+            return false;
+          }
+          
+          // Campaign must have 'type' (CampaignType) and 'status' (CampaignStatus)
+          const hasCampaignType = item.type && campaignTypes.includes(item.type);
+          const hasCampaignStatus = item.status && campaignStatuses.includes(item.status);
+          
+          const isCampaign = hasCampaignType && hasCampaignStatus;
+          if (!isCampaign) {
+            console.warn(`⚠️ [REPOSITORY] Filtered out invalid campaign item: ${item.id} - ${item.name}`);
+          }
+          return isCampaign;
+        });
+        return validCampaigns;
       }
     } catch (error) {
       console.error('Error getting campaigns:', error);
@@ -483,10 +533,27 @@ export const campaignsRepository = {
       if (auth?.businessId && (campaign as any).businessId) {
         const API_BASE_URL = 'https://api.cannycarrot.com';
         
-        // Ensure businessId is set
-        const campaignToSend = {
-          ...campaign,
+        // Normalize campaign to ensure all required fields are present
+        const now = new Date().toISOString();
+        const campaignToSend: Campaign = {
+          id: campaign.id,
           businessId: campaign.businessId || auth.businessId,
+          name: campaign.name || 'Unnamed Campaign',
+          description: campaign.description || '',
+          type: campaign.type || 'bonus_reward', // Required: default to 'bonus_reward'
+          startDate: campaign.startDate || now, // Required: default to now
+          endDate: campaign.endDate || new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString(), // Required: default to 1 year from now
+          status: campaign.status || 'active',
+          targetAudience: campaign.targetAudience || 'all',
+          conditions: campaign.conditions || {},
+          createdAt: campaign.createdAt || now,
+          updatedAt: campaign.updatedAt || now,
+          stats: campaign.stats || { impressions: 0, clicks: 0, conversions: 0 },
+          ...(campaign.objective && { objective: campaign.objective }),
+          ...(campaign.segmentId && { segmentId: campaign.segmentId }),
+          ...(campaign.channelMasks && { channelMasks: campaign.channelMasks }),
+          ...(campaign.notificationMessage && { notificationMessage: campaign.notificationMessage }),
+          ...(campaign.customerProgress && { customerProgress: campaign.customerProgress }),
         };
         
         const response = await fetch(`${API_BASE_URL}/api/v1/campaigns`, {
@@ -961,9 +1028,32 @@ export const downloadAllData = async (businessId: string, apiBaseUrl: string = '
       const campaignsResult = await campaignsResponse.json();
       console.log(`📊 [REPOSITORY] Campaigns API response:`, {success: campaignsResult.success, dataLength: campaignsResult.data?.length || 0, isArray: Array.isArray(campaignsResult.data)});
       if (campaignsResult.success && Array.isArray(campaignsResult.data)) {
+        // Normalize campaigns to ensure all required fields are present
+        const now = new Date().toISOString();
+        const normalizedCampaigns = campaignsResult.data.map((campaign: any) => ({
+          id: campaign.id,
+          businessId: campaign.businessId || businessId,
+          name: campaign.name || 'Unnamed Campaign',
+          description: campaign.description || '',
+          type: campaign.type || 'bonus_reward',
+          startDate: campaign.startDate || now,
+          endDate: campaign.endDate || new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString(),
+          status: campaign.status || 'active',
+          targetAudience: campaign.targetAudience || 'all',
+          conditions: campaign.conditions || {},
+          createdAt: campaign.createdAt || now,
+          updatedAt: campaign.updatedAt || now,
+          stats: campaign.stats || { impressions: 0, clicks: 0, conversions: 0 },
+          ...(campaign.objective && { objective: campaign.objective }),
+          ...(campaign.segmentId && { segmentId: campaign.segmentId }),
+          ...(campaign.channelMasks && { channelMasks: campaign.channelMasks }),
+          ...(campaign.notificationMessage && { notificationMessage: campaign.notificationMessage }),
+          ...(campaign.customerProgress && { customerProgress: campaign.customerProgress }),
+        }));
+        
         // Save without marking as dirty (we're downloading, not modifying)
-        await campaignsRepository.saveAll(campaignsResult.data, true);
-        console.log(`✅ [REPOSITORY] ${campaignsResult.data.length} campaigns downloaded and saved`);
+        await campaignsRepository.saveAll(normalizedCampaigns, true);
+        console.log(`✅ [REPOSITORY] ${normalizedCampaigns.length} campaigns downloaded and saved`);
       } else {
         console.warn(`⚠️ [REPOSITORY] Campaigns API response invalid: success=${campaignsResult.success}, isArray=${Array.isArray(campaignsResult.data)}`);
       }

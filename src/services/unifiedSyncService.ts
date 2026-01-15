@@ -89,7 +89,28 @@ const downloadAllData = async (businessId: string): Promise<{
     if (campaignsResponse.ok) {
       const campaignsResult = await campaignsResponse.json();
       if (campaignsResult.success && Array.isArray(campaignsResult.data)) {
-        result.campaigns = campaignsResult.data;
+        // Normalize campaigns to ensure all required fields are present
+        const now = new Date().toISOString();
+        result.campaigns = campaignsResult.data.map((campaign: any) => ({
+          id: campaign.id,
+          businessId: campaign.businessId || businessId,
+          name: campaign.name || 'Unnamed Campaign',
+          description: campaign.description || '',
+          type: campaign.type || 'bonus_reward',
+          startDate: campaign.startDate || now,
+          endDate: campaign.endDate || new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString(),
+          status: campaign.status || 'active',
+          targetAudience: campaign.targetAudience || 'all',
+          conditions: campaign.conditions || {},
+          createdAt: campaign.createdAt || now,
+          updatedAt: campaign.updatedAt || now,
+          stats: campaign.stats || { impressions: 0, clicks: 0, conversions: 0 },
+          ...(campaign.objective && { objective: campaign.objective }),
+          ...(campaign.segmentId && { segmentId: campaign.segmentId }),
+          ...(campaign.channelMasks && { channelMasks: campaign.channelMasks }),
+          ...(campaign.notificationMessage && { notificationMessage: campaign.notificationMessage }),
+          ...(campaign.customerProgress && { customerProgress: campaign.customerProgress }),
+        }));
         console.log(`  ✅ Downloaded ${result.campaigns.length} campaigns`);
       }
     }
@@ -220,11 +241,34 @@ const uploadAllData = async (businessId: string): Promise<{
     const allCampaigns = await campaignsRepository.getAll();
     for (const campaign of allCampaigns) {
       try {
-        // Ensure businessId is set
-        const campaignToSend = {
-          ...campaign,
+        // Normalize campaign to ensure all required fields are present
+        const now = new Date().toISOString();
+        const campaignToSend: Campaign = {
+          id: campaign.id,
           businessId: campaign.businessId || businessId,
+          name: campaign.name || 'Unnamed Campaign',
+          description: campaign.description || '',
+          type: campaign.type || 'bonus_reward', // Required: default to 'bonus_reward'
+          startDate: campaign.startDate || now, // Required: default to now
+          endDate: campaign.endDate || new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString(), // Required: default to 1 year from now
+          status: campaign.status || 'active',
+          targetAudience: campaign.targetAudience || 'all',
+          conditions: campaign.conditions || {},
+          createdAt: campaign.createdAt || now,
+          updatedAt: campaign.updatedAt || now,
+          stats: campaign.stats || { impressions: 0, clicks: 0, conversions: 0 },
+          ...(campaign.objective && { objective: campaign.objective }),
+          ...(campaign.segmentId && { segmentId: campaign.segmentId }),
+          ...(campaign.channelMasks && { channelMasks: campaign.channelMasks }),
+          ...(campaign.notificationMessage && { notificationMessage: campaign.notificationMessage }),
+          ...(campaign.customerProgress && { customerProgress: campaign.customerProgress }),
         };
+        
+        // Validate required fields before sending
+        if (!campaignToSend.businessId || !campaignToSend.name || !campaignToSend.type || !campaignToSend.startDate || !campaignToSend.endDate) {
+          console.error(`  ❌ Campaign "${campaign.name}" missing required fields, skipping`);
+          continue; // Skip invalid campaigns
+        }
         
         const campaignResponse = await fetch(`${API_BASE_URL}/api/v1/campaigns`, {
           method: 'POST',
