@@ -22,7 +22,7 @@ export interface Customer {
 
 // Reward type matches DB format exactly - no transformation needed
 export interface Reward {
-  id: string;
+  id: string;                     // Unique ID: businessID + reward identifier
   businessId: string;
   name: string;
   description: string;
@@ -38,8 +38,13 @@ export interface Reward {
   currentRedemptions: number;
   createdAt: string;
   updatedAt: string;
-  // Customer progress tracking: customerId -> points collected
-  customerProgress?: Record<string, number>;  // Maps customerId to points earned
+  // Customer progress tracking: customerId -> { points, actions }
+  // Each customer who has scanned this reward's QR code is tracked here
+  // actions: actionId -> count of times that action was completed
+  customerProgress?: Record<string, {
+    points: number;              // Points awarded to this customer
+    actions: Record<string, number>; // actionId -> count of actions completed
+  }>;
   // App-specific fields (computed at render time, not stored):
   // - icon (randomly assigned for UI)
   // - count, total (UI convenience, computed from stampsRequired)
@@ -58,7 +63,8 @@ export interface Reward {
 export type CampaignStatus = 'live' | 'draft' | 'archived';
 
 export interface Campaign {
-  id: string;
+  id: string;                     // Unique ID: businessID + campaign identifier
+  businessId?: string;            // Business ID (may be inferred from context)
   name: string;
   startDate: string;
   endDate: string;
@@ -66,8 +72,13 @@ export interface Campaign {
   status: CampaignStatus; // live, draft, or archived
   description?: string;
   qrCode?: string;
-  // Customer progress tracking: customerId -> points collected
-  customerProgress?: Record<string, number>;  // Maps customerId to points earned
+  // Customer progress tracking: customerId -> { points, actions }
+  // Each customer who has scanned this campaign's QR code is tracked here
+  // actions: actionId -> count of times that action was completed
+  customerProgress?: Record<string, {
+    points: number;              // Points awarded to this customer
+    actions: Record<string, number>; // actionId -> count of actions completed
+  }>;
   createdAt?: string;
   updatedAt?: string;
 }

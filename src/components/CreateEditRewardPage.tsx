@@ -67,6 +67,11 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
   const [createdRewardName, setCreatedRewardName] = useState('');
   const [createdRewardQrCode, setCreatedRewardQrCode] = useState('');
   const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
+  // Action management state (for campaigns)
+  const [createActionModalVisible, setCreateActionModalVisible] = useState(false);
+  const [newActionName, setNewActionName] = useState('');
+  // Success modal state (for campaigns)
+  const [successModalVisible, setSuccessModalVisible] = useState(false);
 
   // Load reward/campaign data and form fields on mount (if editing)
   useEffect(() => {
@@ -205,7 +210,12 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
 
   const handleSave = async () => {
     try {
-      if (!name || !requirement || !pointsPerPurchase) {
+      if (!name || !pointsPerPurchase) {
+        Alert.alert('Error', 'Please fill in all required fields');
+        return;
+      }
+      // For rewards (not campaigns), requirement is required
+      if (!isCampaign && !requirement) {
         Alert.alert('Error', 'Please fill in all required fields');
         return;
       }
@@ -219,7 +229,8 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
       // Generate QR code value using shared utility with business profile data
       // Use rewardId prop, loadedRewardId, reward prop id, or generate new ID (in that order)
       const rewardIdToSave = rewardId || loadedRewardId || reward?.id || Date.now().toString();
-      const requirementValue = parseInt(requirement, 10);
+      // For campaigns, use default requirement value (1) since campaigns don't have requirement field
+      const requirementValue = isCampaign ? 1 : parseInt(requirement, 10) || 1;
       const pointsValue = parseInt(pointsPerPurchase, 10) || 1;
       
       console.log('[CreateEditReward] Saving reward:', {
@@ -323,6 +334,14 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
         
         // Save to campaigns repository (DB format) - this will also write to Redis
         await campaignsRepository.save(campaignToSave);
+        
+        // If creating new campaign, show success modal
+        if (!isEdit) {
+          setSuccessModalVisible(true);
+        } else {
+          Alert.alert('Success', 'Campaign updated successfully');
+          onBack?.();
+        }
       } else {
         // Save as Reward
         const rewardToSave: Reward = {
@@ -428,6 +447,64 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
       console.error('Error saving product to business profile:', error);
       Alert.alert('Warning', 'Product created but failed to save. It may not persist.');
     }
+  };
+
+  const handleCreateAction = async () => {
+    if (!newActionName.trim()) {
+      Alert.alert('Error', 'Please enter an action name');
+      return;
+    }
+    const newAction = newActionName.trim();
+    
+    // Check if action already exists in the actions list
+    if (actions.includes(newAction)) {
+      Alert.alert('Error', 'Action already exists');
+      setNewActionName('');
+      setCreateActionModalVisible(false);
+      return;
+    }
+    
+    // Add to selected actions and update business profile
+    const updatedActions = [...actions, newAction];
+    setSelectedActions([...selectedActions, newAction]);
+    setNewActionName('');
+    setCreateActionModalVisible(false);
+    
+    // Save new action to business profile
+    try {
+      const profile = await businessRepository.get();
+      if (profile) {
+        const updatedProfile = {
+          ...profile,
+          actions: updatedActions,
+          updatedAt: new Date().toISOString(),
+        };
+        await businessRepository.save(updatedProfile);
+        setBusinessProfile(updatedProfile);
+        console.log('Action saved to business profile:', newAction);
+        Alert.alert('Success', 'Action created successfully');
+      } else {
+        throw new Error('Business profile not found');
+      }
+    } catch (error) {
+      console.error('Error saving action to business profile:', error);
+      Alert.alert('Warning', 'Action created but failed to save. It may not persist.');
+    }
+  };
+
+  const handleSuccessModalClose = () => {
+    setSuccessModalVisible(false);
+    // Clear form
+    setName('');
+    setType('product');
+    setRequirement('');
+    setPointsPerPurchase('1');
+    setRewardType('free_product');
+    setSelectedProducts([]);
+    setSelectedActions([]);
+    setPinCode('');
+    // Navigate back to home
+    onNavigate('Home');
   };
 
   const handleSelectProduct = (product: string) => {
@@ -568,7 +645,7 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
             style={styles.input}
             value={name}
             onChangeText={setName}
-            placeholder="Enter reward name"
+            placeholder={isCampaign ? "Enter Campaign name" : "Enter reward name"}
             placeholderTextColor={Colors.text.light}
           />
 
@@ -761,20 +838,31 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
                   </Text>
                 </TouchableOpacity>
               ))}
+              {isCampaign && (
+                <TouchableOpacity
+                  style={styles.createProductButton}
+                  onPress={() => setCreateActionModalVisible(true)}>
+                  <Text style={styles.createProductButtonText}>+ Create New Action</Text>
+                </TouchableOpacity>
+              )}
             </>
           )}
 
-          <Text style={styles.label}>
-            Number of {type === 'product' ? 'Purchases' : 'Actions'} Required *
-          </Text>
-          <TextInput
-            style={styles.input}
-            value={requirement}
-            onChangeText={setRequirement}
-            placeholder="Enter number"
-            keyboardType="numeric"
-            placeholderTextColor={Colors.text.light}
-          />
+          {!isCampaign && (
+            <>
+              <Text style={styles.label}>
+                Number of {type === 'product' ? 'Purchases' : 'Actions'} Required *
+              </Text>
+              <TextInput
+                style={styles.input}
+                value={requirement}
+                onChangeText={setRequirement}
+                placeholder="Enter number"
+                keyboardType="numeric"
+                placeholderTextColor={Colors.text.light}
+              />
+            </>
+          )}
 
           <Text style={styles.label}>
             Number of Points per {type === 'product' ? 'Purchase' : 'Action'} *
@@ -859,6 +947,46 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
             maxLength={4}
           />
 
+          {isCampaign && (
+            <View style={styles.campaignSummary}>
+              <Text style={styles.campaignSummaryTitle}>Campaign Summary</Text>
+              
+              <View style={styles.summarySection}>
+                <Text style={styles.summaryLabel}>Products defined:</Text>
+                {selectedProducts.length > 0 ? (
+                  <View style={styles.summaryList}>
+                    {selectedProducts.map((product, idx) => (
+                      <Text key={idx} style={styles.summaryItem}>• {product}</Text>
+                    ))}
+                  </View>
+                ) : (
+                  <Text style={styles.summaryEmpty}>None</Text>
+                )}
+              </View>
+
+              <View style={styles.summarySection}>
+                <Text style={styles.summaryLabel}>Actions defined:</Text>
+                {selectedActions.length > 0 ? (
+                  <View style={styles.summaryList}>
+                    {selectedActions.map((action, idx) => (
+                      <Text key={idx} style={styles.summaryItem}>• {action}</Text>
+                    ))}
+                  </View>
+                ) : (
+                  <Text style={styles.summaryEmpty}>None</Text>
+                )}
+              </View>
+
+              <View style={styles.summarySection}>
+                <Text style={styles.summaryLabel}>Reward defined:</Text>
+                <Text style={styles.summaryItem}>
+                  {rewardType === 'free_product' ? 'Free Product' : 
+                   rewardType === 'discount' ? 'Discount' : 'Other'}
+                </Text>
+              </View>
+            </View>
+          )}
+
           <Text style={styles.note}>
             * Business verification required to award points for actions
           </Text>
@@ -926,6 +1054,61 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
                 <Text style={styles.deleteModalButtonTextDelete}>Delete</Text>
               </TouchableOpacity>
             </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Create Action Modal (for campaigns) */}
+      <Modal
+        visible={createActionModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setCreateActionModalVisible(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.createProductModal}>
+            <Text style={styles.modalTitle}>Create New Action</Text>
+            <Text style={styles.label}>Action Name *</Text>
+            <TextInput
+              style={styles.input}
+              value={newActionName}
+              onChangeText={setNewActionName}
+              placeholder="Enter action name"
+              placeholderTextColor={Colors.text.light}
+              autoFocus={true}
+            />
+            <View style={styles.modalButtonContainer}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={() => {
+                  setCreateActionModalVisible(false);
+                  setNewActionName('');
+                }}>
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.createButton]}
+                onPress={handleCreateAction}>
+                <Text style={styles.createButtonText}>Create</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Success Modal (for campaigns) */}
+      <Modal
+        visible={successModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={handleSuccessModalClose}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.successModal}>
+            <Text style={styles.successModalTitle}>Campaign successfully created</Text>
+            <TouchableOpacity
+              style={styles.successModalButton}
+              onPress={handleSuccessModalClose}>
+              <Text style={styles.successModalButtonText}>OK</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -1242,6 +1425,71 @@ const styles = StyleSheet.create({
     color: Colors.text.primary,
   },
   createButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: Colors.background,
+  },
+  campaignSummary: {
+    backgroundColor: Colors.neutral[50],
+    borderRadius: 8,
+    padding: 16,
+    marginTop: 16,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: Colors.neutral[200],
+  },
+  campaignSummaryTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: Colors.text.primary,
+    marginBottom: 16,
+  },
+  summarySection: {
+    marginBottom: 16,
+  },
+  summaryLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.text.secondary,
+    marginBottom: 8,
+  },
+  summaryList: {
+    marginLeft: 8,
+  },
+  summaryItem: {
+    fontSize: 14,
+    color: Colors.text.primary,
+    marginBottom: 4,
+  },
+  summaryEmpty: {
+    fontSize: 14,
+    color: Colors.text.light,
+    fontStyle: 'italic',
+    marginLeft: 8,
+  },
+  successModal: {
+    backgroundColor: Colors.background,
+    borderRadius: 16,
+    padding: 24,
+    width: '85%',
+    maxWidth: 400,
+    alignItems: 'center',
+  },
+  successModalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: Colors.text.primary,
+    marginBottom: 24,
+    textAlign: 'center',
+  },
+  successModalButton: {
+    backgroundColor: Colors.primary,
+    borderRadius: 8,
+    padding: 14,
+    width: '100%',
+    alignItems: 'center',
+  },
+  successModalButtonText: {
     fontSize: 16,
     fontWeight: '600',
     color: Colors.background,
