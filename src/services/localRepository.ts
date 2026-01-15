@@ -469,11 +469,9 @@ export const campaignsRepository = {
       const data = await AsyncStorage.getItem(REPOSITORY_KEYS.CAMPAIGNS);
       if (data) {
         const parsed = JSON.parse(data);
-        // Validate: campaigns must have 'type' field (CampaignType) and 'status' field (CampaignStatus)
-        // Rewards have 'isActive' field instead of 'status', and 'stampsRequired' instead of 'type'
-        const campaignTypes = ['double_stamps', 'bonus_reward', 'flash_sale', 'referral', 'birthday', 'happy_hour', 'loyalty_tier'];
-        const campaignStatuses = ['draft', 'scheduled', 'active', 'paused', 'completed', 'cancelled'];
         
+        // Filter out rewards (items that have reward-specific fields)
+        // Only filter based on reward fields - type/status are not required
         const validCampaigns = parsed.filter((item: any) => {
           // Check if it's a reward: has 'isActive' or 'stampsRequired' fields
           const isReward = item.isActive !== undefined || item.stampsRequired || item.costStamps;
@@ -482,16 +480,10 @@ export const campaignsRepository = {
             return false;
           }
           
-          // Campaign must have 'type' (CampaignType) and 'status' (CampaignStatus)
-          const hasCampaignType = item.type && campaignTypes.includes(item.type);
-          const hasCampaignStatus = item.status && campaignStatuses.includes(item.status);
-          
-          const isCampaign = hasCampaignType && hasCampaignStatus;
-          if (!isCampaign) {
-            console.warn(`⚠️ [REPOSITORY] Filtered out invalid campaign item: ${item.id} - ${item.name}`);
-          }
-          return isCampaign;
+          // All non-reward items pass through (regardless of type/status fields)
+          return true;
         });
+        
         return validCampaigns;
       }
     } catch (error) {
