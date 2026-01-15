@@ -1,5 +1,5 @@
 import React, {useState, useEffect} from 'react';
-import {View, Text, StyleSheet, Platform, Linking} from 'react-native';
+import {View, Text, StyleSheet, Platform, Linking, Alert} from 'react-native';
 
 // Suppress React Native Web touch responder warnings and runtime errors (harmless but noisy)
 if (Platform.OS === 'web' && typeof console !== 'undefined') {
@@ -356,12 +356,16 @@ function App(): React.JSX.Element {
   };
 
   const handleDeleteCampaign = async (campaignId: string) => {
-    const updatedCampaigns = campaigns.filter(c => c.id !== campaignId);
-    setCampaigns(updatedCampaigns);
-    // Delete from local repository (source of truth)
-    await campaignsRepository.delete(campaignId);
-    // Also save to legacy storage for backward compatibility
-    saveCampaigns(updatedCampaigns);
+    try {
+      // Delete from local repository (source of truth)
+      await campaignsRepository.delete(campaignId);
+      // Reload campaigns from repository to ensure UI is updated
+      await reloadCampaigns();
+      console.log(`✅ [App] Campaign ${campaignId} deleted successfully`);
+    } catch (error) {
+      console.error(`❌ [App] Error deleting campaign ${campaignId}:`, error);
+      Alert.alert('Error', 'Failed to delete campaign. Please try again.');
+    }
   };
 
   // Reload rewards from repository
@@ -637,12 +641,14 @@ function App(): React.JSX.Element {
           );
         }
         if (currentScreen.startsWith('EditCampaign')) {
+          const campaignId = currentScreen.replace('EditCampaign', '');
           return (
             <CreateEditRewardPage
               currentScreen={currentScreen}
               onNavigate={handleNavigate}
-              rewardId={currentScreen.replace('EditCampaign', '')}
+              rewardId={campaignId}
               onBack={handleBack}
+              onSave={(data) => handleUpdateCampaign(campaignId, data)}
             />
           );
         }
