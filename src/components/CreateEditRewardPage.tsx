@@ -70,8 +70,9 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
   // Action management state (for campaigns)
   const [createActionModalVisible, setCreateActionModalVisible] = useState(false);
   const [newActionName, setNewActionName] = useState('');
-  // Success modal state (for campaigns)
+  // Success modal state (for campaigns and rewards)
   const [successModalVisible, setSuccessModalVisible] = useState(false);
+  const [successModalMessage, setSuccessModalMessage] = useState('');
 
   // Load reward/campaign data and form fields on mount (if editing)
   useEffect(() => {
@@ -335,13 +336,13 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
         // Save to campaigns repository (DB format) - this will also write to Redis
         await campaignsRepository.save(campaignToSave);
         
-        // If creating new campaign, show success modal
+        // Show success modal for both create and edit
         if (!isEdit) {
-          setSuccessModalVisible(true);
+          setSuccessModalMessage('Campaign successfully created');
         } else {
-          Alert.alert('Success', 'Campaign updated successfully');
-          onBack?.();
+          setSuccessModalMessage('Changes saved');
         }
+        setSuccessModalVisible(true);
       } else {
         // Save as Reward
         const rewardToSave: Reward = {
@@ -388,14 +389,17 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
         onSave(rewardData);
       }
       
-      // If creating new reward, show QR code modal with success message
+      // For rewards: if creating new, show QR code modal first, then success modal
+      // If editing, show success modal directly
       if (!isEdit) {
+        // Show QR code modal first for new rewards
         setCreatedRewardName(name);
         setCreatedRewardQrCode(qrCodeValue);
         setQrCodeModalVisible(true);
       } else {
-        Alert.alert('Success', 'Reward updated successfully');
-        onBack?.();
+        // Show success modal for edits
+        setSuccessModalMessage('Changes saved');
+        setSuccessModalVisible(true);
       }
     } catch (error) {
       console.error('[CreateEditReward] Unexpected error in handleSave:', error);
@@ -1026,7 +1030,11 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
         showSuccessMessage={!isEdit} // Show "Reward created!" for new rewards
         onClose={() => {
           setQrCodeModalVisible(false);
-          onBack?.();
+          // After QR modal closes, show success modal for new rewards
+          if (!isEdit) {
+            setSuccessModalMessage('Reward successfully created');
+            setSuccessModalVisible(true);
+          }
         }}
       />
       
@@ -1095,7 +1103,7 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
         </View>
       </Modal>
 
-      {/* Success Modal (for campaigns) */}
+      {/* Success Modal (for campaigns and rewards) */}
       <Modal
         visible={successModalVisible}
         transparent={true}
@@ -1103,7 +1111,7 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
         onRequestClose={handleSuccessModalClose}>
         <View style={styles.modalOverlay}>
           <View style={styles.successModal}>
-            <Text style={styles.successModalTitle}>Campaign successfully created</Text>
+            <Text style={styles.successModalTitle}>{successModalMessage}</Text>
             <TouchableOpacity
               style={styles.successModalButton}
               onPress={handleSuccessModalClose}>
