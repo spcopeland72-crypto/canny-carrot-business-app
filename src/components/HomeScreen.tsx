@@ -13,6 +13,7 @@ import {
   Linking,
   Animated,
   Easing,
+  Platform,
 } from 'react-native';
 import {Colors} from '../constants/Colors';
 import BottomNavigation from './BottomNavigation';
@@ -120,40 +121,51 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   // Local state for campaigns as fallback if props are empty
   const [localCampaigns, setLocalCampaigns] = useState<Campaign[]>([]);
   
-  // Ticker animation - continuous scrolling where each letter reappears on right as it leaves left
-  const tickerAnim = useRef(new Animated.Value(0)).current;
+  // EXACT CodePen - single string with seamless wrap
+  // CodePen uses two ticker__item but effect is one continuous string
   const tickerText = "Canny Carrot welcomes our newest Silver Member Powder Butterfly and our latest Gold Member Blackwells Butchers";
-  const spacing = "          "; // 10 spaces
-  // Create multiple copies for seamless continuous scrolling
-  // Pattern: text + spacing repeated multiple times
-  // As one copy exits left, the next enters from right seamlessly
-  const tickerContent = `${tickerText}${spacing}${tickerText}${spacing}${tickerText}${spacing}${tickerText}${spacing}`;
+  const screenWidth = Dimensions.get('window').width || 375;
+  const tickerAnimation = useRef(new Animated.Value(0)).current;
+  const [tickerWidth, setTickerWidth] = useState(0);
+  const animationRef = useRef<Animated.CompositeAnimation | null>(null);
   
+  // Continuous scroll - no restart, no reset, just continues infinitely
   useEffect(() => {
-    const screenWidth = Dimensions.get('window').width;
-    // Estimate text width (approximate: 7px per character for 12px font)
-    const textWidth = tickerText.length * 7;
-    const spacingWidth = 10 * 7; // 10 spaces
-    const singleInstanceWidth = textWidth + spacingWidth;
-    
-    // Start from 0 (text visible, ready to scroll)
-    // Animate to -singleInstanceWidth (one full instance scrolls off left)
-    // When animation loops back to 0, the duplicate copy is already positioned to seamlessly continue
-    // This creates the effect where each letter reappears on right as it leaves left
-    tickerAnim.setValue(0);
-    
-    const animation = Animated.loop(
-      Animated.timing(tickerAnim, {
-        toValue: -singleInstanceWidth,
-        duration: 15000,
-        easing: Easing.linear,
-        useNativeDriver: true,
-      }),
-      { iterations: -1 } // Infinite loop
-    );
-    animation.start();
-    return () => animation.stop();
-  }, []);
+    if (tickerWidth > 0 && !animationRef.current) {
+      // Create continuous animation that never resets
+      const startContinuousAnimation = () => {
+        // Cycle 3: 2→0 (reset to 0 after reaching 2)
+        const currentValue = tickerAnimation._value || 0;
+        let targetValue;
+        
+        if (currentValue >= 2) {
+          // Cycle 3: Reset to 0
+          tickerAnimation.setValue(0);
+          targetValue = 1;
+        } else {
+          // Continue incrementing: 0→1, 1→2
+          targetValue = currentValue + 1;
+        }
+        
+        animationRef.current = Animated.timing(tickerAnimation, {
+          toValue: targetValue,
+          duration: 30000, // Speed of animation
+          easing: Easing.linear,
+          useNativeDriver: Platform.OS !== 'web',
+        });
+        
+        animationRef.current.start((finished) => {
+          if (finished) {
+            // Continue: 0→1→2→0→1→2...
+            animationRef.current = null;
+            startContinuousAnimation();
+          }
+        });
+      };
+      
+      startContinuousAnimation();
+    }
+  }, [tickerWidth]);
 
   // Load business name and logo from local repository on mount
   useEffect(() => {
@@ -611,21 +623,38 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
           )}
         </View>
         
-        {/* Ticker */}
-        <View style={styles.tickerContainer}>
-          <View style={styles.tickerWrapper}>
-            <Animated.View 
-              style={[
-                styles.tickerContent, 
-                {
-                  transform: [{translateX: tickerAnim}],
-                  width: '200%', // Ensure content is wide enough for duplicates
-                }
-              ]}
-            >
-              <Text style={styles.tickerText} numberOfLines={1}>{tickerContent}</Text>
-            </Animated.View>
-          </View>
+        {/* Ticker - Exact CodePen implementation - Below banner */}
+        {/* Ticker - EXACT CodePen: one string, seamless wrap */}
+        <View style={styles.tickerWrap}>
+          <Animated.View
+            style={[
+              styles.ticker,
+              {
+                transform: [
+                  {
+                    translateX: tickerAnimation.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: tickerWidth > 0 
+                        ? [0, -(tickerWidth + screenWidth)] // Move completely off left border
+                        : [0, 0],
+                      extrapolate: 'extend', // Continue seamlessly beyond inputRange for continuous scroll
+                    }),
+                  },
+                ],
+              },
+            ]}
+            onLayout={(event) => {
+              const { width } = event.nativeEvent.layout;
+              // Width = text1 + text2 + padding-right (100%)
+              // When animation moves by -100%, first text scrolls off left, second appears from right = seamless
+              if (width > 0 && tickerWidth !== width) {
+                setTickerWidth(width);
+              }
+            }}
+          >
+            <Text style={styles.tickerItem}>{tickerText}</Text>
+            <Text style={styles.tickerItem}>{tickerText}</Text>
+          </Animated.View>
         </View>
         
         {/* Rewards Carousel - Round Elements (matching customer app) */}
@@ -1148,30 +1177,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     width: '100%',
   },
-  tickerContainer: {
-    backgroundColor: Colors.neutral[50],
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: Colors.neutral[200],
-    paddingVertical: 8,
-    marginBottom: 24,
-    overflow: 'hidden',
-    zIndex: 1,
-  },
-  tickerWrapper: {
-    overflow: 'hidden',
-    height: 20,
+  // Ticker styles - EXACT CodePen CSS
+  tickerWrap: {
     width: '100%',
+    overflow: 'hidden',
+    height: 45, // Reduced by 30% from 64
+    backgroundColor: '#9E8F85', // Changed from black to #9E8F85
+    paddingLeft: Dimensions.get('window').width, // CodePen: padding-left: 100%
+    marginBottom: 24,
   },
-  tickerContent: {
+  ticker: {
     flexDirection: 'row',
     alignItems: 'center',
+    height: 45, // Reduced by 30% from 64
+    lineHeight: 45, // Reduced by 30% from 64
+    paddingRight: Dimensions.get('window').width, // CodePen: padding-right: 100%
   },
-  tickerText: {
-    fontSize: 12,
-    color: Colors.text.primary,
-    fontWeight: '500',
-    paddingHorizontal: 16,
+  tickerItem: {
+    paddingHorizontal: 32, // CodePen: 0 2rem
+    fontSize: 26, // Reduced by 20% from 32
+    color: 'white', // CodePen: color: white
+    includeFontPadding: false,
     flexShrink: 0,
   },
   bannerTextContainer: {
