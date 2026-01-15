@@ -81,8 +81,31 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
         try {
           if (isCampaign) {
             // Load campaign from repository (DB format)
-            const loadedCampaign = await campaignsRepository.getById(rewardId);
+            let loadedCampaign = await campaignsRepository.getById(rewardId);
             if (loadedCampaign) {
+              // Normalize campaign to ensure all required fields are present
+              // This handles campaigns saved with old structure or missing fields
+              loadedCampaign = {
+                id: loadedCampaign.id,
+                businessId: loadedCampaign.businessId || '',
+                name: loadedCampaign.name || '',
+                description: loadedCampaign.description || '',
+                type: loadedCampaign.type || 'bonus_reward',
+                startDate: loadedCampaign.startDate || new Date().toISOString(),
+                endDate: loadedCampaign.endDate || new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString(),
+                status: loadedCampaign.status || 'active',
+                targetAudience: loadedCampaign.targetAudience || 'all',
+                conditions: loadedCampaign.conditions || {},
+                createdAt: loadedCampaign.createdAt || new Date().toISOString(),
+                updatedAt: loadedCampaign.updatedAt || new Date().toISOString(),
+                stats: loadedCampaign.stats || { impressions: 0, clicks: 0, conversions: 0 },
+                ...(loadedCampaign.objective && { objective: loadedCampaign.objective }),
+                ...(loadedCampaign.segmentId && { segmentId: loadedCampaign.segmentId }),
+                ...(loadedCampaign.channelMasks && { channelMasks: loadedCampaign.channelMasks }),
+                ...(loadedCampaign.notificationMessage && { notificationMessage: loadedCampaign.notificationMessage }),
+                ...(loadedCampaign.customerProgress && { customerProgress: loadedCampaign.customerProgress }),
+              };
+              
               // Store the loaded campaign ID to prevent duplicate creation
               setLoadedRewardId(loadedCampaign.id);
               
@@ -92,8 +115,29 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
               // Note: startDate and endDate are stored in the campaign but not editable in this form
               // They are preserved when saving
               
-              // Load reward data from campaign.conditions.rewardData if it exists
-              const rewardData = loadedCampaign.conditions?.rewardData;
+              // Load reward data - check both new structure (conditions.rewardData) and old structure (reward)
+              let rewardData: any = null;
+              
+              // New structure: reward data in conditions.rewardData
+              if (loadedCampaign.conditions?.rewardData) {
+                rewardData = loadedCampaign.conditions.rewardData;
+              }
+              // Old structure: reward data in campaign.reward (backward compatibility)
+              else if ((loadedCampaign as any).reward) {
+                const oldReward = (loadedCampaign as any).reward;
+                // Convert old reward structure to new rewardData format
+                rewardData = {
+                  selectedProducts: oldReward.selectedProducts,
+                  selectedActions: oldReward.selectedActions,
+                  pinCode: oldReward.pinCode,
+                  qrCode: oldReward.qrCode,
+                  stampsRequired: oldReward.stampsRequired || oldReward.costStamps,
+                  pointsPerPurchase: oldReward.pointsPerPurchase,
+                  rewardType: oldReward.type === 'discount' ? 'discount' : 
+                             (oldReward.type === 'freebie' || oldReward.type === 'product') ? 'free_product' : 'other',
+                };
+              }
+              
               if (rewardData) {
                 setRequirement((rewardData.stampsRequired || 10).toString());
                 setPointsPerPurchase((rewardData.pointsPerPurchase || 1).toString());
