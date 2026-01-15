@@ -82,6 +82,8 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
           if (isCampaign) {
             // Load campaign from repository (DB format)
             let loadedCampaign = await campaignsRepository.getById(rewardId);
+            console.log('[CreateEditReward] Loaded campaign from repository:', JSON.stringify(loadedCampaign, null, 2));
+            
             if (loadedCampaign) {
               // Normalize campaign to ensure all required fields are present
               // This handles campaigns saved with old structure or missing fields
@@ -105,6 +107,11 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
                 ...(loadedCampaign.notificationMessage && { notificationMessage: loadedCampaign.notificationMessage }),
                 ...(loadedCampaign.customerProgress && { customerProgress: loadedCampaign.customerProgress }),
               };
+              
+              console.log('[CreateEditReward] Normalized campaign:', JSON.stringify(loadedCampaign, null, 2));
+              console.log('[CreateEditReward] Campaign conditions:', loadedCampaign.conditions);
+              console.log('[CreateEditReward] Campaign rewardData:', loadedCampaign.conditions?.rewardData);
+              console.log('[CreateEditReward] Campaign has old reward field:', !!(loadedCampaign as any).reward);
               
               // Store the loaded campaign ID to prevent duplicate creation
               setLoadedRewardId(loadedCampaign.id);
