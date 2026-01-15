@@ -60,18 +60,73 @@ export interface Reward {
 // CAMPAIGN TYPES
 // ============================================
 
-export type CampaignStatus = 'live' | 'draft' | 'archived';
+export type CampaignType = 
+  | 'double_stamps'    // 2x stamps for every purchase
+  | 'bonus_reward'     // Extra bonus on top of regular reward
+  | 'flash_sale'       // Limited time discount
+  | 'referral'         // Referral bonus campaign
+  | 'birthday'         // Birthday rewards
+  | 'happy_hour'       // Time-based promotions
+  | 'loyalty_tier';    // VIP tier unlock
 
+export type CampaignStatus = 
+  | 'draft'
+  | 'scheduled'
+  | 'active'
+  | 'paused'
+  | 'completed'
+  | 'cancelled';
+
+export interface CampaignConditions {
+  bonusStamps?: number;
+  discountPercent?: number;
+  minPurchase?: number;
+  maxUsesPerMember?: number;
+  daysOfWeek?: number[]; // 0-6 for Sunday-Saturday
+  startTime?: string; // HH:MM format
+  endTime?: string;
+  // Business app specific: store reward data in conditions
+  rewardData?: {
+    selectedProducts?: string[];
+    selectedActions?: string[];
+    pinCode?: string;
+    qrCode?: string;
+    stampsRequired?: number;
+    pointsPerPurchase?: number;
+    rewardType?: 'free_product' | 'discount' | 'other';
+  };
+}
+
+export interface CampaignStats {
+  impressions: number;
+  clicks: number;
+  conversions: number;
+}
+
+// Campaign type matches API exactly
 export interface Campaign {
-  id: string;                     // Unique ID: businessID + campaign identifier
-  businessId?: string;            // Business ID (may be inferred from context)
+  id: string;                    // Unique ID: businessID + campaign identifier
+  businessId: string;
   name: string;
+  description: string;
+  type: CampaignType;
+  objective?: 'reactivate' | 'upsell' | 'retention' | 'acquisition' | 'engagement';
   startDate: string;
+  startAt?: string;              // Alias for startDate
   endDate: string;
-  reward: Reward;
-  status: CampaignStatus; // live, draft, or archived
-  description?: string;
-  qrCode?: string;
+  endAt?: string;                // Alias for endDate
+  status: CampaignStatus;
+  targetAudience: 'all' | 'new' | 'returning' | 'inactive';
+  segmentId?: string;            // Link to Segment entity
+  conditions?: CampaignConditions;
+  channelMasks?: {
+    push: boolean;
+    email: boolean;
+    sms: boolean;
+    inApp: boolean;
+    geo: boolean;
+  };
+  notificationMessage?: string;
   // Customer progress tracking: customerId -> { points, actions }
   // Each customer who has scanned this campaign's QR code is tracked here
   // actions: actionId -> count of times that action was completed
@@ -79,8 +134,9 @@ export interface Campaign {
     points: number;              // Points awarded to this customer
     actions: Record<string, number>; // actionId -> count of actions completed
   }>;
-  createdAt?: string;
-  updatedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+  stats: CampaignStats;
 }
 
 // ============================================

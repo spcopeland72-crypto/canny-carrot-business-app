@@ -92,6 +92,12 @@ const syncCampaigns = async (campaigns: Campaign[], businessId: string): Promise
   let synced = 0;
   for (const campaign of campaigns) {
     try {
+      // Ensure businessId is set
+      const campaignToSend = {
+        ...campaign,
+        businessId: campaign.businessId || businessId,
+      };
+      
       const url = campaign.id
         ? `${API_BASE_URL}/api/v1/campaigns/${campaign.id}`
         : `${API_BASE_URL}/api/v1/campaigns`;
@@ -101,7 +107,7 @@ const syncCampaigns = async (campaigns: Campaign[], businessId: string): Promise
       const response = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...campaign, businessId }),
+        body: JSON.stringify(campaignToSend),
       });
       
       if (response.ok) {

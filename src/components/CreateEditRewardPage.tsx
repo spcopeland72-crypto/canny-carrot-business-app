@@ -92,33 +92,25 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
               // Note: startDate and endDate are stored in the campaign but not editable in this form
               // They are preserved when saving
               
-              // Load reward data from campaign.reward if it exists
-              if (loadedCampaign.reward) {
-                const reward = loadedCampaign.reward;
-                setRequirement((reward.stampsRequired || reward.costStamps || 10).toString());
-                setPointsPerPurchase((reward.pointsPerPurchase || 1).toString());
-                
-                // Map DB type to UI rewardType
-                if (reward.type === 'discount') {
-                  setRewardType('discount');
-                } else if (reward.type === 'freebie' || reward.type === 'product') {
-                  setRewardType('free_product');
-                } else {
-                  setRewardType('other');
-                }
+              // Load reward data from campaign.conditions.rewardData if it exists
+              const rewardData = loadedCampaign.conditions?.rewardData;
+              if (rewardData) {
+                setRequirement((rewardData.stampsRequired || 10).toString());
+                setPointsPerPurchase((rewardData.pointsPerPurchase || 1).toString());
+                setRewardType(rewardData.rewardType || 'free_product');
                 
                 // Determine type based on selectedProducts vs selectedActions
-                if (reward.selectedProducts && reward.selectedProducts.length > 0) {
+                if (rewardData.selectedProducts && rewardData.selectedProducts.length > 0) {
                   setType('product');
-                  setSelectedProducts(reward.selectedProducts);
-                } else if (reward.selectedActions && reward.selectedActions.length > 0) {
+                  setSelectedProducts(rewardData.selectedProducts);
+                } else if (rewardData.selectedActions && rewardData.selectedActions.length > 0) {
                   setType('action');
-                  setSelectedActions(reward.selectedActions);
+                  setSelectedActions(rewardData.selectedActions);
                 } else {
                   setType('product'); // Default
                 }
                 
-                setPinCode(reward.pinCode || '');
+                setPinCode(rewardData.pinCode || '');
               } else {
                 // No reward data, use defaults
                 setRequirement('10');
@@ -347,31 +339,7 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
       });
       
       if (isCampaign) {
-        // Create reward object with all form data
-        const rewardForCampaign: Reward = {
-          id: `${rewardIdToSave}-reward`,
-          businessId: auth.businessId,
-          name: `${name} - Reward`, // Reward name for the campaign
-          description: '', // Can be added later if needed
-          stampsRequired: requirementValue,
-          costStamps: requirementValue,
-          type: dbType,
-          isActive: true,
-          validFrom: now,
-          validTo: undefined,
-          expiresAt: undefined,
-          createdAt: isEdit ? (reward as any)?.createdAt || now : now,
-          updatedAt: now,
-          currentRedemptions: 0,
-          // App-specific fields (stored but not in core DB type)
-          pinCode,
-          qrCode: qrCodeValue,
-          selectedProducts: type === 'product' ? selectedProducts : undefined,
-          selectedActions: type === 'action' ? selectedActions : undefined,
-          pointsPerPurchase: pointsValue,
-        };
-        
-        // Get existing campaign data if editing to preserve dates
+        // Get existing campaign data if editing to preserve dates and other fields
         let existingCampaign: Campaign | null = null;
         if (isEdit) {
           try {
@@ -381,16 +349,36 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
           }
         }
         
-        // Save as Campaign with reward data
+        // Save as Campaign with reward data stored in conditions.rewardData
         const campaignToSave: Campaign = {
           id: rewardIdToSave,
           businessId: auth.businessId,
           name,
-          description: existingCampaign?.description || '', // Preserve existing description
-          reward: rewardForCampaign,
-          status: existingCampaign?.status || 'live',
+          description: existingCampaign?.description || '',
+          type: existingCampaign?.type || 'bonus_reward',
           startDate: existingCampaign?.startDate || now,
           endDate: existingCampaign?.endDate || new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString(), // Default to 1 year from now
+          status: existingCampaign?.status || 'active',
+          targetAudience: existingCampaign?.targetAudience || 'all',
+          conditions: {
+            ...existingCampaign?.conditions,
+            rewardData: {
+              selectedProducts: type === 'product' ? selectedProducts : undefined,
+              selectedActions: type === 'action' ? selectedActions : undefined,
+              pinCode,
+              qrCode: qrCodeValue,
+              stampsRequired: requirementValue,
+              pointsPerPurchase: pointsValue,
+              rewardType,
+            },
+          },
+          createdAt: existingCampaign?.createdAt || now,
+          updatedAt: now,
+          stats: existingCampaign?.stats || {
+            impressions: 0,
+            clicks: 0,
+            conversions: 0,
+          },
         };
         
         console.log('[CreateEditReward] Saving campaign:', campaignToSave);

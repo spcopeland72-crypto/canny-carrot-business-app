@@ -207,10 +207,16 @@ const writeAllCampaigns = async (campaigns: Campaign[], businessId: string): Pro
   
   for (const campaign of campaigns) {
     try {
+      // Ensure businessId is set
+      const campaignToSend = {
+        ...campaign,
+        businessId: campaign.businessId || businessId,
+      };
+      
       const response = await fetch(`${API_BASE_URL}/api/v1/campaigns`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...campaign, businessId }),
+        body: JSON.stringify(campaignToSend),
       });
       
       if (response.ok) {

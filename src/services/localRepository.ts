@@ -482,10 +482,17 @@ export const campaignsRepository = {
       const auth = await getStoredAuth();
       if (auth?.businessId && (campaign as any).businessId) {
         const API_BASE_URL = 'https://api.cannycarrot.com';
+        
+        // Ensure businessId is set
+        const campaignToSend = {
+          ...campaign,
+          businessId: campaign.businessId || auth.businessId,
+        };
+        
         const response = await fetch(`${API_BASE_URL}/api/v1/campaigns`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(campaign),
+          body: JSON.stringify(campaignToSend),
         });
         
         if (response.ok) {
