@@ -360,8 +360,14 @@ function App(): React.JSX.Element {
       // Delete from local repository (source of truth)
       await campaignsRepository.delete(campaignId);
       // Reload campaigns from repository to ensure UI is updated
-      await reloadCampaigns();
-      console.log(`✅ [App] Campaign ${campaignId} deleted successfully`);
+      const loadedCampaigns = await campaignsRepository.getAll();
+      if (loadedCampaigns && loadedCampaigns.length > 0) {
+        setCampaigns(loadedCampaigns);
+        console.log(`✅ [App] Campaign ${campaignId} deleted successfully, reloaded ${loadedCampaigns.length} campaigns`);
+      } else {
+        setCampaigns([]);
+        console.log(`✅ [App] Campaign ${campaignId} deleted successfully, no campaigns remaining`);
+      }
     } catch (error) {
       console.error(`❌ [App] Error deleting campaign ${campaignId}:`, error);
       Alert.alert('Error', 'Failed to delete campaign. Please try again.');
