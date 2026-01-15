@@ -16,7 +16,7 @@ import QRCodeModal from './QRCodeModal';
 import {generateRewardQRCode} from '../utils/qrCodeUtils';
 import {businessRepository, rewardsRepository, campaignsRepository} from '../services/localRepository';
 import {getStoredAuth} from '../services/authService';
-import type {BusinessProfile, Reward, Campaign} from '../types';
+import type {BusinessProfile, Reward, Campaign, CampaignType} from '../types';
 
 interface CreateEditRewardPageProps {
   currentScreen: string;
@@ -51,12 +51,14 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
   const [type, setType] = useState<'product' | 'action'>('product');
   const [requirement, setRequirement] = useState('');
   const [pointsPerPurchase, setPointsPerPurchase] = useState('1');
-  const [rewardType, setRewardType] = useState<'free_product' | 'discount' | 'other'>('free_product');
+  const [rewardType, setRewardType] = useState<string>('bonus_reward'); // Can be CampaignType or custom string
+  const [customTypeText, setCustomTypeText] = useState<string>(''); // For free text entry when "Other" is selected
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
   const [selectedActions, setSelectedActions] = useState<string[]>([]);
   const [pinCode, setPinCode] = useState('');
   const [businessProfile, setBusinessProfile] = useState<BusinessProfile | null>(null);
   const [loadedRewardId, setLoadedRewardId] = useState<string | null>(null);
+  const [campaignTypeDropdownVisible, setCampaignTypeDropdownVisible] = useState(false);
   
   // Product management state
   const [products, setProducts] = useState<string[]>([]);
@@ -148,7 +150,26 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
               if (rewardData) {
                 setRequirement((rewardData.stampsRequired || 10).toString());
                 setPointsPerPurchase((rewardData.pointsPerPurchase || 1).toString());
-                setRewardType(rewardData.rewardType || 'free_product');
+                // For campaigns, load the campaign.type; for rewards, use rewardType from rewardData
+                if (isCampaign && loadedCampaign?.type) {
+                  // Check if it's a standard CampaignType or custom
+                  const standardTypes: CampaignType[] = ['double_stamps', 'bonus_reward', 'flash_sale', 'referral', 'birthday', 'happy_hour', 'loyalty_tier'];
+                  // Also check legacy reward types that might be in campaigns
+                  const legacyRewardTypes = ['free_product', 'discount', 'other'];
+                  const allStandardTypes = [...standardTypes, ...legacyRewardTypes];
+                  
+                  if (allStandardTypes.includes(loadedCampaign.type as any)) {
+                    setRewardType(loadedCampaign.type);
+                    setCustomTypeText(''); // Clear custom text for standard types
+                  } else {
+                    // Custom type - set to 'other' and populate custom text
+                    setRewardType('other');
+                    setCustomTypeText(loadedCampaign.type);
+                  }
+                } else {
+                  setRewardType(rewardData.rewardType || 'bonus_reward');
+                  setCustomTypeText('');
+                }
                 
                 // Determine type based on selectedProducts vs selectedActions
                 if (rewardData.selectedProducts && rewardData.selectedProducts.length > 0) {
@@ -166,7 +187,8 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
                 // No reward data, use defaults
                 setRequirement('10');
                 setPointsPerPurchase('1');
-                setRewardType('free_product');
+                setRewardType(isCampaign ? 'bonus_reward' : 'free_product');
+                setCustomTypeText('');
                 setType('product');
                 setSelectedProducts([]);
                 setSelectedActions([]);
@@ -304,8 +326,13 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
       }
       
       // Generate QR code value using shared utility with business profile data
-      // Use rewardId prop, loadedRewardId, reward prop id, or generate new ID (in that order)
-      const rewardIdToSave = rewardId || loadedRewardId || reward?.id || Date.now().toString();
+      // Use rewardId prop, loadedRewardId, reward prop id, or generate new unique ID (in that order)
+      // For new items, generate a unique ID that includes timestamp and random suffix to prevent duplicates
+      let rewardIdToSave = rewardId || loadedRewardId || reward?.id;
+      if (!rewardIdToSave) {
+        // Generate unique ID: timestamp + random suffix to prevent duplicates even if created in same millisecond
+        rewardIdToSave = `${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+      }
       // For campaigns, use default requirement value (1) since campaigns don't have requirement field
       const requirementValue = isCampaign ? 1 : parseInt(requirement, 10) || 1;
       const pointsValue = parseInt(pointsPerPurchase, 10) || 1;
@@ -401,12 +428,15 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
         }
         
         // Save as Campaign with reward data stored in conditions.rewardData
+        // Use selected rewardType (or customTypeText if "Other") as campaign.type
+        const campaignTypeValue = rewardType === 'other' ? customTypeText.trim() : rewardType;
         const campaignToSave: Campaign = {
           id: rewardIdToSave,
           businessId: auth.businessId,
           name,
           description: existingCampaign?.description || '',
-          type: existingCampaign?.type || 'bonus_reward',
+          // Use the new type value from the form, not the existing one (unless creating new)
+          type: (campaignTypeValue || 'bonus_reward') as CampaignType,
           startDate: existingCampaign?.startDate || now,
           endDate: existingCampaign?.endDate || new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString(), // Default to 1 year from now
           status: existingCampaign?.status || 'active',
@@ -420,7 +450,7 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
               qrCode: qrCodeValue,
               stampsRequired: requirementValue,
               pointsPerPurchase: pointsValue,
-              rewardType,
+              rewardType: rewardType === 'other' ? customTypeText.trim() : rewardType,
             },
           },
           createdAt: existingCampaign?.createdAt || now,
@@ -989,50 +1019,308 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
           />
 
           <Text style={styles.label}>{isCampaign ? 'Campaign Type *' : 'Reward Type *'}</Text>
-          <View style={styles.radioGroup}>
-            <TouchableOpacity
+          
+          {isCampaign ? (
+            <>
+              {/* Campaign Type Dropdown */}
+              <TouchableOpacity
+            style={styles.dropdown}
+            onPress={() => setCampaignTypeDropdownVisible(true)}>
+            <Text
               style={[
-                styles.radioOption,
-                rewardType === 'free_product' && styles.radioOptionSelected,
+                styles.dropdownText,
+                !rewardType && styles.dropdownPlaceholder,
               ]}
-              onPress={() => setRewardType('free_product')}>
-              <Text
-                style={[
-                  styles.radioText,
-                  rewardType === 'free_product' && styles.radioTextSelected,
-                ]}>
-                Free Product
-              </Text>
-            </TouchableOpacity>
+              numberOfLines={1}>
+              {rewardType === 'other' 
+                ? (customTypeText || 'Other (enter custom type)')
+                : rewardType === 'double_stamps' ? 'Double Stamps'
+                : rewardType === 'bonus_reward' ? 'Bonus Reward'
+                : rewardType === 'flash_sale' ? 'Flash Sale'
+                : rewardType === 'referral' ? 'Referral'
+                : rewardType === 'birthday' ? 'Birthday'
+                : rewardType === 'happy_hour' ? 'Happy Hour'
+                : rewardType === 'loyalty_tier' ? 'Loyalty Tier'
+                : rewardType === 'free_product' ? 'Free Product'
+                : rewardType === 'discount' ? 'Discount'
+                : 'Select campaign type'}
+            </Text>
+            <Text style={styles.dropdownArrow}>▼</Text>
+          </TouchableOpacity>
+
+          {/* Custom Type Text Input (shown when "Other" is selected) */}
+          {rewardType === 'other' && (
+            <TextInput
+              style={[styles.input, {marginTop: 8}]}
+              value={customTypeText}
+              onChangeText={setCustomTypeText}
+              placeholder="Enter custom campaign type"
+              placeholderTextColor={Colors.text.light}
+            />
+          )}
+
+          {/* Campaign Type Dropdown Modal */}
+          <Modal
+            visible={campaignTypeDropdownVisible}
+            transparent={true}
+            animationType="fade"
+            onRequestClose={() => setCampaignTypeDropdownVisible(false)}>
             <TouchableOpacity
-              style={[
-                styles.radioOption,
-                rewardType === 'discount' && styles.radioOptionSelected,
-              ]}
-              onPress={() => setRewardType('discount')}>
-              <Text
-                style={[
-                  styles.radioText,
-                  rewardType === 'discount' && styles.radioTextSelected,
-                ]}>
-                Discount
-              </Text>
+              style={styles.modalOverlay}
+              activeOpacity={1}
+              onPress={() => setCampaignTypeDropdownVisible(false)}>
+              <View style={styles.dropdownModal}>
+                <ScrollView>
+                  <TouchableOpacity
+                    style={[
+                      styles.dropdownOption,
+                      rewardType === 'double_stamps' && styles.dropdownOptionSelected,
+                    ]}
+                    onPress={() => {
+                      setRewardType('double_stamps');
+                      setCustomTypeText('');
+                      setCampaignTypeDropdownVisible(false);
+                    }}>
+                    <Text
+                      style={[
+                        styles.dropdownOptionText,
+                        rewardType === 'double_stamps' && styles.dropdownOptionTextSelected,
+                      ]}>
+                      Double Stamps
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.dropdownOption,
+                      rewardType === 'bonus_reward' && styles.dropdownOptionSelected,
+                    ]}
+                    onPress={() => {
+                      setRewardType('bonus_reward');
+                      setCustomTypeText('');
+                      setCampaignTypeDropdownVisible(false);
+                    }}>
+                    <Text
+                      style={[
+                        styles.dropdownOptionText,
+                        rewardType === 'bonus_reward' && styles.dropdownOptionTextSelected,
+                      ]}>
+                      Bonus Reward
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.dropdownOption,
+                      rewardType === 'flash_sale' && styles.dropdownOptionSelected,
+                    ]}
+                    onPress={() => {
+                      setRewardType('flash_sale');
+                      setCustomTypeText('');
+                      setCampaignTypeDropdownVisible(false);
+                    }}>
+                    <Text
+                      style={[
+                        styles.dropdownOptionText,
+                        rewardType === 'flash_sale' && styles.dropdownOptionTextSelected,
+                      ]}>
+                      Flash Sale
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.dropdownOption,
+                      rewardType === 'referral' && styles.dropdownOptionSelected,
+                    ]}
+                    onPress={() => {
+                      setRewardType('referral');
+                      setCustomTypeText('');
+                      setCampaignTypeDropdownVisible(false);
+                    }}>
+                    <Text
+                      style={[
+                        styles.dropdownOptionText,
+                        rewardType === 'referral' && styles.dropdownOptionTextSelected,
+                      ]}>
+                      Referral
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.dropdownOption,
+                      rewardType === 'birthday' && styles.dropdownOptionSelected,
+                    ]}
+                    onPress={() => {
+                      setRewardType('birthday');
+                      setCustomTypeText('');
+                      setCampaignTypeDropdownVisible(false);
+                    }}>
+                    <Text
+                      style={[
+                        styles.dropdownOptionText,
+                        rewardType === 'birthday' && styles.dropdownOptionTextSelected,
+                      ]}>
+                      Birthday
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.dropdownOption,
+                      rewardType === 'happy_hour' && styles.dropdownOptionSelected,
+                    ]}
+                    onPress={() => {
+                      setRewardType('happy_hour');
+                      setCustomTypeText('');
+                      setCampaignTypeDropdownVisible(false);
+                    }}>
+                    <Text
+                      style={[
+                        styles.dropdownOptionText,
+                        rewardType === 'happy_hour' && styles.dropdownOptionTextSelected,
+                      ]}>
+                      Happy Hour
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.dropdownOption,
+                      rewardType === 'loyalty_tier' && styles.dropdownOptionSelected,
+                    ]}
+                    onPress={() => {
+                      setRewardType('loyalty_tier');
+                      setCustomTypeText('');
+                      setCampaignTypeDropdownVisible(false);
+                    }}>
+                    <Text
+                      style={[
+                        styles.dropdownOptionText,
+                        rewardType === 'loyalty_tier' && styles.dropdownOptionTextSelected,
+                      ]}>
+                      Loyalty Tier
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.dropdownOption,
+                      rewardType === 'free_product' && styles.dropdownOptionSelected,
+                    ]}
+                    onPress={() => {
+                      setRewardType('free_product');
+                      setCustomTypeText('');
+                      setCampaignTypeDropdownVisible(false);
+                    }}>
+                    <Text
+                      style={[
+                        styles.dropdownOptionText,
+                        rewardType === 'free_product' && styles.dropdownOptionTextSelected,
+                      ]}>
+                      Free Product
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.dropdownOption,
+                      rewardType === 'discount' && styles.dropdownOptionSelected,
+                    ]}
+                    onPress={() => {
+                      setRewardType('discount');
+                      setCustomTypeText('');
+                      setCampaignTypeDropdownVisible(false);
+                    }}>
+                    <Text
+                      style={[
+                        styles.dropdownOptionText,
+                        rewardType === 'discount' && styles.dropdownOptionTextSelected,
+                      ]}>
+                      Discount
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.dropdownOption,
+                      rewardType === 'other' && styles.dropdownOptionSelected,
+                    ]}
+                    onPress={() => {
+                      setRewardType('other');
+                      setCampaignTypeDropdownVisible(false);
+                    }}>
+                    <Text
+                      style={[
+                        styles.dropdownOptionText,
+                        rewardType === 'other' && styles.dropdownOptionTextSelected,
+                      ]}>
+                      Other (Custom)
+                    </Text>
+                  </TouchableOpacity>
+                </ScrollView>
+              </View>
             </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.radioOption,
-                rewardType === 'other' && styles.radioOptionSelected,
-              ]}
-              onPress={() => setRewardType('other')}>
-              <Text
+          </Modal>
+            </>
+          ) : (
+            // For rewards, show radio buttons (free_product, discount, other)
+            <View style={styles.radioGroup}>
+              <TouchableOpacity
                 style={[
-                  styles.radioText,
-                  rewardType === 'other' && styles.radioTextSelected,
-                ]}>
-                Other
-              </Text>
-            </TouchableOpacity>
-          </View>
+                  styles.radioOption,
+                  rewardType === 'free_product' && styles.radioOptionSelected,
+                ]}
+                onPress={() => {
+                  setRewardType('free_product');
+                  setCustomTypeText('');
+                }}>
+                <Text
+                  style={[
+                    styles.radioText,
+                    rewardType === 'free_product' && styles.radioTextSelected,
+                  ]}>
+                  Free Product
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.radioOption,
+                  rewardType === 'discount' && styles.radioOptionSelected,
+                ]}
+                onPress={() => {
+                  setRewardType('discount');
+                  setCustomTypeText('');
+                }}>
+                <Text
+                  style={[
+                    styles.radioText,
+                    rewardType === 'discount' && styles.radioTextSelected,
+                  ]}>
+                  Discount
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.radioOption,
+                  rewardType === 'other' && styles.radioOptionSelected,
+                ]}
+                onPress={() => {
+                  setRewardType('other');
+                }}>
+                <Text
+                  style={[
+                    styles.radioText,
+                    rewardType === 'other' && styles.radioTextSelected,
+                  ]}>
+                  Other
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+          
+          {/* Custom Type Text Input for Rewards (shown when "Other" is selected) */}
+          {!isCampaign && rewardType === 'other' && (
+            <TextInput
+              style={[styles.input, {marginTop: 8}]}
+              value={customTypeText}
+              onChangeText={setCustomTypeText}
+              placeholder="Enter custom reward type"
+              placeholderTextColor={Colors.text.light}
+            />
+          )}
 
           <Text style={styles.label}>4-Digit PIN Code *</Text>
           <Text style={styles.labelHint}>
@@ -1085,8 +1373,18 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
               <View style={styles.summarySection}>
                 <Text style={styles.summaryLabel}>Reward defined:</Text>
                 <Text style={styles.summaryItem}>
-                  {rewardType === 'free_product' ? 'Free Product' : 
-                   rewardType === 'discount' ? 'Discount' : 'Other'}
+                  {rewardType === 'other' 
+                    ? (customTypeText || 'Other')
+                    : rewardType === 'double_stamps' ? 'Double Stamps'
+                    : rewardType === 'bonus_reward' ? 'Bonus Reward'
+                    : rewardType === 'flash_sale' ? 'Flash Sale'
+                    : rewardType === 'referral' ? 'Referral'
+                    : rewardType === 'birthday' ? 'Birthday'
+                    : rewardType === 'happy_hour' ? 'Happy Hour'
+                    : rewardType === 'loyalty_tier' ? 'Loyalty Tier'
+                    : rewardType === 'free_product' ? 'Free Product'
+                    : rewardType === 'discount' ? 'Discount'
+                    : 'Not selected'}
                 </Text>
               </View>
             </View>
