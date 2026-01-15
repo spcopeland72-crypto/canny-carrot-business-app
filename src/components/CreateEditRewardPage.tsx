@@ -14,9 +14,9 @@ import PageTemplate from './PageTemplate';
 import QRCodeModal from './QRCodeModal';
 // Products and actions are now stored in business profile, not separate storage
 import {generateRewardQRCode} from '../utils/qrCodeUtils';
-import {businessRepository, rewardsRepository} from '../services/localRepository';
+import {businessRepository, rewardsRepository, campaignsRepository} from '../services/localRepository';
 import {getStoredAuth} from '../services/authService';
-import type {BusinessProfile, Reward} from '../types';
+import type {BusinessProfile, Reward, Campaign} from '../types';
 
 interface CreateEditRewardPageProps {
   currentScreen: string;
@@ -68,40 +68,60 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
   const [createdRewardQrCode, setCreatedRewardQrCode] = useState('');
   const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
 
-  // Load reward data and form fields on mount (if editing)
+  // Load reward/campaign data and form fields on mount (if editing)
   useEffect(() => {
     const loadRewardData = async () => {
       if (isEdit && rewardId) {
         try {
-          // Load reward from repository (DB format)
-          const loadedReward = await rewardsRepository.getById(rewardId);
-          if (loadedReward) {
-            // Store the loaded reward ID to prevent duplicate creation
-            setLoadedRewardId(loadedReward.id);
-            
-            // Map DB format to UI form fields
-            setName(loadedReward.name || '');
-            setRequirement((loadedReward.stampsRequired || loadedReward.costStamps || 10).toString());
-            setPointsPerPurchase((loadedReward.pointsPerPurchase || 1).toString());
-            
-            // Map DB type to UI rewardType
-            if (loadedReward.type === 'discount') {
-              setRewardType('discount');
-            } else if (loadedReward.type === 'freebie' || loadedReward.type === 'product') {
+          if (isCampaign) {
+            // Load campaign from repository (DB format)
+            const loadedCampaign = await campaignsRepository.getById(rewardId);
+            if (loadedCampaign) {
+              // Store the loaded campaign ID to prevent duplicate creation
+              setLoadedRewardId(loadedCampaign.id);
+              
+              // Map DB format to UI form fields
+              setName(loadedCampaign.name || '');
+              // Campaigns don't have stampsRequired, use default
+              setRequirement('10');
+              setPointsPerPurchase('1');
               setRewardType('free_product');
-            } else {
-              setRewardType('other');
+              setType('product');
+              setSelectedProducts([]);
+              setSelectedActions([]);
+              setPinCode('');
             }
-            
-            // Default to 'product' for UI type (DB doesn't have product/action distinction)
-            setType('product');
-            
-            setSelectedProducts(loadedReward.selectedProducts || []);
-            setSelectedActions(loadedReward.selectedActions || []);
-            setPinCode(loadedReward.pinCode || '');
+          } else {
+            // Load reward from repository (DB format)
+            const loadedReward = await rewardsRepository.getById(rewardId);
+            if (loadedReward) {
+              // Store the loaded reward ID to prevent duplicate creation
+              setLoadedRewardId(loadedReward.id);
+              
+              // Map DB format to UI form fields
+              setName(loadedReward.name || '');
+              setRequirement((loadedReward.stampsRequired || loadedReward.costStamps || 10).toString());
+              setPointsPerPurchase((loadedReward.pointsPerPurchase || 1).toString());
+              
+              // Map DB type to UI rewardType
+              if (loadedReward.type === 'discount') {
+                setRewardType('discount');
+              } else if (loadedReward.type === 'freebie' || loadedReward.type === 'product') {
+                setRewardType('free_product');
+              } else {
+                setRewardType('other');
+              }
+              
+              // Default to 'product' for UI type (DB doesn't have product/action distinction)
+              setType('product');
+              
+              setSelectedProducts(loadedReward.selectedProducts || []);
+              setSelectedActions(loadedReward.selectedActions || []);
+              setPinCode(loadedReward.pinCode || '');
+            }
           }
         } catch (error) {
-          console.error('Error loading reward data:', error);
+          console.error('Error loading reward/campaign data:', error);
         }
       } else if (reward) {
         // Fallback: use reward prop if provided (legacy support)
@@ -281,32 +301,56 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
         type,
       });
       
-      // Create reward in DB format directly
-      const rewardToSave: Reward = {
-        id: rewardIdToSave,
-        businessId: auth.businessId,
-        name,
-        description: '', // Can be added later if needed
-        stampsRequired: requirementValue,
-        costStamps: requirementValue,
-        type: dbType,
-        isActive: true,
-        validFrom: now,
-        validTo: undefined,
-        expiresAt: undefined,
-        createdAt: isEdit ? reward?.createdAt || now : now,
-        updatedAt: now,
-        currentRedemptions: 0,
-        // App-specific fields (stored but not in core DB type)
-        pinCode,
-        qrCode: qrCodeValue,
-        selectedProducts: type === 'product' ? selectedProducts : undefined,
-        selectedActions: type === 'action' ? selectedActions : undefined,
-        pointsPerPurchase: pointsValue,
-      };
-      
-      // Save to local repository (DB format) - this will also write to Redis
-      await rewardsRepository.save(rewardToSave);
+      if (isCampaign) {
+        // Save as Campaign
+        const campaignToSave: Campaign = {
+          id: rewardIdToSave,
+          businessId: auth.businessId,
+          name,
+          description: '', // Can be added later if needed
+          type: 'engagement', // Default campaign type
+          status: 'live',
+          startDate: now,
+          endDate: undefined,
+          startAt: now,
+          endAt: undefined,
+          targetAudience: 'all',
+          createdAt: isEdit ? (reward as any)?.createdAt || now : now,
+          updatedAt: now,
+        };
+        
+        console.log('[CreateEditReward] Saving campaign:', campaignToSave);
+        
+        // Save to campaigns repository (DB format) - this will also write to Redis
+        await campaignsRepository.save(campaignToSave);
+      } else {
+        // Save as Reward
+        const rewardToSave: Reward = {
+          id: rewardIdToSave,
+          businessId: auth.businessId,
+          name,
+          description: '', // Can be added later if needed
+          stampsRequired: requirementValue,
+          costStamps: requirementValue,
+          type: dbType,
+          isActive: true,
+          validFrom: now,
+          validTo: undefined,
+          expiresAt: undefined,
+          createdAt: isEdit ? reward?.createdAt || now : now,
+          updatedAt: now,
+          currentRedemptions: 0,
+          // App-specific fields (stored but not in core DB type)
+          pinCode,
+          qrCode: qrCodeValue,
+          selectedProducts: type === 'product' ? selectedProducts : undefined,
+          selectedActions: type === 'action' ? selectedActions : undefined,
+          pointsPerPurchase: pointsValue,
+        };
+        
+        // Save to local repository (DB format) - this will also write to Redis
+        await rewardsRepository.save(rewardToSave);
+      }
       
       // Call onSave callback if provided (for parent component notifications)
       const rewardData = {
