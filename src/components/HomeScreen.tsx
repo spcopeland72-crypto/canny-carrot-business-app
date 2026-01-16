@@ -22,7 +22,7 @@ import NotificationsModal from './NotificationsModal';
 import HelpModal from './HelpModal';
 import CompanyMenuModal from './CompanyMenuModal';
 import CircularProgress from './CircularProgress';
-import QRCode from 'react-native-qrcode-svg';
+import RewardQRCodeModal from './RewardQRCodeModal';
 import {generateRewardQRCode} from '../utils/qrCodeUtils';
 import AnimatedLineChart from './AnimatedLineChart';
 import AnimatedBarChart from './AnimatedBarChart';
@@ -1133,8 +1133,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
               </TouchableOpacity>
             </View>
           </View>
-        </Modal>
-      )}
+        )}
+      </Modal>
     </SafeAreaView>
   );
 };
