@@ -361,6 +361,8 @@ function App(): React.JSX.Element {
     setCampaigns(updatedCampaigns);
     // Delete from local repository (source of truth)
     await campaignsRepository.delete(campaignId);
+    // Also save to legacy storage for backward compatibility
+    saveCampaigns(updatedCampaigns);
   };
 
   // Reload rewards from repository
