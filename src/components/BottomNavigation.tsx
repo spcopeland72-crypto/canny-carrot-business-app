@@ -8,8 +8,14 @@ interface BottomNavigationProps {
   onScanPress?: () => void;
 }
 
-// Use emoji fallback instead of dynamic image requires
-const qrImage = null;
+// Load QR code image for scan button
+let qrImage = null;
+try {
+  qrImage = require('../../Images/qr.png');
+} catch (e) {
+  // Image not found, will use emoji fallback
+  qrImage = null;
+}
 
 const BottomNavigation: React.FC<BottomNavigationProps> = ({
   currentScreen,
@@ -57,6 +63,9 @@ const BottomNavigation: React.FC<BottomNavigationProps> = ({
               source={qrImage}
               style={styles.scanIconImage}
               resizeMode="contain"
+              onError={() => {
+                console.log('QR image failed to load');
+              }}
             />
           ) : (
             <Text style={styles.scanIcon}>📷</Text>
@@ -72,14 +81,14 @@ const BottomNavigation: React.FC<BottomNavigationProps> = ({
       </TouchableOpacity>
       <TouchableOpacity
         style={styles.navItem}
-        onPress={() => onNavigate('Help')}>
-        <Text style={styles.navIcon}>❓</Text>
+        onPress={() => onNavigate('Wallet')}>
+        <Text style={styles.navIcon}>💼</Text>
         <Text
           style={[
             styles.navLabel,
-            currentScreen === 'Help' && styles.navLabelActive,
+            currentScreen === 'Wallet' && styles.navLabelActive,
           ]}>
-          Help
+          Wallet
         </Text>
       </TouchableOpacity>
       <TouchableOpacity
@@ -107,7 +116,7 @@ const BottomNavigation: React.FC<BottomNavigationProps> = ({
 const styles = StyleSheet.create({
   bottomNav: {
     position: 'absolute',
-    bottom: 0,
+    bottom: -11, // Moved lower by 11px (5px + 3px + 2px + 1px) - EXACT customer app
     left: 0,
     right: 0,
     flexDirection: 'row',
@@ -115,8 +124,8 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: Colors.neutral[200],
     paddingTop: 8,
-    paddingBottom: 20,
-    paddingHorizontal: 4,
+    paddingBottom: 14, // Reduced by 6px from 20 - EXACT customer app
+    paddingHorizontal: 8,
     justifyContent: 'space-around',
     alignItems: 'center',
   },
@@ -129,14 +138,14 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   navIcon: {
-    fontSize: 20,
+    fontSize: 24,
     marginBottom: 4,
   },
   navIconActive: {
     color: Colors.secondary,
   },
   navLabel: {
-    fontSize: 10,
+    fontSize: 12,
     color: Colors.text.secondary,
   },
   navLabelActive: {
@@ -144,20 +153,21 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   scanButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     backgroundColor: Colors.secondary,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 4,
   },
   scanIcon: {
-    fontSize: 24,
+    fontSize: 28,
   },
   scanIconImage: {
-    width: 24,
-    height: 24,
+    width: 28,
+    height: 28,
+    // No tintColor - display QR code in original colors
   },
 });
 

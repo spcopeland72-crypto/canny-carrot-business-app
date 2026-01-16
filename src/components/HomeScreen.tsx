@@ -1029,6 +1029,11 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
   },
   header: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 100,
     backgroundColor: Colors.background,
     paddingHorizontal: 16,
     paddingTop: 12,
@@ -1158,7 +1163,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: 100,
+    paddingTop: 74, // Account for sticky header height (12 + 12 + 50 = 74px)
+    paddingBottom: 100, // Account for bottom nav
   },
   bannerSection: {
     marginBottom: 0,
