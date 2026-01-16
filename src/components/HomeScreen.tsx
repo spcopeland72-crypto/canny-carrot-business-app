@@ -1098,6 +1098,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 12,
     paddingBottom: 12,
+    ...Platform.select({
+      web: {
+        position: 'sticky' as const,
+        top: 0,
+        zIndex: 10,
+      },
+      default: {},
+    }),
   },
   headerTop: {
     flexDirection: 'row',
