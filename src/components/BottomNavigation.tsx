@@ -81,14 +81,14 @@ const BottomNavigation: React.FC<BottomNavigationProps> = ({
       </TouchableOpacity>
       <TouchableOpacity
         style={styles.navItem}
-        onPress={() => onNavigate('Wallet')}>
-        <Text style={styles.navIcon}>💼</Text>
+        onPress={() => onNavigate('Help')}>
+        <Text style={styles.navIcon}>❓</Text>
         <Text
           style={[
             styles.navLabel,
-            currentScreen === 'Wallet' && styles.navLabelActive,
+            currentScreen === 'Help' && styles.navLabelActive,
           ]}>
-          Wallet
+          Help
         </Text>
       </TouchableOpacity>
       <TouchableOpacity
