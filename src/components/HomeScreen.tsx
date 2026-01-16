@@ -1718,6 +1718,94 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: Colors.background,
   },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  rewardModalContainer: {
+    backgroundColor: Colors.background,
+    borderRadius: 16,
+    padding: 24,
+    width: '85%',
+    maxWidth: 400,
+    alignItems: 'center',
+  },
+  rewardModalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: Colors.text.primary,
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  qrCodeContainer: {
+    backgroundColor: Colors.background,
+    padding: 20,
+    borderRadius: 12,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: Colors.neutral[200],
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  qrPlaceholder: {
+    width: 200,
+    height: 200,
+    backgroundColor: Colors.neutral[100],
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 8,
+  },
+  qrIcon: {
+    fontSize: 48,
+    marginBottom: 12,
+  },
+  qrText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: Colors.text.primary,
+  },
+  rewardModalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    width: '100%',
+    marginBottom: 16,
+  },
+  rewardModalButton: {
+    flex: 1,
+    padding: 14,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  editButton: {
+    backgroundColor: Colors.primary,
+  },
+  editButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: Colors.background,
+  },
+  analyticsButton: {
+    backgroundColor: Colors.secondary,
+  },
+  analyticsButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: Colors.background,
+  },
+  closeModalButton: {
+    padding: 12,
+    borderRadius: 8,
+    backgroundColor: Colors.neutral[200],
+    width: '100%',
+    alignItems: 'center',
+  },
+  closeModalButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: Colors.text.primary,
+  },
 });
 
 export default HomeScreen;
