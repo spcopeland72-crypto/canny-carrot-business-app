@@ -429,12 +429,11 @@ function App(): React.JSX.Element {
     } catch (error) {
       console.error('Error logging out:', error);
       // Continue with logout even if logoutBusiness fails
+    } finally {
+      // Always update state to show login screen, even if logoutBusiness fails
+      setIsAuthenticatedState(false);
+      setCurrentScreen('Home');
     }
-    // Always update state to show login screen, even if logoutBusiness fails
-    // Set state immediately (not in finally) to ensure it updates
-    setIsAuthenticatedState(false);
-    setCurrentScreen('Home');
-    console.log('✅ [App] Auth state set to false, should show login screen');
   };
 
   const handleBarcodeScanned = (data: string, type: string) => {
