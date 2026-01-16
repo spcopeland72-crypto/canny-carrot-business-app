@@ -422,6 +422,7 @@ function App(): React.JSX.Element {
   };
 
   const handleLogout = async () => {
+    console.log('[App] handleLogout called');
     try {
       const { logoutBusiness } = await import('./src/services/authService');
       await logoutBusiness();
@@ -431,8 +432,10 @@ function App(): React.JSX.Element {
       // Continue with logout even if logoutBusiness fails
     } finally {
       // Always update state to show login screen, even if logoutBusiness fails
+      console.log('[App] Setting isAuthenticatedState to false');
       setIsAuthenticatedState(false);
       setCurrentScreen('Home');
+      console.log('[App] State updated, should trigger re-render to show LoginPage');
     }
   };
 
