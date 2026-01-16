@@ -91,9 +91,19 @@ const CompanyMenuModal: React.FC<CompanyMenuModalProps> = ({
       await logoutBusiness();
       console.log('✅ Logged out successfully');
       onClose();
-      onLogout();
+      // Call onLogout callback to trigger App.tsx to show login screen
+      if (onLogout) {
+        console.log('[CompanyMenuModal] Calling onLogout callback');
+        onLogout();
+      } else {
+        console.error('[CompanyMenuModal] onLogout callback is missing!');
+      }
     } catch (error) {
       console.error('Error logging out:', error);
+      // Still call onLogout even if logoutBusiness fails
+      if (onLogout) {
+        onLogout();
+      }
     }
   };
 
