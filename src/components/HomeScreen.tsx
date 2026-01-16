@@ -1029,110 +1029,56 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
       />
       
       {/* Reward QR Code Modal */}
-      <Modal
-        visible={rewardModalVisible && selectedReward !== null}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => {
-          setRewardModalVisible(false);
-          setSelectedReward(null);
-        }}>
-        {selectedReward && (
-          <View style={styles.modalOverlay}>
-            <View style={styles.rewardModalContainer}>
-              <Text style={styles.rewardModalTitle}>{selectedReward.name}</Text>
-              
-              {/* QR Code */}
-              <View style={styles.qrCodeContainer}>
-                {(() => {
-                  let qrValue = selectedReward.qrCode;
-                  if (!qrValue) {
-                    // Generate QR code if not stored
-                    try {
-                      const businessProfile = {
-                        name: businessName,
-                        address: '',
-                        addressLine1: '',
-                        addressLine2: '',
-                        city: '',
-                        postcode: '',
-                        country: 'UK',
-                        phone: '',
-                        email: '',
-                        website: '',
-                        socialMedia: {},
-                      };
-                      qrValue = generateRewardQRCode(
-                        selectedReward.id,
-                        selectedReward.name,
-                        selectedReward.stampsRequired || selectedReward.costStamps || 10,
-                        selectedReward.type === 'freebie' ? 'free_product' : 
-                        selectedReward.type === 'discount' ? 'discount' : 'other',
-                        selectedReward.selectedProducts,
-                        selectedReward.selectedActions,
-                        selectedReward.pinCode,
-                        businessProfile,
-                        selectedReward.pointsPerPurchase
-                      );
-                    } catch (error) {
-                      console.error('[HomeScreen] Error generating QR code:', error);
-                      qrValue = '';
-                    }
-                  }
-                  
-                  if (!qrValue) {
-                    return (
-                      <View style={styles.qrPlaceholder}>
-                        <Text style={styles.qrIcon}>📱</Text>
-                        <Text style={styles.qrText}>No QR Code</Text>
-                      </View>
-                    );
-                  }
-                  
-                  return (
-                    <QRCode
-                      value={qrValue}
-                      size={200}
-                      color={Colors.text.primary}
-                      backgroundColor={Colors.background}
-                      quietZone={10}
-                      onError={(error) => {
-                        console.error('[HomeScreen] QR code generation error:', error);
-                      }}
-                    />
-                  );
-                })()}
-              </View>
-              
-              {/* Buttons */}
-              <View style={styles.rewardModalButtons}>
-                <TouchableOpacity
-                  style={[styles.rewardModalButton, styles.editButton]}
-                  onPress={() => {
-                    setRewardModalVisible(false);
-                    onNavigate(`EditReward${selectedReward.id}`);
-                  }}>
-                  <Text style={styles.editButtonText}>Edit Reward</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.rewardModalButton, styles.analyticsButton]}
-                  onPress={() => {
-                    setRewardModalVisible(false);
-                    onNavigate(`Analytics${selectedReward.id}`);
-                  }}>
-                  <Text style={styles.analyticsButtonText}>Analytics</Text>
-                </TouchableOpacity>
-              </View>
-              
-              <TouchableOpacity
-                style={styles.closeModalButton}
-                onPress={() => setRewardModalVisible(false)}>
-                <Text style={styles.closeModalButtonText}>Close</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
-      </Modal>
+      {selectedRewardForQR && (() => {
+        let qrValue = selectedRewardForQR.qrCode;
+        if (!qrValue) {
+          // Generate QR code if not stored
+          try {
+            const businessProfile = {
+              name: businessName,
+              address: '',
+              addressLine1: '',
+              addressLine2: '',
+              city: '',
+              postcode: '',
+              country: 'UK',
+              phone: '',
+              email: '',
+              website: '',
+              socialMedia: {},
+            };
+            qrValue = generateRewardQRCode(
+              selectedRewardForQR.id,
+              selectedRewardForQR.name,
+              selectedRewardForQR.stampsRequired || selectedRewardForQR.costStamps || 10,
+              selectedRewardForQR.type === 'freebie' ? 'free_product' : 
+              selectedRewardForQR.type === 'discount' ? 'discount' : 'other',
+              selectedRewardForQR.selectedProducts,
+              selectedRewardForQR.selectedActions,
+              selectedRewardForQR.pinCode,
+              businessProfile,
+              selectedRewardForQR.pointsPerPurchase
+            );
+          } catch (error) {
+            console.error('[HomeScreen] Error generating QR code:', error);
+            qrValue = '';
+          }
+        }
+        
+        return (
+          <RewardQRCodeModal
+            visible={rewardQRModalVisible}
+            rewardName={selectedRewardForQR.name}
+            qrValue={qrValue}
+            rewardId={selectedRewardForQR.id}
+            onClose={() => {
+              setRewardQRModalVisible(false);
+              setSelectedRewardForQR(null);
+            }}
+            onNavigate={onNavigate}
+          />
+        );
+      })()}
     </SafeAreaView>
   );
 };
