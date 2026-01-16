@@ -1,5 +1,5 @@
 import React from 'react';
-import {View, Text, TouchableOpacity, StyleSheet, Image} from 'react-native';
+import {View, Text, TouchableOpacity, StyleSheet, Image, Platform} from 'react-native';
 import {Colors} from '../constants/Colors';
 
 interface BottomNavigationProps {
@@ -115,10 +115,22 @@ const BottomNavigation: React.FC<BottomNavigationProps> = ({
 
 const styles = StyleSheet.create({
   bottomNav: {
-    position: 'absolute',
-    bottom: -11, // Moved lower by 11px (5px + 3px + 2px + 1px) - EXACT customer app
-    left: 0,
-    right: 0,
+    ...Platform.select({
+      web: {
+        position: 'fixed' as const,
+        bottom: -11, // Moved lower by 11px (5px + 3px + 2px + 1px) - EXACT customer app
+        left: 0,
+        right: 0,
+        zIndex: 100,
+      },
+      default: {
+        position: 'absolute' as const,
+        bottom: -11, // Moved lower by 11px (5px + 3px + 2px + 1px) - EXACT customer app
+        left: 0,
+        right: 0,
+        zIndex: 100,
+      },
+    }),
     flexDirection: 'row',
     backgroundColor: Colors.background,
     borderTopWidth: 1,
