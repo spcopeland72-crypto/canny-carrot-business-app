@@ -357,17 +357,18 @@ function App(): React.JSX.Element {
 
   const handleDeleteCampaign = async (campaignId: string) => {
     try {
-      // Simple delete: just delete from local storage
+      // Simple delete: just delete from local storage (NO Redis deletion from app)
+      // Redis deletion only happens via admin console or sync operations
       await campaignsRepository.delete(campaignId);
       console.log(`✅ [App] Campaign ${campaignId} deleted from local storage`);
       
-      // Reload campaigns and refresh Home screen
+      // Reload campaigns and refresh state
       const loadedCampaigns = await campaignsRepository.getAll();
       setCampaigns(loadedCampaigns || []);
       
-      // If we're on Home screen, reload it to refresh
+      // If on Home screen, trigger reload by navigating to Home again
       if (currentScreen === 'Home') {
-        await reloadCampaigns();
+        await handleNavigate('Home');
       }
     } catch (error) {
       console.error(`❌ [App] Error deleting campaign ${campaignId}:`, error);
