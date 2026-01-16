@@ -122,10 +122,13 @@ export const businessRepository = {
    * Save business profile to local repository
    * IMMEDIATELY writes to Redis after saving locally
    */
-  save: async (profile: BusinessProfile): Promise<void> => {
+  save: async (profile: BusinessProfile, skipMarkDirty: boolean = false): Promise<void> => {
     try {
       await AsyncStorage.setItem(REPOSITORY_KEYS.BUSINESS_PROFILE, JSON.stringify(profile));
-      await markDirty();
+      // ONLY update timestamp if this is a user action (create/edit/submit), NOT during downloads
+      if (!skipMarkDirty) {
+        await markDirty();
+      }
       console.log('✅ Business profile saved to local repository');
       
       // IMMEDIATELY write to Redis
@@ -248,30 +251,9 @@ export const rewardsRepository = {
       const data = await AsyncStorage.getItem(REPOSITORY_KEYS.REWARDS);
       if (data) {
         const parsed = JSON.parse(data);
-        // Validate: rewards must have 'isActive' or 'stampsRequired' field
-        // Campaigns have 'type' (CampaignType: 'double_stamps', 'bonus_reward', etc.) and 'status' (CampaignStatus: 'active', 'draft', etc.)
-        const campaignTypes = ['double_stamps', 'bonus_reward', 'flash_sale', 'referral', 'birthday', 'happy_hour', 'loyalty_tier'];
-        const campaignStatuses = ['draft', 'scheduled', 'active', 'paused', 'completed', 'cancelled'];
-        
-        const validRewards = parsed.filter((item: any) => {
-          // Check if it's a campaign: has CampaignType 'type' field or CampaignStatus 'status' field
-          const hasCampaignType = item.type && campaignTypes.includes(item.type);
-          const hasCampaignStatus = item.status && campaignStatuses.includes(item.status) && item.isActive === undefined;
-          
-          // If it looks like a campaign, filter it out
-          if (hasCampaignType || hasCampaignStatus) {
-            console.warn(`⚠️ [REPOSITORY] Filtered out campaign from rewards (moved to campaigns): ${item.id} - ${item.name}`);
-            return false;
-          }
-          
-          // Reward must have isActive or stampsRequired
-          const isReward = item.isActive !== undefined || item.stampsRequired || item.costStamps;
-          if (!isReward) {
-            console.warn(`⚠️ [REPOSITORY] Filtered out invalid reward item: ${item.id} - ${item.name}`);
-          }
-          return isReward;
-        });
-        return validRewards;
+        // Return all rewards as-is - no validation/filtering needed
+        // Rewards and campaigns are discrete entities stored separately
+        return parsed || [];
       }
     } catch (error) {
       console.error('Error getting rewards:', error);
@@ -469,22 +451,9 @@ export const campaignsRepository = {
       const data = await AsyncStorage.getItem(REPOSITORY_KEYS.CAMPAIGNS);
       if (data) {
         const parsed = JSON.parse(data);
-        
-        // Filter out rewards (items that have reward-specific fields)
-        // Only filter based on reward fields - type/status are not required
-        const validCampaigns = parsed.filter((item: any) => {
-          // Check if it's a reward: has 'isActive' or 'stampsRequired' fields
-          const isReward = item.isActive !== undefined || item.stampsRequired || item.costStamps;
-          if (isReward) {
-            console.warn(`⚠️ [REPOSITORY] Filtered out reward from campaigns (should be in rewards): ${item.id} - ${item.name}`);
-            return false;
-          }
-          
-          // All non-reward items pass through (regardless of type/status fields)
-          return true;
-        });
-        
-        return validCampaigns;
+        // Return all campaigns as-is - no validation/filtering needed
+        // Campaigns and rewards are discrete entities stored separately
+        return parsed || [];
       }
     } catch (error) {
       console.error('Error getting campaigns:', error);
@@ -844,30 +813,13 @@ export const restoreArchivedRepository = async (businessId: string): Promise<voi
  * Get local repository timestamp
  * CRITICAL: NEVER returns null - if timestamp doesn't exist, creates one and returns it
  */
-export const getLocalRepositoryTimestamp = async (): Promise<string> => {
+export const getLocalRepositoryTimestamp = async (): Promise<string | null> => {
   try {
-    const metadata = await getSyncMetadata();
-    // getSyncMetadata() now guarantees a timestamp, but double-check
-    if (metadata.lastModified) {
-      return metadata.lastModified;
-    }
-    // If somehow still null, create timestamp now
-    console.warn('⚠️ [REPOSITORY] Timestamp was null - creating new timestamp');
-    const now = new Date().toISOString();
-    await updateSyncMetadata({ lastModified: now });
-    return now;
+    const profile = await businessRepository.get();
+    return profile?.updatedAt || null;
   } catch (error) {
     console.error('Error getting local repository timestamp:', error);
-    // Even on error, return a timestamp - use current time
-    const now = new Date().toISOString();
-    console.warn(`⚠️ [REPOSITORY] Error getting timestamp - using current time: ${now}`);
-    // Try to save it
-    try {
-      await updateSyncMetadata({ lastModified: now });
-    } catch (e) {
-      console.error('Failed to save timestamp after error:', e);
-    }
-    return now;
+    return null;
   }
 };
 
@@ -1067,14 +1019,12 @@ export const downloadAllData = async (businessId: string, apiBaseUrl: string = '
       console.error(`❌ [REPOSITORY] API error ${customersResponse.status} - customers download failed`);
     }
 
-    // Update sync metadata with database timestamp as the repository timestamp
-    // The business.updatedAt from Redis represents the top-level repository timestamp
-    // Use current time if we couldn't get the database timestamp
-    const finalTimestamp = dbRepositoryTimestamp || new Date().toISOString();
+    // DO NOT update timestamp on download - timestamp ONLY changes on user create/edit/submit
+    // Just record that we downloaded, but preserve existing timestamp
     await updateSyncMetadata({
       lastDownloadedAt: new Date().toISOString(),
-      lastModified: finalTimestamp, // Set top-level timestamp to database timestamp
       hasUnsyncedChanges: false,
+      // DO NOT update lastModified - it only changes when user creates/edits/submits
     });
 
     // Set current business ID for this repository

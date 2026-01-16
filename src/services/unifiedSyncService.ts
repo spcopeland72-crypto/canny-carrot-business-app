@@ -378,42 +378,72 @@ export const performUnifiedSync = async (businessId: string): Promise<{
     console.log('🔄 [UNIFIED SYNC] Starting unified sync for business:', businessId);
     console.log('🔄 [UNIFIED SYNC] All data (account, rewards, products, campaigns) syncs as one unit');
 
-    // Get timestamps
-    const localTimestamp = await getLocalRepositoryTimestamp();
-    const remoteTimestamp = await getRemoteRepositoryTimestamp(businessId);
+    // Get timestamps - RETRY if missing
+    let localTimestamp = await getLocalRepositoryTimestamp();
+    let remoteTimestamp = await getRemoteRepositoryTimestamp(businessId);
+    
+    // Retry fetching timestamps if missing (up to 2 retries)
+    let retryCount = 0;
+    const maxRetries = 2;
+    while ((!localTimestamp || !remoteTimestamp) && retryCount < maxRetries) {
+      retryCount++;
+      console.warn(`⚠️ [UNIFIED SYNC] Missing timestamps (attempt ${retryCount}/${maxRetries}) - retrying...`);
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
+      
+      if (!localTimestamp) {
+        localTimestamp = await getLocalRepositoryTimestamp();
+      }
+      if (!remoteTimestamp) {
+        remoteTimestamp = await getRemoteRepositoryTimestamp(businessId);
+      }
+    }
 
     console.log(`📊 [UNIFIED SYNC] Timestamp comparison:`);
-    console.log(`   Local:  ${localTimestamp || 'N/A (no local timestamp - repository is old/empty)'}`);
-    console.log(`   Remote: ${remoteTimestamp || 'N/A (no timestamp in Redis)'}`);
-
-    // Decide sync direction based on timestamps
-    let direction: 'upload' | 'download' | 'none' = 'none';
+    console.log(`   Local:  ${localTimestamp || 'MISSING'}`);
+    console.log(`   Remote: ${remoteTimestamp || 'MISSING'}`);
     
-    if (!localTimestamp) {
-      // No local timestamp - repository is empty/old - DOWNLOAD from Redis
-      console.log('📥 [UNIFIED SYNC] No local timestamp found - downloading from Redis (repository is old/empty)');
-      direction = 'download';
-    } else if (!remoteTimestamp) {
-      // No remote timestamp - upload local data
-      console.log('📤 [UNIFIED SYNC] No remote timestamp found - uploading all local data');
-      direction = 'upload';
-    } else {
+    // CRITICAL DEBUG: Log actual values being compared
+    if (localTimestamp && remoteTimestamp) {
       const localTime = new Date(localTimestamp).getTime();
       const remoteTime = new Date(remoteTimestamp).getTime();
-      
-      if (localTime > remoteTime) {
-        // Local is newer - upload
-        console.log('📤 [UNIFIED SYNC] Local is newer - uploading all data');
-        direction = 'upload';
-      } else if (remoteTime > localTime) {
-        // Remote is newer - download
-        console.log('📥 [UNIFIED SYNC] Remote is newer - downloading all data');
-        direction = 'download';
-      } else {
-        // Timestamps are equal - no sync needed
-        console.log('✅ [UNIFIED SYNC] Timestamps are equal - no sync needed');
-        direction = 'none';
-      }
+      console.log(`   Local time (ms):  ${localTime}`);
+      console.log(`   Remote time (ms): ${remoteTime}`);
+      console.log(`   Local > Remote:   ${localTime > remoteTime}`);
+      console.log(`   Remote > Local:   ${remoteTime > localTime}`);
+      console.log(`   Difference (ms):  ${Math.abs(localTime - remoteTime)} (${Math.abs(localTime - remoteTime) / 1000 / 60} minutes)`);
+    }
+
+    // CRITICAL: Both timestamps MUST exist to perform comparison test
+    // If either is missing after retries, we CANNOT perform the test - fail gracefully
+    if (!localTimestamp || !remoteTimestamp) {
+      const errorMsg = `❌ [UNIFIED SYNC] Cannot perform timestamp comparison after ${maxRetries} retries - missing required data: localTimestamp=${localTimestamp ? 'exists' : 'MISSING'}, remoteTimestamp=${remoteTimestamp ? 'exists' : 'MISSING'}`;
+      console.error(errorMsg);
+      errors.push(errorMsg);
+      return {
+        success: false,
+        direction: 'none',
+        synced: result,
+        errors,
+      };
+    }
+    
+    // Both timestamps exist - perform comparison test
+    let direction: 'upload' | 'download' | 'none' = 'none';
+    const localTime = new Date(localTimestamp).getTime();
+    const remoteTime = new Date(remoteTimestamp).getTime();
+    
+    if (localTime > remoteTime) {
+      // Local is newer - upload
+      console.log('📤 [UNIFIED SYNC] Local is newer - uploading all data');
+      direction = 'upload';
+    } else if (remoteTime > localTime) {
+      // Remote is newer - download
+      console.log('📥 [UNIFIED SYNC] Remote is newer - downloading all data');
+      direction = 'download';
+    } else {
+      // Timestamps are equal - no sync needed
+      console.log('✅ [UNIFIED SYNC] Timestamps are equal - no sync needed');
+      direction = 'none';
     }
 
     // Perform sync based on direction
@@ -427,12 +457,12 @@ export const performUnifiedSync = async (businessId: string): Promise<{
       if (!uploadResult.success) {
         errors.push('Failed to upload all data');
       } else {
-        // Update sync metadata
-        const syncTime = new Date().toISOString();
+        // DO NOT update timestamp on sync - timestamp only changes on user create/edit/submit
+        // Just record that we synced, but preserve existing timestamp
         await updateSyncMetadata({
-          lastSyncedAt: syncTime,
-          lastModified: localTimestamp, // Keep local timestamp
+          lastSyncedAt: new Date().toISOString(),
           hasUnsyncedChanges: false,
+          // DO NOT update lastModified - it only changes when user creates/edits/submits
         });
       }
     } else if (direction === 'download') {
@@ -440,8 +470,9 @@ export const performUnifiedSync = async (businessId: string): Promise<{
       
       if (downloadResult.success) {
         // Save all downloaded data to local repository
+        // DO NOT update timestamp - downloads don't change timestamp
         if (downloadResult.profile) {
-          await businessRepository.save(downloadResult.profile);
+          await businessRepository.save(downloadResult.profile, true); // skipMarkDirty = true
           result.profile = true;
         }
         
