@@ -705,8 +705,10 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                     key={reward.id}
                     style={styles.rewardCard}
                     onPress={() => {
+                      console.log('[HomeScreen] Reward clicked:', reward.id, reward.name);
                       setSelectedReward(reward);
                       setRewardModalVisible(true);
+                      console.log('[HomeScreen] Modal state set - rewardModalVisible should be true');
                     }}>
                     <View style={styles.rewardTitleContainer}>
                       <Text style={styles.rewardTitle}>{reward.name}</Text>
