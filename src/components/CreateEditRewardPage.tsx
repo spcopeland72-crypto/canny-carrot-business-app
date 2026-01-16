@@ -684,18 +684,25 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
     if (!isEdit || !rewardId) return;
     
     try {
-      await rewardsRepository.delete(rewardId);
+      // Use the correct repository based on whether it's a campaign or reward
+      if (isCampaign) {
+        await campaignsRepository.delete(rewardId);
+        console.log(`✅ [CreateEditReward] Campaign ${rewardId} deleted successfully`);
+      } else {
+        await rewardsRepository.delete(rewardId);
+        console.log(`✅ [CreateEditReward] Reward ${rewardId} deleted successfully`);
+      }
       Alert.alert('Success', isCampaign ? 'Campaign deleted successfully' : 'Reward deleted successfully', [
         {
           text: 'OK',
           onPress: () => {
-            // Navigate to Home to trigger reload of rewards
+            // Navigate to Home to trigger reload of rewards/campaigns
             onNavigate('Home');
           },
         },
       ]);
     } catch (error) {
-      console.error('Error deleting reward:', error);
+      console.error('Error deleting:', error);
       Alert.alert('Error', isCampaign ? 'Failed to delete campaign. Please try again.' : 'Failed to delete reward. Please try again.');
     }
     setDeleteConfirmVisible(false);
