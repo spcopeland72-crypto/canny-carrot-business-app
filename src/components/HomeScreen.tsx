@@ -111,8 +111,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   const [bannerError, setBannerError] = useState(false);
   const [businessName, setBusinessName] = useState('Business'); // Default until loaded from repository
   const [businessLogo, setBusinessLogo] = useState<string | null>(null); // Business logo from profile
-  const [rewardModalVisible, setRewardModalVisible] = useState(false);
-  const [selectedReward, setSelectedReward] = useState<Reward | null>(null);
+  const [rewardQRModalVisible, setRewardQRModalVisible] = useState(false);
+  const [selectedRewardForQR, setSelectedRewardForQR] = useState<Reward | null>(null);
   const [socialIcons, setSocialIcons] = useState<{
     facebook?: any;
     instagram?: any;
@@ -705,10 +705,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                     key={reward.id}
                     style={styles.rewardCard}
                     onPress={() => {
-                      console.log('[HomeScreen] Reward clicked:', reward.id, reward.name);
-                      setSelectedReward(reward);
-                      setRewardModalVisible(true);
-                      console.log('[HomeScreen] Modal state set - rewardModalVisible should be true');
+                      setSelectedRewardForQR(reward);
+                      setRewardQRModalVisible(true);
                     }}>
                     <View style={styles.rewardTitleContainer}>
                       <Text style={styles.rewardTitle}>{reward.name}</Text>
