@@ -704,7 +704,10 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                   <TouchableOpacity
                     key={reward.id}
                     style={styles.rewardCard}
-                    onPress={() => onNavigate(`EditReward${reward.id}`)}>
+                    onPress={() => {
+                      setSelectedReward(reward);
+                      setRewardModalVisible(true);
+                    }}>
                     <View style={styles.rewardTitleContainer}>
                       <Text style={styles.rewardTitle}>{reward.name}</Text>
                     </View>
