@@ -40,6 +40,8 @@ const RewardQRCodeModal: React.FC<RewardQRCodeModalProps> = ({
     }
   };
 
+  console.log('[RewardQRCodeModal] Rendering modal, visible:', visible, 'rewardName:', rewardName);
+  
   return (
     <Modal
       visible={visible}
@@ -48,7 +50,7 @@ const RewardQRCodeModal: React.FC<RewardQRCodeModalProps> = ({
       onRequestClose={onClose}>
       <View style={styles.overlay}>
         <View style={styles.modalContainer}>
-          <Text style={styles.modalTitle}>{rewardName}</Text>
+          <Text style={styles.modalTitle}>{rewardName || 'Reward'}</Text>
           
           {/* QR Code */}
           <View style={styles.qrCodeContainer}>
