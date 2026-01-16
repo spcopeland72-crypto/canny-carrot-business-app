@@ -700,16 +700,21 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                 const progress = total > 0 ? ((total - count) / total) * 100 : 0;
                 const progressColor = Colors.secondary;
                 console.log('[HomeScreen] Rendering reward:', { id: reward.id, name: reward.name, stampsRequired: reward.stampsRequired });
+                
+                // Handler for reward card click - EXACT customer app pattern
+                const handleRewardPress = () => {
+                  console.log('[HomeScreen] Reward clicked:', reward.id, reward.name);
+                  setSelectedRewardForQR(reward);
+                  setRewardQRModalVisible(true);
+                  console.log('[HomeScreen] Modal state set - should be visible');
+                };
+                
                 return (
                   <TouchableOpacity
                     key={reward.id}
                     style={styles.rewardCard}
-                    onPress={() => {
-                      console.log('[HomeScreen] Reward clicked:', reward.id, reward.name);
-                      setSelectedRewardForQR(reward);
-                      setRewardQRModalVisible(true);
-                      console.log('[HomeScreen] Modal state set - should be visible');
-                    }}>
+                    onPress={handleRewardPress}
+                    activeOpacity={0.7}>
                     <View style={styles.rewardTitleContainer}>
                       <Text style={styles.rewardTitle}>{reward.name}</Text>
                     </View>
