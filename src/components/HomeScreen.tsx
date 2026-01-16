@@ -1029,56 +1029,54 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
       />
       
       {/* Reward QR Code Modal */}
-      {selectedRewardForQR && (() => {
-        let qrValue = selectedRewardForQR.qrCode;
-        if (!qrValue) {
-          // Generate QR code if not stored
-          try {
-            const businessProfile = {
-              name: businessName,
-              address: '',
-              addressLine1: '',
-              addressLine2: '',
-              city: '',
-              postcode: '',
-              country: 'UK',
-              phone: '',
-              email: '',
-              website: '',
-              socialMedia: {},
-            };
-            qrValue = generateRewardQRCode(
-              selectedRewardForQR.id,
-              selectedRewardForQR.name,
-              selectedRewardForQR.stampsRequired || selectedRewardForQR.costStamps || 10,
-              selectedRewardForQR.type === 'freebie' ? 'free_product' : 
-              selectedRewardForQR.type === 'discount' ? 'discount' : 'other',
-              selectedRewardForQR.selectedProducts,
-              selectedRewardForQR.selectedActions,
-              selectedRewardForQR.pinCode,
-              businessProfile,
-              selectedRewardForQR.pointsPerPurchase
-            );
-          } catch (error) {
-            console.error('[HomeScreen] Error generating QR code:', error);
-            qrValue = '';
+      <RewardQRCodeModal
+        visible={rewardQRModalVisible}
+        rewardName={selectedRewardForQR?.name || ''}
+        qrValue={(() => {
+          if (!selectedRewardForQR) return '';
+          let qrValue = selectedRewardForQR.qrCode;
+          if (!qrValue) {
+            // Generate QR code if not stored
+            try {
+              const businessProfile = {
+                name: businessName,
+                address: '',
+                addressLine1: '',
+                addressLine2: '',
+                city: '',
+                postcode: '',
+                country: 'UK',
+                phone: '',
+                email: '',
+                website: '',
+                socialMedia: {},
+              };
+              qrValue = generateRewardQRCode(
+                selectedRewardForQR.id,
+                selectedRewardForQR.name,
+                selectedRewardForQR.stampsRequired || selectedRewardForQR.costStamps || 10,
+                selectedRewardForQR.type === 'freebie' ? 'free_product' : 
+                selectedRewardForQR.type === 'discount' ? 'discount' : 'other',
+                selectedRewardForQR.selectedProducts,
+                selectedRewardForQR.selectedActions,
+                selectedRewardForQR.pinCode,
+                businessProfile,
+                selectedRewardForQR.pointsPerPurchase
+              );
+            } catch (error) {
+              console.error('[HomeScreen] Error generating QR code:', error);
+              qrValue = '';
+            }
           }
-        }
-        
-        return (
-          <RewardQRCodeModal
-            visible={rewardQRModalVisible}
-            rewardName={selectedRewardForQR.name}
-            qrValue={qrValue}
-            rewardId={selectedRewardForQR.id}
-            onClose={() => {
-              setRewardQRModalVisible(false);
-              setSelectedRewardForQR(null);
-            }}
-            onNavigate={onNavigate}
-          />
-        );
-      })()}
+          return qrValue;
+        })()}
+        rewardId={selectedRewardForQR?.id}
+        onClose={() => {
+          setRewardQRModalVisible(false);
+          setSelectedRewardForQR(null);
+        }}
+        onNavigate={onNavigate}
+      />
     </SafeAreaView>
   );
 };
