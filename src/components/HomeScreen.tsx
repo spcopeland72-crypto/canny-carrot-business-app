@@ -1031,12 +1031,15 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
       />
       
       {/* Reward QR Code Modal */}
-      {selectedReward && (
-        <Modal
-          visible={rewardModalVisible}
-          transparent={true}
-          animationType="slide"
-          onRequestClose={() => setRewardModalVisible(false)}>
+      <Modal
+        visible={rewardModalVisible && selectedReward !== null}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => {
+          setRewardModalVisible(false);
+          setSelectedReward(null);
+        }}>
+        {selectedReward && (
           <View style={styles.modalOverlay}>
             <View style={styles.rewardModalContainer}>
               <Text style={styles.rewardModalTitle}>{selectedReward.name}</Text>
