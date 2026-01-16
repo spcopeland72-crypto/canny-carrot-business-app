@@ -357,16 +357,17 @@ function App(): React.JSX.Element {
 
   const handleDeleteCampaign = async (campaignId: string) => {
     try {
-      // Delete from local repository (source of truth)
+      // Simple delete: just delete from local storage
       await campaignsRepository.delete(campaignId);
-      // Reload campaigns from repository to ensure UI is updated
+      console.log(`✅ [App] Campaign ${campaignId} deleted from local storage`);
+      
+      // Reload campaigns and refresh Home screen
       const loadedCampaigns = await campaignsRepository.getAll();
-      if (loadedCampaigns && loadedCampaigns.length > 0) {
-        setCampaigns(loadedCampaigns);
-        console.log(`✅ [App] Campaign ${campaignId} deleted successfully, reloaded ${loadedCampaigns.length} campaigns`);
-      } else {
-        setCampaigns([]);
-        console.log(`✅ [App] Campaign ${campaignId} deleted successfully, no campaigns remaining`);
+      setCampaigns(loadedCampaigns || []);
+      
+      // If we're on Home screen, reload it to refresh
+      if (currentScreen === 'Home') {
+        await reloadCampaigns();
       }
     } catch (error) {
       console.error(`❌ [App] Error deleting campaign ${campaignId}:`, error);

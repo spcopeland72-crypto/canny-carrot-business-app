@@ -684,28 +684,23 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
     if (!isEdit || !rewardId) return;
     
     try {
-      // Use the correct repository based on whether it's a campaign or reward
+      // Simple delete: just delete from local storage
       if (isCampaign) {
         await campaignsRepository.delete(rewardId);
-        console.log(`✅ [CreateEditReward] Campaign ${rewardId} deleted successfully`);
+        console.log(`✅ [CreateEditReward] Campaign ${rewardId} deleted from local storage`);
       } else {
         await rewardsRepository.delete(rewardId);
-        console.log(`✅ [CreateEditReward] Reward ${rewardId} deleted successfully`);
+        console.log(`✅ [CreateEditReward] Reward ${rewardId} deleted from local storage`);
       }
-      Alert.alert('Success', isCampaign ? 'Campaign deleted successfully' : 'Reward deleted successfully', [
-        {
-          text: 'OK',
-          onPress: () => {
-            // Navigate to Home to trigger reload of rewards/campaigns
-            onNavigate('Home');
-          },
-        },
-      ]);
+      
+      // Close modal and navigate to Home to refresh
+      setDeleteConfirmVisible(false);
+      onNavigate('Home');
     } catch (error) {
       console.error('Error deleting:', error);
       Alert.alert('Error', isCampaign ? 'Failed to delete campaign. Please try again.' : 'Failed to delete reward. Please try again.');
+      setDeleteConfirmVisible(false);
     }
-    setDeleteConfirmVisible(false);
   };
 
   const handleDeleteProduct = async (product: string) => {
