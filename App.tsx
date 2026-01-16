@@ -355,25 +355,12 @@ function App(): React.JSX.Element {
     saveCampaigns(updatedCampaigns);
   };
 
+  // Campaign delete - REUSED from rewards delete code (identical data elements)
   const handleDeleteCampaign = async (campaignId: string) => {
-    try {
-      // Simple delete: just delete from local storage (NO Redis deletion from app)
-      // Redis deletion only happens via admin console or sync operations
-      await campaignsRepository.delete(campaignId);
-      console.log(`✅ [App] Campaign ${campaignId} deleted from local storage`);
-      
-      // Reload campaigns and refresh state
-      const loadedCampaigns = await campaignsRepository.getAll();
-      setCampaigns(loadedCampaigns || []);
-      
-      // If on Home screen, trigger reload by navigating to Home again
-      if (currentScreen === 'Home') {
-        await handleNavigate('Home');
-      }
-    } catch (error) {
-      console.error(`❌ [App] Error deleting campaign ${campaignId}:`, error);
-      Alert.alert('Error', 'Failed to delete campaign. Please try again.');
-    }
+    const updatedCampaigns = campaigns.filter(c => c.id !== campaignId);
+    setCampaigns(updatedCampaigns);
+    // Delete from local repository (source of truth)
+    await campaignsRepository.delete(campaignId);
   };
 
   // Reload rewards from repository
