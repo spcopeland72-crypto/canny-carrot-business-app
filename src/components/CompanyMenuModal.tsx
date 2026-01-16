@@ -11,7 +11,7 @@ import {
 import {Colors} from '../constants/Colors';
 import {businessRepository} from '../services/localRepository';
 import {logoutBusiness, getStoredAuth} from '../services/authService';
-import {performFullReplacementSync} from '../services/fullReplacementSync';
+import {performUnifiedSync} from '../services/unifiedSyncService';
 
 // Load CC logo image (same as customer app header)
 let ccLogoImage: any = null;
@@ -70,13 +70,13 @@ const CompanyMenuModal: React.FC<CompanyMenuModalProps> = ({
       onClose();
       const auth = await getStoredAuth();
       if (auth?.businessId) {
-        console.log('🔄 [SYNC] Starting full replacement sync...');
-        const syncResult = await performFullReplacementSync(auth.businessId);
+        console.log('🔄 [SYNC] Starting unified sync (all data as one unit)...');
+        const syncResult = await performUnifiedSync(auth.businessId);
         if (syncResult.success) {
-          console.log('✅ [SYNC] Full replacement sync completed successfully');
+          console.log(`✅ [SYNC] Unified sync completed successfully (${syncResult.direction})`);
           console.log('   Synced:', syncResult.synced);
         } else {
-          console.warn('⚠️ [SYNC] Some data failed to sync:', syncResult.errors);
+          console.warn('⚠️ [SYNC] Sync failed:', syncResult.errors);
         }
       } else {
         console.error('No business ID found for sync');
@@ -265,6 +265,8 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     paddingTop: 60,
     paddingLeft: 16,
+    zIndex: 1000,
+    elevation: 1000,
   },
   modalContainer: {
     width: 280,
@@ -276,6 +278,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 8,
+    zIndex: 1001,
   },
   content: {
     padding: 10,
