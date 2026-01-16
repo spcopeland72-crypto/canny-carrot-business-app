@@ -14,6 +14,7 @@ import {
   Animated,
   Easing,
   Platform,
+  Modal,
 } from 'react-native';
 import {Colors} from '../constants/Colors';
 import BottomNavigation from './BottomNavigation';
@@ -21,6 +22,8 @@ import NotificationsModal from './NotificationsModal';
 import HelpModal from './HelpModal';
 import CompanyMenuModal from './CompanyMenuModal';
 import CircularProgress from './CircularProgress';
+import QRCode from 'react-native-qrcode-svg';
+import {generateRewardQRCode} from '../utils/qrCodeUtils';
 import AnimatedLineChart from './AnimatedLineChart';
 import AnimatedBarChart from './AnimatedBarChart';
 import AnimatedDonutChart from './AnimatedDonutChart';
@@ -108,6 +111,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   const [bannerError, setBannerError] = useState(false);
   const [businessName, setBusinessName] = useState('Business'); // Default until loaded from repository
   const [businessLogo, setBusinessLogo] = useState<string | null>(null); // Business logo from profile
+  const [rewardModalVisible, setRewardModalVisible] = useState(false);
+  const [selectedReward, setSelectedReward] = useState<Reward | null>(null);
   const [socialIcons, setSocialIcons] = useState<{
     facebook?: any;
     instagram?: any;
@@ -1019,6 +1024,109 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
         businessName={businessName}
         businessLogo={businessLogo}
       />
+      
+      {/* Reward QR Code Modal */}
+      {selectedReward && (
+        <Modal
+          visible={rewardModalVisible}
+          transparent={true}
+          animationType="slide"
+          onRequestClose={() => setRewardModalVisible(false)}>
+          <View style={styles.modalOverlay}>
+            <View style={styles.rewardModalContainer}>
+              <Text style={styles.rewardModalTitle}>{selectedReward.name}</Text>
+              
+              {/* QR Code */}
+              <View style={styles.qrCodeContainer}>
+                {(() => {
+                  let qrValue = selectedReward.qrCode;
+                  if (!qrValue) {
+                    // Generate QR code if not stored
+                    try {
+                      const businessProfile = {
+                        name: businessName,
+                        address: '',
+                        addressLine1: '',
+                        addressLine2: '',
+                        city: '',
+                        postcode: '',
+                        country: 'UK',
+                        phone: '',
+                        email: '',
+                        website: '',
+                        socialMedia: {},
+                      };
+                      qrValue = generateRewardQRCode(
+                        selectedReward.id,
+                        selectedReward.name,
+                        selectedReward.stampsRequired || selectedReward.costStamps || 10,
+                        selectedReward.type === 'freebie' ? 'free_product' : 
+                        selectedReward.type === 'discount' ? 'discount' : 'other',
+                        selectedReward.selectedProducts,
+                        selectedReward.selectedActions,
+                        selectedReward.pinCode,
+                        businessProfile,
+                        selectedReward.pointsPerPurchase
+                      );
+                    } catch (error) {
+                      console.error('[HomeScreen] Error generating QR code:', error);
+                      qrValue = '';
+                    }
+                  }
+                  
+                  if (!qrValue) {
+                    return (
+                      <View style={styles.qrPlaceholder}>
+                        <Text style={styles.qrIcon}>📱</Text>
+                        <Text style={styles.qrText}>No QR Code</Text>
+                      </View>
+                    );
+                  }
+                  
+                  return (
+                    <QRCode
+                      value={qrValue}
+                      size={200}
+                      color={Colors.text.primary}
+                      backgroundColor={Colors.background}
+                      quietZone={10}
+                      onError={(error) => {
+                        console.error('[HomeScreen] QR code generation error:', error);
+                      }}
+                    />
+                  );
+                })()}
+              </View>
+              
+              {/* Buttons */}
+              <View style={styles.rewardModalButtons}>
+                <TouchableOpacity
+                  style={[styles.rewardModalButton, styles.editButton]}
+                  onPress={() => {
+                    setRewardModalVisible(false);
+                    onNavigate(`EditReward${selectedReward.id}`);
+                  }}>
+                  <Text style={styles.editButtonText}>Edit Reward</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.rewardModalButton, styles.analyticsButton]}
+                  onPress={() => {
+                    setRewardModalVisible(false);
+                    onNavigate(`Analytics${selectedReward.id}`);
+                  }}>
+                  <Text style={styles.analyticsButtonText}>Analytics</Text>
+                </TouchableOpacity>
+              </View>
+              
+              <TouchableOpacity
+                style={styles.closeModalButton}
+                onPress={() => setRewardModalVisible(false)}>
+                <Text style={styles.closeModalButtonText}>Close</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+      )}
     </SafeAreaView>
   );
 };
