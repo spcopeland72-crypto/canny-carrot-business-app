@@ -26,8 +26,8 @@ const getRemoteRepositoryTimestamp = async (businessId: string): Promise<string 
     if (response.ok) {
       const result = await response.json();
       if (result.success && result.data) {
-        // Use business.updatedAt as the repository timestamp
-        return result.data.updatedAt || null;
+        // Use business.updatedAt as the repository timestamp (check both top-level and profile)
+        return result.data.updatedAt || result.data.profile?.updatedAt || null;
       }
     }
   } catch (error: any) {
@@ -383,13 +383,17 @@ export const performUnifiedSync = async (businessId: string): Promise<{
     const remoteTimestamp = await getRemoteRepositoryTimestamp(businessId);
 
     console.log(`📊 [UNIFIED SYNC] Timestamp comparison:`);
-    console.log(`   Local:  ${localTimestamp}`);
+    console.log(`   Local:  ${localTimestamp || 'N/A (no local timestamp - repository is old/empty)'}`);
     console.log(`   Remote: ${remoteTimestamp || 'N/A (no timestamp in Redis)'}`);
 
     // Decide sync direction based on timestamps
     let direction: 'upload' | 'download' | 'none' = 'none';
     
-    if (!remoteTimestamp) {
+    if (!localTimestamp) {
+      // No local timestamp - repository is empty/old - DOWNLOAD from Redis
+      console.log('📥 [UNIFIED SYNC] No local timestamp found - downloading from Redis (repository is old/empty)');
+      direction = 'download';
+    } else if (!remoteTimestamp) {
       // No remote timestamp - upload local data
       console.log('📤 [UNIFIED SYNC] No remote timestamp found - uploading all local data');
       direction = 'upload';
