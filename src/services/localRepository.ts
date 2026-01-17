@@ -807,6 +807,7 @@ export const downloadAllData = async (businessId: string, apiBaseUrl: string = '
       console.log(`📊 [REPOSITORY] Campaigns API response:`, {success: campaignsResult.success, dataLength: campaignsResult.data?.length || 0, isArray: Array.isArray(campaignsResult.data)});
       if (campaignsResult.success && Array.isArray(campaignsResult.data)) {
         // Normalize campaigns to ensure all required fields are present
+        // IMPORTANT: Include ALL fields from Redis, including selectedProducts, selectedActions, pinCode, qrCode
         const now = new Date().toISOString();
         const normalizedCampaigns = campaignsResult.data.map((campaign: any) => ({
           id: campaign.id,
@@ -822,6 +823,12 @@ export const downloadAllData = async (businessId: string, apiBaseUrl: string = '
           createdAt: campaign.createdAt || now,
           updatedAt: campaign.updatedAt || now,
           stats: campaign.stats || { impressions: 0, clicks: 0, conversions: 0 },
+          // Include direct fields (same as rewards) - selectedProducts, selectedActions, pinCode, qrCode, pointsPerPurchase
+          selectedProducts: campaign.selectedProducts || [],
+          selectedActions: campaign.selectedActions || [],
+          pinCode: campaign.pinCode,
+          qrCode: campaign.qrCode,
+          pointsPerPurchase: campaign.pointsPerPurchase,
           ...(campaign.objective && { objective: campaign.objective }),
           ...(campaign.segmentId && { segmentId: campaign.segmentId }),
           ...(campaign.channelMasks && { channelMasks: campaign.channelMasks }),
