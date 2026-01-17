@@ -542,33 +542,37 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
       }
       
       // Call onSave callback if provided (for parent component notifications)
-      const rewardData = {
-        name,
-        type,
-        requirement: requirementValue,
-        pointsPerPurchase: pointsValue,
-        rewardType,
-        selectedProducts: type === 'product' ? selectedProducts : undefined,
-        selectedActions: type === 'action' ? selectedActions : undefined,
-        pinCode,
-        qrCode: qrCodeValue,
-      };
-      
-      if (onSave) {
+      // NOTE: For campaigns, we don't use onSave callback - campaigns save directly to repository
+      // Only call onSave for rewards (legacy support)
+      if (!isCampaign && onSave) {
+        const rewardData = {
+          name,
+          type,
+          requirement: requirementValue,
+          pointsPerPurchase: pointsValue,
+          rewardType,
+          selectedProducts: type === 'product' ? selectedProducts : undefined,
+          selectedActions: type === 'action' ? selectedActions : undefined,
+          pinCode,
+          qrCode: qrCodeValue,
+        };
         onSave(rewardData);
       }
       
       // For rewards: if creating new, show QR code modal first, then success modal
       // If editing, show success modal directly
-      if (!isEdit) {
-        // Show QR code modal first for new rewards
-        setCreatedRewardName(name);
-        setCreatedRewardQrCode(qrCodeValue);
-        setQrCodeModalVisible(true);
-      } else {
-        // Show success modal for edits
-        setSuccessModalMessage('Changes saved');
-        setSuccessModalVisible(true);
+      // NOTE: Campaigns already show success modal above (line 514), so skip this for campaigns
+      if (!isCampaign) {
+        if (!isEdit) {
+          // Show QR code modal first for new rewards
+          setCreatedRewardName(name);
+          setCreatedRewardQrCode(qrCodeValue);
+          setQrCodeModalVisible(true);
+        } else {
+          // Show success modal for reward edits
+          setSuccessModalMessage('Changes saved');
+          setSuccessModalVisible(true);
+        }
       }
     } catch (error) {
       console.error('[CreateEditReward] Unexpected error in handleSave:', error);
