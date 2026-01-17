@@ -314,22 +314,13 @@ function App(): React.JSX.Element {
     rewardType: 'free_product' | 'discount' | 'other';
     selectedProducts?: string[];
     selectedActions?: string[];
+    pinCode?: string;
+    qrCode?: string;
+    pointsPerPurchase?: number;
   }) => {
-    const icons = ['🎄', '🎆', '💝', '🌸', '🎃', '🎁', '🎉', '🏆', '🎯', '🎊', '🌟', '⭐'];
-    const newCampaign: Campaign = {
-      id: Date.now().toString(),
-      name: campaignData.name,
-      count: 0,
-      total: campaignData.requirement,
-      icon: icons[Math.floor(Math.random() * icons.length)],
-      status: 'upcoming',
-    };
-    const updatedCampaigns = [...campaigns, newCampaign];
-    setCampaigns(updatedCampaigns);
-    // Save to local repository (source of truth)
-    await campaignsRepository.save(newCampaign);
-    // Also save to legacy storage for backward compatibility
-    saveCampaigns(updatedCampaigns);
+    // EXACT SAME AS handleAddReward - campaigns already saved to repository by CreateEditRewardPage
+    // Just reload from repository to update state (same pattern as rewards)
+    await reloadCampaigns();
   };
 
   const handleUpdateCampaign = async (campaignId: string, campaignData: {
@@ -592,10 +583,7 @@ function App(): React.JSX.Element {
             currentScreen={currentScreen}
             onNavigate={handleNavigate}
             onBack={handleBack}
-            onSave={async () => {
-              // Reload campaigns after save to update state
-              await reloadCampaigns();
-            }}
+            onSave={handleAddCampaign}
           />
         );
       case 'Settings':
@@ -656,10 +644,7 @@ function App(): React.JSX.Element {
               onNavigate={handleNavigate}
               rewardId={campaignId}
               onBack={handleBack}
-              onSave={async () => {
-                // Reload campaigns after save to update state
-                await reloadCampaigns();
-              }}
+              onSave={handleAddCampaign}
             />
           );
         }
