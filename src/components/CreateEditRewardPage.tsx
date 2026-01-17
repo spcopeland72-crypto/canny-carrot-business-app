@@ -397,8 +397,9 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
           name,
           requirementValue,
           rewardType,
-          type === 'product' ? selectedProducts : undefined,
-          type === 'action' ? selectedActions : undefined,
+          // NOTE: type field is only for UI presentation - pass products/actions if they exist
+          selectedProducts && selectedProducts.length > 0 ? selectedProducts : undefined,
+          selectedActions && selectedActions.length > 0 ? selectedActions : undefined,
           pinCode,
           businessProfile ? {
             name: businessProfile.name,
@@ -484,8 +485,10 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
           status: existingCampaign?.status || 'active',
           targetAudience: existingCampaign?.targetAudience || 'all',
           // Store products/actions/pinCode DIRECTLY (same as rewards) - this is the working model
-          selectedProducts: type === 'product' ? selectedProducts : undefined,
-          selectedActions: type === 'action' ? selectedActions : undefined,
+          // NOTE: type field is only for UI presentation (which tab to show), not for data storage
+          // Save both selectedProducts and selectedActions if they have values, regardless of type tab
+          selectedProducts: selectedProducts && selectedProducts.length > 0 ? selectedProducts : undefined,
+          selectedActions: selectedActions && selectedActions.length > 0 ? selectedActions : undefined,
           pinCode,
           qrCode: qrCodeValue,
           pointsPerPurchase: pointsValue,
@@ -538,8 +541,10 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
           // App-specific fields (stored but not in core DB type)
           pinCode,
           qrCode: qrCodeValue,
-          selectedProducts: type === 'product' ? selectedProducts : undefined,
-          selectedActions: type === 'action' ? selectedActions : undefined,
+          // NOTE: type field is only for UI presentation (which tab to show), not for data storage
+          // Save both selectedProducts and selectedActions if they have values, regardless of type tab
+          selectedProducts: selectedProducts && selectedProducts.length > 0 ? selectedProducts : undefined,
+          selectedActions: selectedActions && selectedActions.length > 0 ? selectedActions : undefined,
           pointsPerPurchase: pointsValue,
         };
         
@@ -557,8 +562,9 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
           requirement: requirementValue,
           pointsPerPurchase: pointsValue,
           rewardType,
-          selectedProducts: type === 'product' ? selectedProducts : undefined,
-          selectedActions: type === 'action' ? selectedActions : undefined,
+          // NOTE: type field is only for UI presentation - pass products/actions if they exist
+          selectedProducts: selectedProducts && selectedProducts.length > 0 ? selectedProducts : undefined,
+          selectedActions: selectedActions && selectedActions.length > 0 ? selectedActions : undefined,
           pinCode,
           qrCode: qrCodeValue,
         };
@@ -696,6 +702,7 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
     } else {
       setSelectedProducts([...selectedProducts, product]);
     }
+    // NOTE: type field is only for UI presentation - don't change it when selecting products
     setDropdownVisible(false);
   };
 
