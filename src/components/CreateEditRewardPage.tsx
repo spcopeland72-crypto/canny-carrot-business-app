@@ -210,15 +210,16 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
                   
                   setPinCode(rewardData.pinCode || '');
                 } else {
-                // No reward data, use defaults
-                setRequirement('10');
-                setPointsPerPurchase('1');
-                setRewardType(isCampaign ? 'bonus_reward' : 'free_product');
-                setCustomTypeText('');
-                setType('product');
-                setSelectedProducts([]);
-                setSelectedActions([]);
-                setPinCode('');
+                  // No reward data, use defaults
+                  setRequirement('10');
+                  setPointsPerPurchase('1');
+                  setRewardType(isCampaign ? 'bonus_reward' : 'free_product');
+                  setCustomTypeText('');
+                  setType('product');
+                  setSelectedProducts([]);
+                  setSelectedActions([]);
+                  setPinCode('');
+                }
               }
             }
           } else {
