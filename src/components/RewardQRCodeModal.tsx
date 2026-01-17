@@ -39,8 +39,6 @@ const RewardQRCodeModal: React.FC<RewardQRCodeModalProps> = ({
       onNavigate(`Analytics${rewardId}`);
     }
   };
-
-  console.log('[RewardQRCodeModal] Rendering modal, visible:', visible, 'rewardName:', rewardName);
   
   return (
     <Modal

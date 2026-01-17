@@ -286,16 +286,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   
   // Use campaigns from props, fallback to local state, then empty array
   const campaigns = propsCampaigns.length > 0 ? propsCampaigns : (localCampaigns.length > 0 ? localCampaigns : []);
-  
-  // Log current state for debugging
-  useEffect(() => {
-    console.log('[HomeScreen] Current render state:', {
-      rewardsCount: rewards.length,
-      campaignsCount: campaigns.length,
-      propsRewardsCount: propsRewards.length,
-      propsCampaignsCount: propsCampaigns.length,
-    });
-  }, [rewards, campaigns, propsRewards, propsCampaigns]);
 
   // 2x2 Box Elements (matching customer app Features section)
   const boxElements = [
@@ -699,7 +689,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                 const count = 0; // Business app doesn't track customer progress
                 const progress = total > 0 ? ((total - count) / total) * 100 : 0;
                 const progressColor = Colors.secondary;
-                console.log('[HomeScreen] Rendering reward:', { id: reward.id, name: reward.name, stampsRequired: reward.stampsRequired });
                 
                 // Handler for reward card click - EXACT customer app pattern
                 const handleRewardPress = () => {
@@ -782,8 +771,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                 : campaign.status === 'completed' 
                 ? Colors.secondary 
                 : Colors.neutral[300];
-              
-              console.log('[HomeScreen] Rendering campaign:', { id: campaign.id, name: campaign.name, status: campaign.status });
               
               return (
                 <TouchableOpacity

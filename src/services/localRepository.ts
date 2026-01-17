@@ -131,61 +131,11 @@ export const businessRepository = {
       }
       console.log('✅ Business profile saved to local repository');
       
-      // IMMEDIATELY write to Redis
-      try {
-        const { getStoredAuth } = await import('./authService');
-        const auth = await getStoredAuth();
-        if (auth?.businessId && profile.id) {
-          const API_BASE_URL = 'https://api.cannycarrot.com';
-          const response = await fetch(`${API_BASE_URL}/api/v1/businesses/${profile.id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(profile),
-          });
-          
-          if (response.ok) {
-            console.log(`✅ [REPOSITORY] Business profile written to Redis (${profile.products?.length || 0} products, ${profile.actions?.length || 0} actions)`);
-            
-            // Update business.updatedAt timestamp to match the local repository's timestamp
-            // The profile's updatedAt should already match the repository timestamp from markDirty()
-            try {
-              const { getLocalRepositoryTimestamp } = await import('./localRepository');
-              const localTimestamp = await getLocalRepositoryTimestamp();
-              
-              const businessResponse = await fetch(`${API_BASE_URL}/api/v1/businesses/${auth.businessId}`, {
-                method: 'GET',
-                headers: { 'Content-Type': 'application/json' },
-              });
-              
-              if (businessResponse.ok) {
-                const businessResult = await businessResponse.json();
-                if (businessResult.success && businessResult.data) {
-                  const existingBusiness = businessResult.data;
-                  const updatedBusiness = {
-                    ...existingBusiness,
-                    updatedAt: localTimestamp, // Use device's timestamp, not a new one
-                  };
-                  
-                  await fetch(`${API_BASE_URL}/api/v1/businesses/${auth.businessId}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(updatedBusiness),
-                  });
-                }
-              }
-            } catch (timestampError: any) {
-              console.warn(`⚠️ [REPOSITORY] Error updating business timestamp: ${timestampError.message || timestampError}`);
-              // Don't fail the save if timestamp update fails
-            }
-          } else {
-            const errorText = await response.text();
-            console.error(`❌ [REPOSITORY] Failed to write business profile to Redis: ${response.status} ${errorText.substring(0, 200)}`);
-          }
-        }
-      } catch (redisError: any) {
-        console.error('[REPOSITORY] Error writing business profile to Redis:', redisError.message);
-        // Don't fail the save if Redis write fails - local save already succeeded
-      }
+      // NO immediate Redis write - Redis writes ONLY happen on:
+      // 1. Manual sync
+      // 2. Logout
+      // 3. Login update check
+      // This ensures business profile, rewards, and campaigns all sync together
     } catch (error) {
       console.error('Error saving business profile:', error);
       throw error;
@@ -287,60 +237,8 @@ export const rewardsRepository = {
     // saveAll() will call markDirty() which updates top-level lastModified timestamp
     await rewardsRepository.saveAll(rewards);
     
-    // IMMEDIATELY write to Redis
-    try {
-      const { getStoredAuth } = await import('./authService');
-      const auth = await getStoredAuth();
-      if (auth?.businessId && reward.businessId) {
-        const API_BASE_URL = 'https://api.cannycarrot.com';
-        const response = await fetch(`${API_BASE_URL}/api/v1/rewards`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(reward),
-        });
-        
-        if (response.ok) {
-          console.log(`✅ [REPOSITORY] Reward "${reward.name}" written to Redis`);
-          
-          // Update business.updatedAt timestamp to match the local repository's timestamp
-          try {
-            const { getLocalRepositoryTimestamp } = await import('./localRepository');
-            const localTimestamp = await getLocalRepositoryTimestamp();
-            
-            const businessResponse = await fetch(`${API_BASE_URL}/api/v1/businesses/${auth.businessId}`, {
-              method: 'GET',
-              headers: { 'Content-Type': 'application/json' },
-            });
-            
-            if (businessResponse.ok) {
-              const businessResult = await businessResponse.json();
-              if (businessResult.success && businessResult.data) {
-                const existingBusiness = businessResult.data;
-                const updatedBusiness = {
-                  ...existingBusiness,
-                  updatedAt: localTimestamp, // Use device's timestamp, not a new one
-                };
-                
-                await fetch(`${API_BASE_URL}/api/v1/businesses/${auth.businessId}`, {
-                  method: 'PUT',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify(updatedBusiness),
-                });
-              }
-            }
-          } catch (timestampError: any) {
-            console.warn(`⚠️ [REPOSITORY] Error updating business timestamp: ${timestampError.message || timestampError}`);
-            // Don't fail the save if timestamp update fails
-          }
-        } else {
-          const errorText = await response.text();
-          console.error(`❌ [REPOSITORY] Failed to write reward to Redis: ${response.status} ${errorText.substring(0, 200)}`);
-        }
-      }
-    } catch (redisError: any) {
-      console.error('[REPOSITORY] Error writing reward to Redis:', redisError.message);
-      // Don't fail the save if Redis write fails - local save already succeeded
-    }
+    // NO IMMEDIATE REDIS WRITE - Redis writes only happen on sync, logout, or login check
+    // This ensures the local timestamp is newer than Redis, triggering a sync
   },
 
   /**
@@ -745,12 +643,14 @@ export const restoreArchivedRepository = async (businessId: string): Promise<voi
  */
 /**
  * Get local repository timestamp
- * CRITICAL: NEVER returns null - if timestamp doesn't exist, creates one and returns it
+ * CRITICAL: Returns the lastModified timestamp from sync metadata
+ * This is the timestamp that markDirty() updates when any entity is saved
+ * NOT the business profile's updatedAt (which is only updated when profile changes)
  */
 export const getLocalRepositoryTimestamp = async (): Promise<string | null> => {
   try {
-    const profile = await businessRepository.get();
-    return profile?.updatedAt || null;
+    const metadata = await getSyncMetadata();
+    return metadata.lastModified || null;
   } catch (error) {
     console.error('Error getting local repository timestamp:', error);
     return null;
