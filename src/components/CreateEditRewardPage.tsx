@@ -434,22 +434,28 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
       }
       
       // Call onSave callback if provided (for parent component notifications)
-      // NOTE: For campaigns, we don't use onSave callback - campaigns save directly to repository
-      // Only call onSave for rewards (legacy support)
-      if (!isCampaign && onSave) {
-        const rewardData = {
-          name,
-          type,
-          requirement: requirementValue,
-          pointsPerPurchase: pointsValue,
-          rewardType,
-          // NOTE: type field is only for UI presentation - pass products/actions if they exist
-          selectedProducts: selectedProducts && selectedProducts.length > 0 ? selectedProducts : undefined,
-          selectedActions: selectedActions && selectedActions.length > 0 ? selectedActions : undefined,
-          pinCode,
-          qrCode: qrCodeValue,
-        };
-        onSave(rewardData);
+      // For campaigns: onSave is used to reload campaigns state in App.tsx
+      // For rewards: onSave is used for legacy support
+      if (onSave) {
+        if (isCampaign) {
+          // For campaigns, just call onSave to trigger reload (no data needed)
+          await onSave({} as any);
+        } else {
+          // For rewards, pass reward data
+          const rewardData = {
+            name,
+            type,
+            requirement: requirementValue,
+            pointsPerPurchase: pointsValue,
+            rewardType,
+            // NOTE: type field is only for UI presentation - pass products/actions if they exist
+            selectedProducts: selectedProducts && selectedProducts.length > 0 ? selectedProducts : undefined,
+            selectedActions: selectedActions && selectedActions.length > 0 ? selectedActions : undefined,
+            pinCode,
+            qrCode: qrCodeValue,
+          };
+          onSave(rewardData);
+        }
       }
       
       // For rewards: if creating new, show QR code modal first, then success modal

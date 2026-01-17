@@ -383,6 +383,22 @@ function App(): React.JSX.Element {
     }
   };
 
+  // Reload campaigns from repository
+  const reloadCampaigns = async () => {
+    try {
+      const loadedCampaigns = await campaignsRepository.getAll();
+      if (loadedCampaigns && loadedCampaigns.length > 0) {
+        setCampaigns(loadedCampaigns);
+        console.log(`✅ [App] Reloaded ${loadedCampaigns.length} campaigns from repository`);
+      } else {
+        setCampaigns([]);
+        console.log('ℹ️ [App] No campaigns found in repository');
+      }
+    } catch (error) {
+      console.error('❌ [App] Error reloading campaigns:', error);
+    }
+  };
+
   const handleNavigate = async (screen: ScreenName) => {
     setPreviousScreen(currentScreen);
     setCurrentScreen(screen);
@@ -393,18 +409,7 @@ function App(): React.JSX.Element {
       await reloadRewards();
       
       // Also reload campaigns
-      try {
-        const loadedCampaigns = await campaignsRepository.getAll();
-        if (loadedCampaigns && loadedCampaigns.length > 0) {
-          setCampaigns(loadedCampaigns);
-          console.log(`✅ [App] Reloaded ${loadedCampaigns.length} campaigns for Home screen`);
-        } else {
-          setCampaigns([]);
-          console.log('ℹ️ [App] No campaigns found in repository');
-        }
-      } catch (error) {
-        console.error('❌ [App] Error reloading campaigns:', error);
-      }
+      await reloadCampaigns();
     }
   };
 
@@ -587,7 +592,10 @@ function App(): React.JSX.Element {
             currentScreen={currentScreen}
             onNavigate={handleNavigate}
             onBack={handleBack}
-            // No onSave callback - CreateEditRewardPage saves directly to repository
+            onSave={async () => {
+              // Reload campaigns after save to update state
+              await reloadCampaigns();
+            }}
           />
         );
       case 'Settings':
@@ -648,7 +656,10 @@ function App(): React.JSX.Element {
               onNavigate={handleNavigate}
               rewardId={campaignId}
               onBack={handleBack}
-              // No onSave callback - CreateEditRewardPage saves directly to repository
+              onSave={async () => {
+                // Reload campaigns after save to update state
+                await reloadCampaigns();
+              }}
             />
           );
         }
