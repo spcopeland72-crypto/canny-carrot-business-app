@@ -1378,6 +1378,64 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
               </View>
             </TouchableOpacity>
           </Modal>
+
+              {/* Campaign Date Pickers (embedded in campaign section) */}
+              <Text style={styles.label}>Campaign Start Date *</Text>
+              <TouchableOpacity
+                style={styles.input}
+                onPress={() => {
+                  console.log('[CreateEditReward] Start date picker opened, current startDate:', startDate);
+                  setStartDatePickerVisible(true);
+                }}>
+                <Text style={[styles.dateInputText, !startDate && styles.dateInputPlaceholder]}>
+                  {startDate || 'Select start date (YYYY-MM-DD)'}
+                </Text>
+              </TouchableOpacity>
+              
+              <Text style={styles.label}>End Date *</Text>
+              <TouchableOpacity
+                style={styles.input}
+                onPress={() => setEndDatePickerVisible(true)}>
+                <Text style={[styles.dateInputText, !endDate && styles.dateInputPlaceholder]}>
+                  {endDate || 'Select end date (YYYY-MM-DD)'}
+                </Text>
+              </TouchableOpacity>
+
+              {/* Start Date Picker Modal */}
+              <Modal
+                visible={startDatePickerVisible}
+                transparent={true}
+                animationType="slide"
+                onRequestClose={() => setStartDatePickerVisible(false)}>
+                <View style={styles.modalOverlay}>
+                  <View style={styles.datePickerModal}>
+                    <Text style={styles.modalTitle}>Select Start Date</Text>
+                    <DatePickerComponent
+                      initialDate={startDate ? parseDateFromInput(startDate) : new Date()}
+                      onDateSelect={handleStartDateSelect}
+                      onCancel={() => setStartDatePickerVisible(false)}
+                    />
+                  </View>
+                </View>
+              </Modal>
+
+              {/* End Date Picker Modal */}
+              <Modal
+                visible={endDatePickerVisible}
+                transparent={true}
+                animationType="slide"
+                onRequestClose={() => setEndDatePickerVisible(false)}>
+                <View style={styles.modalOverlay}>
+                  <View style={styles.datePickerModal}>
+                    <Text style={styles.modalTitle}>Select End Date</Text>
+                    <DatePickerComponent
+                      initialDate={endDate ? parseDateFromInput(endDate) : new Date()}
+                      onDateSelect={handleEndDateSelect}
+                      onCancel={() => setEndDatePickerVisible(false)}
+                    />
+                  </View>
+                </View>
+              </Modal>
             </>
           ) : (
             // For rewards, show radio buttons (free_product, discount, other)
@@ -1444,68 +1502,6 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
               placeholder="Enter custom reward type"
               placeholderTextColor={Colors.text.light}
             />
-          )}
-
-          {/* Campaign Date Pickers (only for campaigns) */}
-          {isCampaign && (
-            <>
-              <Text style={styles.label}>Campaign Start Date *</Text>
-              <TouchableOpacity
-                style={styles.input}
-                onPress={() => {
-                  console.log('[CreateEditReward] Start date picker opened, current startDate:', startDate);
-                  setStartDatePickerVisible(true);
-                }}>
-                <Text style={[styles.dateInputText, !startDate && styles.dateInputPlaceholder]}>
-                  {startDate || 'Select start date (YYYY-MM-DD)'}
-                </Text>
-              </TouchableOpacity>
-              
-              <Text style={styles.label}>End Date *</Text>
-              <TouchableOpacity
-                style={styles.input}
-                onPress={() => setEndDatePickerVisible(true)}>
-                <Text style={[styles.dateInputText, !endDate && styles.dateInputPlaceholder]}>
-                  {endDate || 'Select end date (YYYY-MM-DD)'}
-                </Text>
-              </TouchableOpacity>
-
-              {/* Start Date Picker Modal */}
-              <Modal
-                visible={startDatePickerVisible}
-                transparent={true}
-                animationType="slide"
-                onRequestClose={() => setStartDatePickerVisible(false)}>
-                <View style={styles.modalOverlay}>
-                  <View style={styles.datePickerModal}>
-                    <Text style={styles.modalTitle}>Select Start Date</Text>
-                    <DatePickerComponent
-                      initialDate={startDate ? parseDateFromInput(startDate) : new Date()}
-                      onDateSelect={handleStartDateSelect}
-                      onCancel={() => setStartDatePickerVisible(false)}
-                    />
-                  </View>
-                </View>
-              </Modal>
-
-              {/* End Date Picker Modal */}
-              <Modal
-                visible={endDatePickerVisible}
-                transparent={true}
-                animationType="slide"
-                onRequestClose={() => setEndDatePickerVisible(false)}>
-                <View style={styles.modalOverlay}>
-                  <View style={styles.datePickerModal}>
-                    <Text style={styles.modalTitle}>Select End Date</Text>
-                    <DatePickerComponent
-                      initialDate={endDate ? parseDateFromInput(endDate) : new Date()}
-                      onDateSelect={handleEndDateSelect}
-                      onCancel={() => setEndDatePickerVisible(false)}
-                    />
-                  </View>
-                </View>
-              </Modal>
-            </>
           )}
 
           <Text style={styles.label}>4-Digit PIN Code *</Text>
