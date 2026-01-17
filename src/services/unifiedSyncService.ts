@@ -353,7 +353,7 @@ const uploadAllData = async (businessId: string): Promise<{
             updatedAt: localTimestamp, // Preserve local timestamp
           };
           
-          await fetch(`${API_BASE_URL}/api/v1/businesses/${businessId}`, {
+          const updateResponse = await fetch(`${API_BASE_URL}/api/v1/businesses/${businessId}`, {
             method: 'PUT',
             headers: { 
               'Content-Type': 'application/json',
@@ -361,10 +361,19 @@ const uploadAllData = async (businessId: string): Promise<{
             },
             body: JSON.stringify(updatedBusiness),
           });
+          
+          if (updateResponse.ok) {
+            console.log(`✅ [UNIFIED SYNC] Business timestamp updated to ${localTimestamp}`);
+          } else {
+            const errorText = await updateResponse.text();
+            console.error(`❌ [UNIFIED SYNC] Failed to update business timestamp: ${updateResponse.status} ${errorText.substring(0, 200)}`);
+          }
         }
+      } else {
+        console.error(`❌ [UNIFIED SYNC] Failed to fetch business for timestamp update: ${businessResponse.status}`);
       }
     } catch (error: any) {
-      console.warn(`⚠️ [UNIFIED SYNC] Error updating business timestamp: ${error.message || error}`);
+      console.error(`❌ [UNIFIED SYNC] Error updating business timestamp: ${error.message || error}`);
       // Don't fail sync if timestamp update fails
     }
 
