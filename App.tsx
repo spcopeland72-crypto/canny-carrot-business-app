@@ -587,7 +587,7 @@ function App(): React.JSX.Element {
             currentScreen={currentScreen}
             onNavigate={handleNavigate}
             onBack={handleBack}
-            onSave={handleAddCampaign}
+            // No onSave callback - CreateEditRewardPage saves directly to repository
           />
         );
       case 'Settings':
@@ -648,7 +648,7 @@ function App(): React.JSX.Element {
               onNavigate={handleNavigate}
               rewardId={campaignId}
               onBack={handleBack}
-              onSave={(data) => handleUpdateCampaign(campaignId, data)}
+              // No onSave callback - CreateEditRewardPage saves directly to repository
             />
           );
         }
