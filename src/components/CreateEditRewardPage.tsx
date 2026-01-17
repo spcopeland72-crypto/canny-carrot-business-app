@@ -77,6 +77,9 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
   // Success modal state (for campaigns and rewards)
   const [successModalVisible, setSuccessModalVisible] = useState(false);
   const [successModalMessage, setSuccessModalMessage] = useState('');
+  // Error modal state (for validation failures)
+  const [errorModalVisible, setErrorModalVisible] = useState(false);
+  const [errorModalMessages, setErrorModalMessages] = useState<string[]>([]);
 
   // Load reward/campaign data and form fields on mount (if editing)
   useEffect(() => {
@@ -235,26 +238,37 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
 
   const handleSave = async () => {
     console.log('[CreateEditReward] handleSave called', { isCampaign, isEdit, name, pointsPerPurchase, requirement, pinCode });
+    
+    // Collect all validation errors
+    const missingFields: string[] = [];
+    
+    if (!name || !name.trim()) {
+      missingFields.push('Name');
+    }
+    
+    if (!pointsPerPurchase || !pointsPerPurchase.trim()) {
+      missingFields.push('Points per purchase');
+    }
+    
+    // For rewards (not campaigns), requirement is required
+    if (!isCampaign && (!requirement || !requirement.trim())) {
+      missingFields.push('Requirement');
+    }
+    
+    // Validate PIN code (must be 4 digits)
+    if (!pinCode || pinCode.length !== 4 || !/^\d{4}$/.test(pinCode)) {
+      missingFields.push('PIN number (must be 4 digits)');
+    }
+    
+    // If there are missing fields, show error modal
+    if (missingFields.length > 0) {
+      console.log('[CreateEditReward] Validation failed:', missingFields);
+      setErrorModalMessages(missingFields);
+      setErrorModalVisible(true);
+      return;
+    }
+    
     try {
-      if (!name || !pointsPerPurchase) {
-        console.log('[CreateEditReward] Validation failed: missing name or pointsPerPurchase');
-        Alert.alert('Error', 'Please fill in all required fields');
-        return;
-      }
-      // For rewards (not campaigns), requirement is required
-      if (!isCampaign && !requirement) {
-        console.log('[CreateEditReward] Validation failed: missing requirement for reward');
-        Alert.alert('Error', 'Please fill in all required fields');
-        return;
-      }
-      
-      // Validate PIN code (must be 4 digits)
-      if (!pinCode || pinCode.length !== 4 || !/^\d{4}$/.test(pinCode)) {
-        console.log('[CreateEditReward] Validation failed: invalid PIN code', { pinCode, length: pinCode?.length });
-        Alert.alert('Error', 'Please enter a valid 4-digit PIN code');
-        return;
-      }
-      
       console.log('[CreateEditReward] Validation passed, proceeding with save');
       
       // Generate QR code value using shared utility with business profile data
