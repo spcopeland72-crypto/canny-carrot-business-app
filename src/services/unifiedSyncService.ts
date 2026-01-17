@@ -227,8 +227,19 @@ const uploadAllData = async (businessId: string): Promise<{
 
     // Upload all local campaigns (same pattern as rewards - simple spread, no normalization)
     const allCampaigns = await campaignsRepository.getAll();
+    console.log(`📤 [UNIFIED SYNC] Uploading ${allCampaigns.length} campaigns`);
     for (const campaign of allCampaigns) {
       try {
+        // Debug: Log what we're sending
+        console.log(`📤 [UNIFIED SYNC] Campaign "${campaign.name}":`, {
+          hasSelectedProducts: !!campaign.selectedProducts,
+          selectedProductsCount: campaign.selectedProducts?.length || 0,
+          hasSelectedActions: !!campaign.selectedActions,
+          selectedActionsCount: campaign.selectedActions?.length || 0,
+          hasPinCode: !!campaign.pinCode,
+          hasQrCode: !!campaign.qrCode,
+        });
+        
         const campaignResponse = await fetch(`${API_BASE_URL}/api/v1/campaigns`, {
           method: 'POST',
           headers: { 
