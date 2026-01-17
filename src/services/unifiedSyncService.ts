@@ -265,11 +265,12 @@ const uploadAllData = async (businessId: string): Promise<{
           updatedAt: campaign.updatedAt || now,
           stats: campaign.stats || { impressions: 0, clicks: 0, conversions: 0 },
           // Include direct fields (same as rewards) - selectedProducts, selectedActions, pinCode, qrCode, pointsPerPurchase
-          ...(campaign.selectedProducts !== undefined && { selectedProducts: campaign.selectedProducts }),
-          ...(campaign.selectedActions !== undefined && { selectedActions: campaign.selectedActions }),
-          ...(campaign.pinCode !== undefined && { pinCode: campaign.pinCode }),
-          ...(campaign.qrCode !== undefined && { qrCode: campaign.qrCode }),
-          ...(campaign.pointsPerPurchase !== undefined && { pointsPerPurchase: campaign.pointsPerPurchase }),
+          // Always include these fields if they exist in the campaign object (even if empty arrays)
+          selectedProducts: campaign.selectedProducts || [],
+          selectedActions: campaign.selectedActions || [],
+          pinCode: campaign.pinCode || undefined,
+          qrCode: campaign.qrCode || undefined,
+          pointsPerPurchase: campaign.pointsPerPurchase || undefined,
           ...(campaign.objective && { objective: campaign.objective }),
           ...(campaign.segmentId && { segmentId: campaign.segmentId }),
           ...(campaign.channelMasks && { channelMasks: campaign.channelMasks }),
@@ -396,6 +397,36 @@ export const performUnifiedSync = async (businessId: string): Promise<{
   try {
     console.log('🔄 [UNIFIED SYNC] Starting unified sync for business:', businessId);
     console.log('🔄 [UNIFIED SYNC] All data (account, rewards, products, campaigns) syncs as one unit');
+
+    // ⚠️ DEBUG: Send local storage dump to API for debugging
+    try {
+      const [businessProfile, allRewards, allCampaigns, allCustomers, syncStatus] = await Promise.all([
+        businessRepository.get(),
+        rewardsRepository.getAll(),
+        campaignsRepository.getAll(),
+        customersRepository.getAll(),
+        getSyncStatus(),
+      ]);
+      
+      await fetch(`${API_BASE_URL}/api/v1/debug/local-storage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          businessId,
+          campaigns: allCampaigns,
+          rewards: allRewards,
+          businessProfile,
+          customers: allCustomers,
+          syncMetadata: syncStatus,
+        }),
+      }).catch(err => {
+        // Silently fail - debug endpoint is optional
+        console.log('⚠️ [DEBUG] Could not send local storage dump to API:', err.message);
+      });
+    } catch (debugError: any) {
+      // Silently fail - debug endpoint is optional
+      console.log('⚠️ [DEBUG] Error collecting local storage dump:', debugError.message);
+    }
 
     // Get timestamps - RETRY if missing
     let localTimestamp = await getLocalRepositoryTimestamp();
