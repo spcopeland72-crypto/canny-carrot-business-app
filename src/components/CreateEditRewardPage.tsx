@@ -82,47 +82,12 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
       if (isEdit && rewardId) {
         try {
           if (isCampaign) {
-            // Load campaign from repository (DB format)
-            let loadedCampaign = await campaignsRepository.getById(rewardId);
+            // Load campaign from repository (DB format) - EXACT SAME AS REWARDS
+            const loadedCampaign = await campaignsRepository.getById(rewardId);
             console.log('[CreateEditReward] Loaded campaign from repository:', JSON.stringify(loadedCampaign, null, 2));
             console.log('[CreateEditReward] Loaded campaign selectedProducts:', loadedCampaign?.selectedProducts);
-            console.log('[CreateEditReward] Loaded campaign has selectedProducts property:', 'selectedProducts' in (loadedCampaign || {}));
             
             if (loadedCampaign) {
-              // Normalize campaign to ensure all required fields are present
-              // CRITICAL: Preserve selectedProducts, selectedActions, pinCode, qrCode, pointsPerPurchase
-              loadedCampaign = {
-                id: loadedCampaign.id,
-                businessId: loadedCampaign.businessId || '',
-                name: loadedCampaign.name || '',
-                description: loadedCampaign.description || '',
-                type: loadedCampaign.type || 'bonus_reward',
-                startDate: loadedCampaign.startDate || new Date().toISOString(),
-                endDate: loadedCampaign.endDate || new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString(),
-                status: loadedCampaign.status || 'active',
-                targetAudience: loadedCampaign.targetAudience || 'all',
-                conditions: loadedCampaign.conditions || {},
-                createdAt: loadedCampaign.createdAt || new Date().toISOString(),
-                updatedAt: loadedCampaign.updatedAt || new Date().toISOString(),
-                stats: loadedCampaign.stats || { impressions: 0, clicks: 0, conversions: 0 },
-                // CRITICAL: Preserve direct fields (same as rewards) - these were being stripped!
-                ...(loadedCampaign.selectedProducts !== undefined && { selectedProducts: loadedCampaign.selectedProducts }),
-                ...(loadedCampaign.selectedActions !== undefined && { selectedActions: loadedCampaign.selectedActions }),
-                ...(loadedCampaign.pinCode !== undefined && { pinCode: loadedCampaign.pinCode }),
-                ...(loadedCampaign.qrCode !== undefined && { qrCode: loadedCampaign.qrCode }),
-                ...(loadedCampaign.pointsPerPurchase !== undefined && { pointsPerPurchase: loadedCampaign.pointsPerPurchase }),
-                ...(loadedCampaign.objective && { objective: loadedCampaign.objective }),
-                ...(loadedCampaign.segmentId && { segmentId: loadedCampaign.segmentId }),
-                ...(loadedCampaign.channelMasks && { channelMasks: loadedCampaign.channelMasks }),
-                ...(loadedCampaign.notificationMessage && { notificationMessage: loadedCampaign.notificationMessage }),
-                ...(loadedCampaign.customerProgress && { customerProgress: loadedCampaign.customerProgress }),
-              };
-              
-              console.log('[CreateEditReward] Normalized campaign:', JSON.stringify(loadedCampaign, null, 2));
-              console.log('[CreateEditReward] Campaign conditions:', loadedCampaign.conditions);
-              console.log('[CreateEditReward] Campaign rewardData:', loadedCampaign.conditions?.rewardData);
-              console.log('[CreateEditReward] Campaign has old reward field:', !!(loadedCampaign as any).reward);
-              
               // Store the loaded campaign ID to prevent duplicate creation
               setLoadedRewardId(loadedCampaign.id);
               
