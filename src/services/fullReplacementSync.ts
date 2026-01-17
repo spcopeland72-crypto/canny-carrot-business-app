@@ -211,6 +211,7 @@ const writeAllCampaigns = async (campaigns: Campaign[], businessId: string): Pro
   for (const campaign of campaigns) {
     try {
       // Normalize campaign to ensure all required fields are present
+      // IMPORTANT: Include ALL fields from local campaign, including selectedProducts, selectedActions, pinCode, qrCode
       const now = new Date().toISOString();
       const campaignToSend: Campaign = {
         id: campaign.id,
@@ -226,6 +227,12 @@ const writeAllCampaigns = async (campaigns: Campaign[], businessId: string): Pro
         createdAt: campaign.createdAt || now,
         updatedAt: campaign.updatedAt || now,
         stats: campaign.stats || { impressions: 0, clicks: 0, conversions: 0 },
+        // Include direct fields (same as rewards) - selectedProducts, selectedActions, pinCode, qrCode, pointsPerPurchase
+        selectedProducts: campaign.selectedProducts || [],
+        selectedActions: campaign.selectedActions || [],
+        pinCode: campaign.pinCode,
+        qrCode: campaign.qrCode,
+        pointsPerPurchase: campaign.pointsPerPurchase,
         ...(campaign.objective && { objective: campaign.objective }),
         ...(campaign.segmentId && { segmentId: campaign.segmentId }),
         ...(campaign.channelMasks && { channelMasks: campaign.channelMasks }),
