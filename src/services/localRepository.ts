@@ -474,7 +474,7 @@ export const campaignsRepository = {
 
   /**
    * Add or update a campaign
-   * IMMEDIATELY writes to Redis after saving locally
+   * Saves locally only - Redis writes happen ONLY on sync, logout, or login update check
    */
   save: async (campaign: Campaign): Promise<void> => {
     const campaigns = await campaignsRepository.getAll();
@@ -494,96 +494,11 @@ export const campaignsRepository = {
     await campaignsRepository.saveAll(campaigns);
     console.log(`✅ [REPOSITORY] Saved ${campaigns.length} campaigns total (${isEdit ? 'updated' : 'created'} 1 campaign)`);
     
-    // IMMEDIATELY write to Redis ONLY for new campaigns (not edits)
-    // Edits should only sync on manual sync or logout
-    if (!isEdit) {
-      try {
-      const { getStoredAuth } = await import('./authService');
-      const auth = await getStoredAuth();
-      if (auth?.businessId && (campaign as any).businessId) {
-        const API_BASE_URL = 'https://api.cannycarrot.com';
-        
-        // Normalize campaign to ensure all required fields are present
-        // IMPORTANT: Include ALL fields from campaign, including selectedProducts, selectedActions, pinCode, qrCode
-        const now = new Date().toISOString();
-        const campaignToSend: Campaign = {
-          id: campaign.id,
-          businessId: campaign.businessId || auth.businessId,
-          name: campaign.name || 'Unnamed Campaign',
-          description: campaign.description || '',
-          type: campaign.type || 'bonus_reward', // Required: default to 'bonus_reward'
-          startDate: campaign.startDate || now, // Required: default to now
-          endDate: campaign.endDate || new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString(), // Required: default to 1 year from now
-          status: campaign.status || 'active',
-          targetAudience: campaign.targetAudience || 'all',
-          conditions: campaign.conditions || {},
-          createdAt: campaign.createdAt || now,
-          updatedAt: campaign.updatedAt || now,
-          stats: campaign.stats || { impressions: 0, clicks: 0, conversions: 0 },
-          // Include direct fields (same as rewards) - selectedProducts, selectedActions, pinCode, qrCode, pointsPerPurchase
-          ...(campaign.selectedProducts !== undefined && { selectedProducts: campaign.selectedProducts }),
-          ...(campaign.selectedActions !== undefined && { selectedActions: campaign.selectedActions }),
-          ...(campaign.pinCode !== undefined && { pinCode: campaign.pinCode }),
-          ...(campaign.qrCode !== undefined && { qrCode: campaign.qrCode }),
-          ...(campaign.pointsPerPurchase !== undefined && { pointsPerPurchase: campaign.pointsPerPurchase }),
-          ...(campaign.objective && { objective: campaign.objective }),
-          ...(campaign.segmentId && { segmentId: campaign.segmentId }),
-          ...(campaign.channelMasks && { channelMasks: campaign.channelMasks }),
-          ...(campaign.notificationMessage && { notificationMessage: campaign.notificationMessage }),
-          ...(campaign.customerProgress && { customerProgress: campaign.customerProgress }),
-        };
-        
-        const response = await fetch(`${API_BASE_URL}/api/v1/campaigns`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(campaignToSend),
-        });
-        
-        if (response.ok) {
-          console.log(`✅ [REPOSITORY] Campaign "${campaign.name}" written to Redis`);
-          
-          // Update business.updatedAt timestamp to match the local repository's timestamp
-          try {
-            const { getLocalRepositoryTimestamp } = await import('./localRepository');
-            const localTimestamp = await getLocalRepositoryTimestamp();
-            
-            const businessResponse = await fetch(`${API_BASE_URL}/api/v1/businesses/${auth.businessId}`, {
-              method: 'GET',
-              headers: { 'Content-Type': 'application/json' },
-            });
-            
-            if (businessResponse.ok) {
-              const businessResult = await businessResponse.json();
-              if (businessResult.success && businessResult.data) {
-                const existingBusiness = businessResult.data;
-                const updatedBusiness = {
-                  ...existingBusiness,
-                  updatedAt: localTimestamp, // Use device's timestamp, not a new one
-                };
-                
-                await fetch(`${API_BASE_URL}/api/v1/businesses/${auth.businessId}`, {
-                  method: 'PUT',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify(updatedBusiness),
-                });
-              }
-            }
-          } catch (timestampError: any) {
-            console.warn(`⚠️ [REPOSITORY] Error updating business timestamp: ${timestampError.message || timestampError}`);
-            // Don't fail the save if timestamp update fails
-          }
-        } else {
-          const errorText = await response.text();
-          console.error(`❌ [REPOSITORY] Failed to write new campaign to Redis: ${response.status} ${errorText.substring(0, 200)}`);
-        }
-      }
-    } catch (redisError: any) {
-      console.error('[REPOSITORY] Error writing new campaign to Redis:', redisError.message);
-      // Don't fail the save if Redis write fails - local save already succeeded
-    }
-    } else {
-      console.log(`ℹ️ [REPOSITORY] Campaign edit - skipping immediate Redis write (will sync on manual sync or logout)`);
-    }
+    // NO immediate Redis write - Redis writes ONLY happen on:
+    // 1. Manual sync
+    // 2. Logout
+    // 3. Login update check
+    // This applies to both creates and edits
   },
 
   /**
