@@ -1447,9 +1447,8 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
           )}
 
           {/* Campaign Date Pickers (only for campaigns) */}
-          {isCampaign ? (
+          {isCampaign && (
             <>
-              {console.log('[CreateEditReward] Rendering date pickers for campaign, startDate:', startDate, 'endDate:', endDate)}
               <Text style={styles.label}>Campaign Start Date *</Text>
               <TouchableOpacity
                 style={styles.input}
