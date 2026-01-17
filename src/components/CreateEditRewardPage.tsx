@@ -8,6 +8,7 @@ import {
   ScrollView,
   Alert,
   Modal,
+  Platform,
 } from 'react-native';
 import {Colors} from '../constants/Colors';
 import PageTemplate from './PageTemplate';
@@ -17,6 +18,112 @@ import {generateRewardQRCode} from '../utils/qrCodeUtils';
 import {businessRepository, rewardsRepository, campaignsRepository} from '../services/localRepository';
 import {getStoredAuth} from '../services/authService';
 import type {BusinessProfile, Reward, Campaign, CampaignType} from '../types';
+
+// Simple Date Picker Component for Native Mobile
+const DatePickerComponent: React.FC<{
+  initialDate: Date;
+  onDateSelect: (year: number, month: number, day: number) => void;
+  onCancel: () => void;
+}> = ({ initialDate, onDateSelect, onCancel }) => {
+  const [selectedYear, setSelectedYear] = useState(initialDate.getFullYear());
+  const [selectedMonth, setSelectedMonth] = useState(initialDate.getMonth() + 1);
+  const [selectedDay, setSelectedDay] = useState(initialDate.getDate());
+
+  const currentYear = new Date().getFullYear();
+  const years = Array.from({ length: 10 }, (_, i) => currentYear + i);
+  const months = Array.from({ length: 12 }, (_, i) => i + 1);
+  const daysInMonth = new Date(selectedYear, selectedMonth, 0).getDate();
+  const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+
+  const handleConfirm = () => {
+    onDateSelect(selectedYear, selectedMonth, selectedDay);
+  };
+
+  return (
+    <View style={styles.datePickerContainer}>
+      <View style={styles.datePickerRow}>
+        <View style={styles.datePickerColumn}>
+          <Text style={styles.datePickerLabel}>Year</Text>
+          <ScrollView style={styles.datePickerScroll}>
+            {years.map((year) => (
+              <TouchableOpacity
+                key={year}
+                style={[
+                  styles.datePickerOption,
+                  selectedYear === year && styles.datePickerOptionSelected,
+                ]}
+                onPress={() => setSelectedYear(year)}>
+                <Text
+                  style={[
+                    styles.datePickerOptionText,
+                    selectedYear === year && styles.datePickerOptionTextSelected,
+                  ]}>
+                  {year}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+        <View style={styles.datePickerColumn}>
+          <Text style={styles.datePickerLabel}>Month</Text>
+          <ScrollView style={styles.datePickerScroll}>
+            {months.map((month) => (
+              <TouchableOpacity
+                key={month}
+                style={[
+                  styles.datePickerOption,
+                  selectedMonth === month && styles.datePickerOptionSelected,
+                ]}
+                onPress={() => setSelectedMonth(month)}>
+                <Text
+                  style={[
+                    styles.datePickerOptionText,
+                    selectedMonth === month && styles.datePickerOptionTextSelected,
+                  ]}>
+                  {month}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+        <View style={styles.datePickerColumn}>
+          <Text style={styles.datePickerLabel}>Day</Text>
+          <ScrollView style={styles.datePickerScroll}>
+            {days.map((day) => (
+              <TouchableOpacity
+                key={day}
+                style={[
+                  styles.datePickerOption,
+                  selectedDay === day && styles.datePickerOptionSelected,
+                ]}
+                onPress={() => setSelectedDay(day)}>
+                <Text
+                  style={[
+                    styles.datePickerOptionText,
+                    selectedDay === day && styles.datePickerOptionTextSelected,
+                  ]}>
+                  {day}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      </View>
+      <View style={styles.modalButtonContainer}>
+        <TouchableOpacity
+          style={[styles.modalButton, styles.cancelButton]}
+          onPress={onCancel}>
+          <Text style={styles.cancelButtonText}>Cancel</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.modalButton, styles.createButton]}
+          onPress={handleConfirm}>
+          <Text style={styles.createButtonText}>Select</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+};
 
 interface CreateEditRewardPageProps {
   currentScreen: string;
@@ -83,6 +190,11 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
   // Error modal state (for validation failures)
   const [errorModalVisible, setErrorModalVisible] = useState(false);
   const [errorModalMessages, setErrorModalMessages] = useState<string[]>([]);
+  // Date picker modal state
+  const [startDatePickerVisible, setStartDatePickerVisible] = useState(false);
+  const [endDatePickerVisible, setEndDatePickerVisible] = useState(false);
+  const [tempStartDate, setTempStartDate] = useState<string>('');
+  const [tempEndDate, setTempEndDate] = useState<string>('');
 
   // Load reward/campaign data and form fields on mount (if editing)
   useEffect(() => {
@@ -1309,26 +1421,58 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
           {isCampaign && (
             <>
               <Text style={styles.label}>Start Date *</Text>
-              <TextInput
+              <TouchableOpacity
                 style={styles.input}
-                value={startDate}
-                onChangeText={setStartDate}
-                placeholder="YYYY-MM-DD"
-                placeholderTextColor={Colors.text.light}
-                // @ts-ignore - type="date" works on web
-                type="date"
-              />
+                onPress={() => setStartDatePickerVisible(true)}>
+                <Text style={[styles.dateInputText, !startDate && styles.dateInputPlaceholder]}>
+                  {startDate || 'Select start date (YYYY-MM-DD)'}
+                </Text>
+              </TouchableOpacity>
               
               <Text style={styles.label}>End Date *</Text>
-              <TextInput
+              <TouchableOpacity
                 style={styles.input}
-                value={endDate}
-                onChangeText={setEndDate}
-                placeholder="YYYY-MM-DD"
-                placeholderTextColor={Colors.text.light}
-                // @ts-ignore - type="date" works on web
-                type="date"
-              />
+                onPress={() => setEndDatePickerVisible(true)}>
+                <Text style={[styles.dateInputText, !endDate && styles.dateInputPlaceholder]}>
+                  {endDate || 'Select end date (YYYY-MM-DD)'}
+                </Text>
+              </TouchableOpacity>
+
+              {/* Start Date Picker Modal */}
+              <Modal
+                visible={startDatePickerVisible}
+                transparent={true}
+                animationType="slide"
+                onRequestClose={() => setStartDatePickerVisible(false)}>
+                <View style={styles.modalOverlay}>
+                  <View style={styles.datePickerModal}>
+                    <Text style={styles.modalTitle}>Select Start Date</Text>
+                    <DatePickerComponent
+                      initialDate={startDate ? parseDateFromInput(startDate) : new Date()}
+                      onDateSelect={handleStartDateSelect}
+                      onCancel={() => setStartDatePickerVisible(false)}
+                    />
+                  </View>
+                </View>
+              </Modal>
+
+              {/* End Date Picker Modal */}
+              <Modal
+                visible={endDatePickerVisible}
+                transparent={true}
+                animationType="slide"
+                onRequestClose={() => setEndDatePickerVisible(false)}>
+                <View style={styles.modalOverlay}>
+                  <View style={styles.datePickerModal}>
+                    <Text style={styles.modalTitle}>Select End Date</Text>
+                    <DatePickerComponent
+                      initialDate={endDate ? parseDateFromInput(endDate) : new Date()}
+                      onDateSelect={handleEndDateSelect}
+                      onCancel={() => setEndDatePickerVisible(false)}
+                    />
+                  </View>
+                </View>
+              </Modal>
             </>
           )}
 
@@ -1945,6 +2089,61 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: Colors.background,
+  },
+  dateInputText: {
+    fontSize: 16,
+    color: Colors.text.primary,
+  },
+  dateInputPlaceholder: {
+    color: Colors.text.light,
+  },
+  datePickerModal: {
+    backgroundColor: Colors.background,
+    borderRadius: 16,
+    padding: 24,
+    width: '90%',
+    maxWidth: 400,
+    maxHeight: '80%',
+  },
+  datePickerContainer: {
+    width: '100%',
+  },
+  datePickerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+    height: 200,
+  },
+  datePickerColumn: {
+    flex: 1,
+    marginHorizontal: 4,
+  },
+  datePickerLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.text.secondary,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  datePickerScroll: {
+    flex: 1,
+  },
+  datePickerOption: {
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 4,
+    alignItems: 'center',
+  },
+  datePickerOptionSelected: {
+    backgroundColor: Colors.primary,
+  },
+  datePickerOptionText: {
+    fontSize: 16,
+    color: Colors.text.primary,
+  },
+  datePickerOptionTextSelected: {
+    color: Colors.background,
+    fontWeight: '600',
   },
 });
 
