@@ -809,38 +809,14 @@ export const downloadAllData = async (businessId: string, apiBaseUrl: string = '
       const campaignsResult = await campaignsResponse.json();
       console.log(`📊 [REPOSITORY] Campaigns API response:`, {success: campaignsResult.success, dataLength: campaignsResult.data?.length || 0, isArray: Array.isArray(campaignsResult.data)});
       if (campaignsResult.success && Array.isArray(campaignsResult.data)) {
-        // Normalize campaigns to ensure all required fields are present
-        // IMPORTANT: Include ALL fields from Redis, including selectedProducts, selectedActions, pinCode, qrCode
-        const now = new Date().toISOString();
-        const normalizedCampaigns = campaignsResult.data.map((campaign: any) => ({
-          id: campaign.id,
+        // Same pattern as rewards - use data as-is, no normalization
+        const campaigns = campaignsResult.data.map((campaign: any) => ({
+          ...campaign,
           businessId: campaign.businessId || businessId,
-          name: campaign.name || 'Unnamed Campaign',
-          description: campaign.description || '',
-          type: campaign.type || 'bonus_reward',
-          startDate: campaign.startDate || now,
-          endDate: campaign.endDate || new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString(),
-          status: campaign.status || 'active',
-          targetAudience: campaign.targetAudience || 'all',
-          conditions: campaign.conditions || {},
-          createdAt: campaign.createdAt || now,
-          updatedAt: campaign.updatedAt || now,
-          stats: campaign.stats || { impressions: 0, clicks: 0, conversions: 0 },
-          // Include direct fields (same as rewards) - selectedProducts, selectedActions, pinCode, qrCode, pointsPerPurchase
-          selectedProducts: campaign.selectedProducts || [],
-          selectedActions: campaign.selectedActions || [],
-          pinCode: campaign.pinCode,
-          qrCode: campaign.qrCode,
-          pointsPerPurchase: campaign.pointsPerPurchase,
-          ...(campaign.objective && { objective: campaign.objective }),
-          ...(campaign.segmentId && { segmentId: campaign.segmentId }),
-          ...(campaign.channelMasks && { channelMasks: campaign.channelMasks }),
-          ...(campaign.notificationMessage && { notificationMessage: campaign.notificationMessage }),
-          ...(campaign.customerProgress && { customerProgress: campaign.customerProgress }),
         }));
         
         // Save without marking as dirty (we're downloading, not modifying)
-        await campaignsRepository.saveAll(normalizedCampaigns, true);
+        await campaignsRepository.saveAll(campaigns, true);
         console.log(`✅ [REPOSITORY] ${normalizedCampaigns.length} campaigns downloaded and saved`);
       } else {
         console.warn(`⚠️ [REPOSITORY] Campaigns API response invalid: success=${campaignsResult.success}, isArray=${Array.isArray(campaignsResult.data)}`);

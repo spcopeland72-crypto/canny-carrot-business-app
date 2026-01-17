@@ -84,39 +84,14 @@ const downloadAllData = async (businessId: string): Promise<{
       }
     }
 
-    // Download all campaigns
+    // Download all campaigns (same pattern as rewards - use data as-is, no normalization)
     const campaignsResponse = await fetch(`${API_BASE_URL}/api/v1/campaigns?businessId=${businessId}`);
     if (campaignsResponse.ok) {
       const campaignsResult = await campaignsResponse.json();
       if (campaignsResult.success && Array.isArray(campaignsResult.data)) {
-        // Normalize campaigns to ensure all required fields are present
-        // IMPORTANT: Include ALL fields from Redis, including selectedProducts, selectedActions, pinCode, qrCode
-        const now = new Date().toISOString();
         result.campaigns = campaignsResult.data.map((campaign: any) => ({
-          id: campaign.id,
+          ...campaign,
           businessId: campaign.businessId || businessId,
-          name: campaign.name || 'Unnamed Campaign',
-          description: campaign.description || '',
-          type: campaign.type || 'bonus_reward',
-          startDate: campaign.startDate || now,
-          endDate: campaign.endDate || new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString(),
-          status: campaign.status || 'active',
-          targetAudience: campaign.targetAudience || 'all',
-          conditions: campaign.conditions || {},
-          createdAt: campaign.createdAt || now,
-          updatedAt: campaign.updatedAt || now,
-          stats: campaign.stats || { impressions: 0, clicks: 0, conversions: 0 },
-          // Include direct fields (same as rewards) - selectedProducts, selectedActions, pinCode, qrCode, pointsPerPurchase
-          selectedProducts: campaign.selectedProducts || [],
-          selectedActions: campaign.selectedActions || [],
-          pinCode: campaign.pinCode,
-          qrCode: campaign.qrCode,
-          pointsPerPurchase: campaign.pointsPerPurchase,
-          ...(campaign.objective && { objective: campaign.objective }),
-          ...(campaign.segmentId && { segmentId: campaign.segmentId }),
-          ...(campaign.channelMasks && { channelMasks: campaign.channelMasks }),
-          ...(campaign.notificationMessage && { notificationMessage: campaign.notificationMessage }),
-          ...(campaign.customerProgress && { customerProgress: campaign.customerProgress }),
         }));
         console.log(`  ✅ Downloaded ${result.campaigns.length} campaigns`);
       }
