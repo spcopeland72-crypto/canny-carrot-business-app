@@ -47,6 +47,7 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
 }) => {
   const isEdit = !!rewardId;
   const isCampaign = currentScreen.startsWith('CreateCampaign') || currentScreen.startsWith('EditCampaign');
+  console.log('[CreateEditReward] Component initialized:', { currentScreen, isCampaign, isEdit, rewardId });
   const [name, setName] = useState('');
   const [type, setType] = useState<'product' | 'action'>('product');
   const [requirement, setRequirement] = useState('');
@@ -232,22 +233,28 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
     : defaultActions;
 
   const handleSave = async () => {
+    console.log('[CreateEditReward] handleSave called', { isCampaign, isEdit, name, pointsPerPurchase, requirement, pinCode });
     try {
       if (!name || !pointsPerPurchase) {
+        console.log('[CreateEditReward] Validation failed: missing name or pointsPerPurchase');
         Alert.alert('Error', 'Please fill in all required fields');
         return;
       }
       // For rewards (not campaigns), requirement is required
       if (!isCampaign && !requirement) {
+        console.log('[CreateEditReward] Validation failed: missing requirement for reward');
         Alert.alert('Error', 'Please fill in all required fields');
         return;
       }
       
       // Validate PIN code (must be 4 digits)
       if (!pinCode || pinCode.length !== 4 || !/^\d{4}$/.test(pinCode)) {
+        console.log('[CreateEditReward] Validation failed: invalid PIN code', { pinCode, length: pinCode?.length });
         Alert.alert('Error', 'Please enter a valid 4-digit PIN code');
         return;
       }
+      
+      console.log('[CreateEditReward] Validation passed, proceeding with save');
       
       // Generate QR code value using shared utility with business profile data
       // Use rewardId prop, loadedRewardId, reward prop id, or generate new unique ID (in that order)
@@ -1338,7 +1345,12 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
             * Business verification required to award points for actions
           </Text>
 
-          <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
+          <TouchableOpacity 
+            style={styles.saveButton} 
+            onPress={() => {
+              console.log('[CreateEditReward] Save button pressed', { isCampaign, isEdit, currentScreen });
+              handleSave();
+            }}>
             <Text style={styles.saveButtonText}>
               {isEdit ? 'Save Changes' : (isCampaign ? 'Create Campaign' : 'Create Reward')}
             </Text>
