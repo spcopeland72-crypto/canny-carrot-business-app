@@ -1401,6 +1401,36 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
         }}
       />
       
+      {/* Error Modal for Missing Fields */}
+      <Modal
+        visible={errorModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setErrorModalVisible(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.deleteModal}>
+            <Text style={styles.deleteModalTitle}>Create Failed - Missing Data</Text>
+            <Text style={styles.deleteModalMessage}>
+              Please complete the following required fields:
+            </Text>
+            <View style={{marginVertical: 12}}>
+              {errorModalMessages.map((field, index) => (
+                <Text key={index} style={[styles.deleteModalMessage, {marginLeft: 16, marginTop: 4}]}>
+                  • {field}
+                </Text>
+              ))}
+            </View>
+            <View style={styles.deleteModalButtons}>
+              <TouchableOpacity
+                style={[styles.deleteModalButton, styles.deleteModalButtonCancel]}
+                onPress={() => setErrorModalVisible(false)}>
+                <Text style={styles.deleteModalButtonTextCancel}>OK</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       {/* Delete Confirmation Modal */}
       <Modal
         visible={deleteConfirmVisible}
