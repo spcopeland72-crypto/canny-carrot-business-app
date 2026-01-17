@@ -179,7 +179,10 @@ const writeAllRewards = async (rewards: Reward[], businessId: string): Promise<n
       
       const response = await fetch(`${API_BASE_URL}/api/v1/rewards`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'X-Sync-Context': 'logout', // Required by Redis write monitor
+        },
         body: JSON.stringify(rewardToSync),
       });
       
@@ -244,7 +247,10 @@ const writeAllCampaigns = async (campaigns: Campaign[], businessId: string): Pro
       
       const response = await fetch(`${API_BASE_URL}/api/v1/campaigns`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'X-Sync-Context': 'logout', // Required by Redis write monitor
+        },
         body: JSON.stringify(campaignToSend),
       });
       
@@ -342,7 +348,10 @@ export const performFullReplacementSync = async (businessId: string): Promise<{
         
         const response = await fetch(`${API_BASE_URL}/api/v1/businesses/${businessId}`, {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            'X-Sync-Context': 'logout', // Required by Redis write monitor
+          },
           body: JSON.stringify(profile),
         });
         
@@ -405,7 +414,10 @@ export const performFullReplacementSync = async (businessId: string): Promise<{
           
           const updateResponse = await fetch(`${API_BASE_URL}/api/v1/businesses/${businessId}`, {
             method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+              'Content-Type': 'application/json',
+              'X-Sync-Context': 'logout', // Required by Redis write monitor
+            },
             body: JSON.stringify(updatedBusiness),
           });
           
