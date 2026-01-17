@@ -90,7 +90,7 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
             
             if (loadedCampaign) {
               // Normalize campaign to ensure all required fields are present
-              // This handles campaigns saved with old structure or missing fields
+              // CRITICAL: Preserve selectedProducts, selectedActions, pinCode, qrCode, pointsPerPurchase
               loadedCampaign = {
                 id: loadedCampaign.id,
                 businessId: loadedCampaign.businessId || '',
@@ -105,6 +105,12 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
                 createdAt: loadedCampaign.createdAt || new Date().toISOString(),
                 updatedAt: loadedCampaign.updatedAt || new Date().toISOString(),
                 stats: loadedCampaign.stats || { impressions: 0, clicks: 0, conversions: 0 },
+                // CRITICAL: Preserve direct fields (same as rewards) - these were being stripped!
+                ...(loadedCampaign.selectedProducts !== undefined && { selectedProducts: loadedCampaign.selectedProducts }),
+                ...(loadedCampaign.selectedActions !== undefined && { selectedActions: loadedCampaign.selectedActions }),
+                ...(loadedCampaign.pinCode !== undefined && { pinCode: loadedCampaign.pinCode }),
+                ...(loadedCampaign.qrCode !== undefined && { qrCode: loadedCampaign.qrCode }),
+                ...(loadedCampaign.pointsPerPurchase !== undefined && { pointsPerPurchase: loadedCampaign.pointsPerPurchase }),
                 ...(loadedCampaign.objective && { objective: loadedCampaign.objective }),
                 ...(loadedCampaign.segmentId && { segmentId: loadedCampaign.segmentId }),
                 ...(loadedCampaign.channelMasks && { channelMasks: loadedCampaign.channelMasks }),
@@ -500,11 +506,13 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
           pointsPerPurchase: pointsValue,
         };
         
-        console.log('[CreateEditReward] Saving campaign:', campaignToSave);
-        console.log('[CreateEditReward] Campaign selectedProducts:', campaignToSave.selectedProducts);
-        console.log('[CreateEditReward] Campaign selectedActions:', campaignToSave.selectedActions);
-        console.log('[CreateEditReward] Form state - type:', type, 'selectedProducts:', selectedProducts, 'selectedActions:', selectedActions);
-        console.log('[CreateEditReward] Full campaignToSave object:', JSON.stringify(campaignToSave, null, 2));
+        console.log('[CreateEditReward] ===== SAVING CAMPAIGN =====');
+        console.log('[CreateEditReward] Form state selectedProducts:', selectedProducts);
+        console.log('[CreateEditReward] Form state selectedProducts.length:', selectedProducts?.length);
+        console.log('[CreateEditReward] Form state selectedProducts check:', selectedProducts && selectedProducts.length > 0);
+        console.log('[CreateEditReward] Campaign selectedProducts BEFORE save:', campaignToSave.selectedProducts);
+        console.log('[CreateEditReward] Campaign selectedProducts type:', typeof campaignToSave.selectedProducts);
+        console.log('[CreateEditReward] Full campaignToSave:', JSON.stringify(campaignToSave, null, 2));
         
         // Save to campaigns repository (DB format)
         // NOTE: For edits, this only saves locally (no immediate Redis write)
