@@ -85,6 +85,8 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
             // Load campaign from repository (DB format)
             let loadedCampaign = await campaignsRepository.getById(rewardId);
             console.log('[CreateEditReward] Loaded campaign from repository:', JSON.stringify(loadedCampaign, null, 2));
+            console.log('[CreateEditReward] Loaded campaign selectedProducts:', loadedCampaign?.selectedProducts);
+            console.log('[CreateEditReward] Loaded campaign has selectedProducts property:', 'selectedProducts' in (loadedCampaign || {}));
             
             if (loadedCampaign) {
               // Normalize campaign to ensure all required fields are present
@@ -126,7 +128,10 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
               
               // Load campaign data - USE SAME LOGIC AS REWARDS (direct fields first)
               // Check direct fields first (same as rewards - this is the working model)
-              const hasDirectFields = loadedCampaign.selectedProducts || loadedCampaign.selectedActions || loadedCampaign.pinCode;
+              // IMPORTANT: Check if property exists (not just truthy) - empty arrays are falsy but still valid
+              const hasDirectFields = 'selectedProducts' in loadedCampaign || 
+                                     'selectedActions' in loadedCampaign || 
+                                     'pinCode' in loadedCampaign;
               
               if (hasDirectFields) {
                 // Use direct fields (same as rewards) - this is the working model
@@ -149,14 +154,17 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
                 }
                 
                 // Load products/actions from direct fields (same as rewards)
-                if (loadedCampaign.selectedProducts && loadedCampaign.selectedProducts.length > 0) {
+                // IMPORTANT: Check if property exists (not just truthy) - empty arrays are valid
+                if ('selectedProducts' in loadedCampaign) {
                   setType('product');
-                  setSelectedProducts(loadedCampaign.selectedProducts);
-                } else if (loadedCampaign.selectedActions && loadedCampaign.selectedActions.length > 0) {
+                  setSelectedProducts(loadedCampaign.selectedProducts || []);
+                } else if ('selectedActions' in loadedCampaign) {
                   setType('action');
-                  setSelectedActions(loadedCampaign.selectedActions);
+                  setSelectedActions(loadedCampaign.selectedActions || []);
                 } else {
-                  setType('product'); // Default
+                  // Default to product type if neither exists
+                  setType('product');
+                  setSelectedProducts([]);
                 }
                 
                 setPinCode(loadedCampaign.pinCode || '');
@@ -486,9 +494,16 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
         };
         
         console.log('[CreateEditReward] Saving campaign:', campaignToSave);
+        console.log('[CreateEditReward] Campaign selectedProducts:', campaignToSave.selectedProducts);
+        console.log('[CreateEditReward] Campaign selectedActions:', campaignToSave.selectedActions);
         
         // Save to campaigns repository (DB format) - this will also write to Redis
         await campaignsRepository.save(campaignToSave);
+        
+        // Verify the save by loading it back
+        const savedCampaign = await campaignsRepository.getById(rewardIdToSave);
+        console.log('[CreateEditReward] Campaign saved and verified:', savedCampaign);
+        console.log('[CreateEditReward] Saved campaign selectedProducts:', savedCampaign?.selectedProducts);
         
         // Show success modal for both create and edit
         if (!isEdit) {
