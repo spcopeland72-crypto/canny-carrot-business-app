@@ -255,11 +255,13 @@ const uploadAllData = async (businessId: string): Promise<{
           allKeys: Object.keys(campaign),
         });
         
-        // Debug: Log the actual JSON being sent
+        // Create campaign object to send (same pattern as rewards - simple spread)
         const campaignToSend = {
           ...campaign,
           businessId: campaign.businessId || businessId,
         };
+        
+        // Debug: Log the actual JSON being sent
         console.log(`📤 [UNIFIED SYNC] Campaign JSON payload (first 1000 chars):`, JSON.stringify(campaignToSend).substring(0, 1000));
         
         const campaignResponse = await fetch(`${API_BASE_URL}/api/v1/campaigns`, {
@@ -268,10 +270,7 @@ const uploadAllData = async (businessId: string): Promise<{
             'Content-Type': 'application/json',
             'X-Sync-Context': 'manual-sync', // Required by Redis write monitor
           },
-          body: JSON.stringify({
-            ...campaign,
-            businessId: campaign.businessId || businessId,
-          }),
+          body: JSON.stringify(campaignToSend),
         });
         
         if (campaignResponse.ok) {
