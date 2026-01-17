@@ -737,6 +737,9 @@ export const downloadAllData = async (businessId: string, apiBaseUrl: string = '
           companyNumber: businessData.profile?.companyNumber,
           createdAt: businessData.createdAt || businessData.profile?.createdAt,
           updatedAt: businessData.updatedAt || businessData.profile?.updatedAt,
+          // IMPORTANT: Include products and actions from Redis
+          products: businessData.products || businessData.profile?.products || [],
+          actions: businessData.actions || businessData.profile?.actions || [],
         };
         // Save profile without marking as dirty (we're downloading, not modifying)
         await AsyncStorage.setItem(REPOSITORY_KEYS.BUSINESS_PROFILE, JSON.stringify(profile));
