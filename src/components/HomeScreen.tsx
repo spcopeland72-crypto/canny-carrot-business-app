@@ -23,7 +23,9 @@ import HelpModal from './HelpModal';
 import CompanyMenuModal from './CompanyMenuModal';
 import CircularProgress from './CircularProgress';
 import RewardQRCodeModal from './RewardQRCodeModal';
-import {generateRewardQRCode} from '../utils/qrCodeUtils';
+import QRCodeModal from './QRCodeModal';
+import {generateRewardQRCode, generateCampaignItemQRCode} from '../utils/qrCodeUtils';
+import {getStoredAuth} from '../services/authService';
 import AnimatedLineChart from './AnimatedLineChart';
 import AnimatedBarChart from './AnimatedBarChart';
 import AnimatedDonutChart from './AnimatedDonutChart';
@@ -113,6 +115,13 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   const [businessLogo, setBusinessLogo] = useState<string | null>(null); // Business logo from profile
   const [rewardQRModalVisible, setRewardQRModalVisible] = useState(false);
   const [selectedRewardForQR, setSelectedRewardForQR] = useState<Reward | null>(null);
+  // Campaign items modal state
+  const [campaignItemsModalVisible, setCampaignItemsModalVisible] = useState(false);
+  const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
+  const [campaignItemQRCodes, setCampaignItemQRCodes] = useState<Map<string, string>>(new Map());
+  const [campaignQRModalVisible, setCampaignQRModalVisible] = useState(false);
+  const [campaignQRModalTitle, setCampaignQRModalTitle] = useState('');
+  const [campaignQRModalValue, setCampaignQRModalValue] = useState('');
   const [socialIcons, setSocialIcons] = useState<{
     facebook?: any;
     instagram?: any;
@@ -776,7 +785,50 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                 <TouchableOpacity
                   key={campaign.id}
                   style={styles.rewardCard}
-                  onPress={() => onNavigate(`EditCampaign${campaign.id}`)}>
+                  onPress={async () => {
+                    // Load campaign products/actions and generate QR codes
+                    const fullCampaign = await campaignsRepository.getById(campaign.id);
+                    if (fullCampaign) {
+                      setSelectedCampaign(fullCampaign as Campaign);
+                      
+                      // Generate QR codes for products/actions
+                      const auth = await getStoredAuth();
+                      const qrCodes = new Map<string, string>();
+                      
+                      const startDate = fullCampaign.startDate ? new Date(fullCampaign.startDate).toISOString().split('T')[0] : '';
+                      const endDate = fullCampaign.endDate ? new Date(fullCampaign.endDate).toISOString().split('T')[0] : '';
+                      
+                      if (fullCampaign.selectedProducts && fullCampaign.selectedProducts.length > 0 && auth?.businessId) {
+                        fullCampaign.selectedProducts.forEach((product: string) => {
+                          const qrCode = generateCampaignItemQRCode(
+                            auth.businessId,
+                            fullCampaign.name,
+                            'product',
+                            product,
+                            startDate,
+                            endDate
+                          );
+                          qrCodes.set(`product:${product}`, qrCode);
+                        });
+                      }
+                      if (fullCampaign.selectedActions && fullCampaign.selectedActions.length > 0 && auth?.businessId) {
+                        fullCampaign.selectedActions.forEach((action: string) => {
+                          const qrCode = generateCampaignItemQRCode(
+                            auth.businessId,
+                            fullCampaign.name,
+                            'action',
+                            action,
+                            startDate,
+                            endDate
+                          );
+                          qrCodes.set(`action:${action}`, qrCode);
+                        });
+                      }
+                      
+                      setCampaignItemQRCodes(qrCodes);
+                      setCampaignItemsModalVisible(true);
+                    }
+                  }}>
                   <View style={styles.rewardTitleContainer}>
                     <Text style={styles.rewardTitle}>{campaign.name}</Text>
                   </View>
@@ -1002,7 +1054,95 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
         onNavigate={onNavigate}
         onScanPress={onScanPress}
       />
-
+      
+      {/* Campaign Items Modal */}
+      <Modal
+        visible={campaignItemsModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setCampaignItemsModalVisible(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.campaignItemsModal}>
+            <Text style={styles.campaignItemsModalTitle}>
+              {selectedCampaign?.name || 'Campaign Items'}
+            </Text>
+            
+            {selectedCampaign && (() => {
+              // Combine products and actions for display
+              const products = selectedCampaign.selectedProducts || [];
+              const actions = selectedCampaign.selectedActions || [];
+              const items = [
+                ...products.map((p: string) => ({name: p, type: 'product' as const})),
+                ...actions.map((a: string) => ({name: a, type: 'action' as const}))
+              ];
+              
+              // Determine grid layout: 2x2 for 1-4 items, 3x3 for 5-9 items
+              const gridSize = items.length <= 4 ? 2 : 3;
+              const itemsPerRow = gridSize;
+              
+              return (
+                <View style={styles.campaignItemsGridContainer}>
+                  <View style={[styles.campaignItemsGrid, {flexDirection: 'row', flexWrap: 'wrap'}]}>
+                    {items.map((item, idx) => (
+                      <TouchableOpacity
+                        key={`${item.type}-${idx}`}
+                        style={[
+                          styles.campaignItemBox,
+                          {width: `${100 / itemsPerRow}%`, padding: 8}
+                        ]}
+                        onPress={() => {
+                          const qrKey = `${item.type}:${item.name}`;
+                          const qrValue = campaignItemQRCodes.get(qrKey);
+                          if (qrValue) {
+                            setCampaignQRModalTitle(`${item.type === 'product' ? 'Product' : 'Action'}: ${item.name}`);
+                            setCampaignQRModalValue(qrValue);
+                            setCampaignItemsModalVisible(false);
+                            setCampaignQRModalVisible(true);
+                          }
+                        }}>
+                        <Text style={styles.campaignItemBoxText} numberOfLines={2}>
+                          {item.name}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                  
+                  <View style={styles.campaignItemsModalButtons}>
+                    <TouchableOpacity
+                      style={[styles.campaignItemsModalButton, styles.editButton]}
+                      onPress={() => {
+                        setCampaignItemsModalVisible(false);
+                        if (selectedCampaign) {
+                          onNavigate(`EditCampaign${selectedCampaign.id}`);
+                        }
+                      }}>
+                      <Text style={styles.editButtonText}>Edit Campaign</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.campaignItemsModalButton, styles.closeButton]}
+                      onPress={() => setCampaignItemsModalVisible(false)}>
+                      <Text style={styles.closeButtonText}>Close</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              );
+            })()}
+          </View>
+        </View>
+      </Modal>
+      
+      {/* Campaign Item QR Code Modal */}
+      <QRCodeModal
+        visible={campaignQRModalVisible}
+        title={campaignQRModalTitle}
+        qrValue={campaignQRModalValue}
+        onClose={() => {
+          setCampaignQRModalVisible(false);
+          setCampaignItemsModalVisible(true); // Return to items modal
+        }}
+        showSuccessMessage={false}
+      />
+      
       {/* Modals */}
       <HelpModal
         visible={helpModalVisible}
@@ -1751,6 +1891,78 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   closeModalButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: Colors.text.primary,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  campaignItemsModal: {
+    backgroundColor: Colors.background,
+    borderRadius: 16,
+    padding: 24,
+    width: '90%',
+    maxWidth: 500,
+    maxHeight: '80%',
+  },
+  campaignItemsModalTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: Colors.text.primary,
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  campaignItemsGridContainer: {
+    width: '100%',
+  },
+  campaignItemsGrid: {
+    width: '100%',
+    marginBottom: 24,
+  },
+  campaignItemBox: {
+    backgroundColor: Colors.primary,
+    borderRadius: 12,
+    padding: 16,
+    margin: 4,
+    minHeight: 80,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: Colors.neutral[200],
+  },
+  campaignItemBoxText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.background,
+    textAlign: 'center',
+  },
+  campaignItemsModalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 8,
+  },
+  campaignItemsModalButton: {
+    flex: 1,
+    padding: 14,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  editButton: {
+    backgroundColor: Colors.primary,
+  },
+  editButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: Colors.background,
+  },
+  closeButton: {
+    backgroundColor: Colors.neutral[200],
+  },
+  closeButtonText: {
     fontSize: 16,
     fontWeight: '600',
     color: Colors.text.primary,
