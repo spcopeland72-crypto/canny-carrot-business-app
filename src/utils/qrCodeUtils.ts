@@ -83,7 +83,7 @@ export const generateCampaignQRCode = (
   name: string,
   description: string = ''
 ): string => {
-  return `CAMPAIGN:${id}:${name}:{description}`;
+  return `CAMPAIGN:${id}:${name}:${description}`;
 };
 
 /**
