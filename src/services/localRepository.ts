@@ -817,7 +817,7 @@ export const downloadAllData = async (businessId: string, apiBaseUrl: string = '
         
         // Save without marking as dirty (we're downloading, not modifying)
         await campaignsRepository.saveAll(campaigns, true);
-        console.log(`✅ [REPOSITORY] ${normalizedCampaigns.length} campaigns downloaded and saved`);
+        console.log(`✅ [REPOSITORY] ${campaigns.length} campaigns downloaded and saved`);
       } else {
         console.warn(`⚠️ [REPOSITORY] Campaigns API response invalid: success=${campaignsResult.success}, isArray=${Array.isArray(campaignsResult.data)}`);
       }
