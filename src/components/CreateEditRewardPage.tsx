@@ -470,30 +470,20 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
           }
         }
         
-        // Save as Campaign - USE SAME STRUCTURE AS REWARDS (direct fields, not nested)
+        // Save as Campaign - EXACT SAME PATTERN AS REWARDS
         // Use selected rewardType (or customTypeText if "Other") as campaign.type
         const campaignTypeValue = rewardType === 'other' ? customTypeText.trim() : rewardType;
+        // EXACT SAME PATTERN AS REWARDS - copy field order exactly
         const campaignToSave: Campaign = {
           id: rewardIdToSave,
           businessId: auth.businessId,
           name,
           description: existingCampaign?.description || '',
-          // Use the new type value from the form, not the existing one (unless creating new)
           type: (campaignTypeValue || 'bonus_reward') as CampaignType,
           startDate: existingCampaign?.startDate || now,
-          endDate: existingCampaign?.endDate || new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString(), // Default to 1 year from now
+          endDate: existingCampaign?.endDate || new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString(),
           status: existingCampaign?.status || 'active',
           targetAudience: existingCampaign?.targetAudience || 'all',
-          // Store products/actions/pinCode DIRECTLY (same as rewards) - this is the working model
-          // NOTE: type field is only for UI presentation (which tab to show), not for data storage
-          // Save both selectedProducts and selectedActions if they have values, regardless of type tab
-          selectedProducts: selectedProducts && selectedProducts.length > 0 ? selectedProducts : undefined,
-          selectedActions: selectedActions && selectedActions.length > 0 ? selectedActions : undefined,
-          pinCode,
-          qrCode: qrCodeValue,
-          pointsPerPurchase: pointsValue,
-          // Preserve existing conditions (if any) but don't duplicate data in rewardData
-          conditions: existingCampaign?.conditions,
           createdAt: existingCampaign?.createdAt || now,
           updatedAt: now,
           stats: existingCampaign?.stats || {
@@ -501,6 +491,13 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
             clicks: 0,
             conversions: 0,
           },
+          conditions: existingCampaign?.conditions,
+          // EXACT SAME AS REWARDS - app-specific fields in same order
+          pinCode,
+          qrCode: qrCodeValue,
+          selectedProducts: selectedProducts && selectedProducts.length > 0 ? selectedProducts : undefined,
+          selectedActions: selectedActions && selectedActions.length > 0 ? selectedActions : undefined,
+          pointsPerPurchase: pointsValue,
         };
         
         console.log('[CreateEditReward] Saving campaign:', campaignToSave);
