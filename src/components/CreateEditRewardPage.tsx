@@ -156,6 +156,7 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
   const isEdit = !!rewardId;
   const isCampaign = currentScreen.startsWith('CreateCampaign') || currentScreen.startsWith('EditCampaign');
   console.log('[CreateEditReward] Component initialized:', { currentScreen, isCampaign, isEdit, rewardId });
+  console.log('[CreateEditReward] Date picker will render:', isCampaign);
   const [name, setName] = useState('');
   const [type, setType] = useState<'product' | 'action'>('product');
   const [requirement, setRequirement] = useState('');
@@ -292,14 +293,42 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
     loadRewardData();
   }, [isEdit, rewardId, reward]);
   
+  // Helper function to format date as YYYY-MM-DD for input
+  const formatDateForInput = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  // Helper function to parse date string to Date object
+  const parseDateFromInput = (dateStr: string): Date => {
+    if (!dateStr) return new Date();
+    const [year, month, day] = dateStr.split('-').map(Number);
+    return new Date(year, month - 1, day);
+  };
+
+  // Handle date picker selection
+  const handleStartDateSelect = (year: number, month: number, day: number) => {
+    const dateStr = formatDateForInput(new Date(year, month - 1, day));
+    setStartDate(dateStr);
+    setStartDatePickerVisible(false);
+  };
+
+  const handleEndDateSelect = (year: number, month: number, day: number) => {
+    const dateStr = formatDateForInput(new Date(year, month - 1, day));
+    setEndDate(dateStr);
+    setEndDatePickerVisible(false);
+  };
+
   // Initialize campaign dates for new campaigns
   useEffect(() => {
     if (isCampaign && !isEdit) {
       const now = new Date();
       const defaultEndDate = new Date(now);
       defaultEndDate.setFullYear(now.getFullYear() + 1);
-      setStartDate(now.toISOString().split('T')[0]);
-      setEndDate(defaultEndDate.toISOString().split('T')[0]);
+      setStartDate(formatDateForInput(now));
+      setEndDate(formatDateForInput(defaultEndDate));
     }
   }, [isCampaign, isEdit]);
 
@@ -1418,12 +1447,16 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
           )}
 
           {/* Campaign Date Pickers (only for campaigns) */}
-          {isCampaign && (
+          {isCampaign ? (
             <>
-              <Text style={styles.label}>Start Date *</Text>
+              {console.log('[CreateEditReward] Rendering date pickers for campaign, startDate:', startDate, 'endDate:', endDate)}
+              <Text style={styles.label}>Campaign Start Date *</Text>
               <TouchableOpacity
                 style={styles.input}
-                onPress={() => setStartDatePickerVisible(true)}>
+                onPress={() => {
+                  console.log('[CreateEditReward] Start date picker opened, current startDate:', startDate);
+                  setStartDatePickerVisible(true);
+                }}>
                 <Text style={[styles.dateInputText, !startDate && styles.dateInputPlaceholder]}>
                   {startDate || 'Select start date (YYYY-MM-DD)'}
                 </Text>
