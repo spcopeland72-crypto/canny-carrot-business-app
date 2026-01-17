@@ -83,7 +83,22 @@ export const generateCampaignQRCode = (
   name: string,
   description: string = ''
 ): string => {
-  return `CAMPAIGN:${id}:${name}:${description}`;
+  return `CAMPAIGN:${id}:${name}:{description}`;
+};
+
+/**
+ * Generate QR code for a campaign product or action
+ * Format: CAMPAIGN_ITEM:{businessId}:{campaignName}:{itemType}:{itemName}:{startDate}:{endDate}
+ */
+export const generateCampaignItemQRCode = (
+  businessId: string,
+  campaignName: string,
+  itemType: 'product' | 'action',
+  itemName: string,
+  startDate: string,
+  endDate: string
+): string => {
+  return `CAMPAIGN_ITEM:${businessId}:${campaignName}:${itemType}:${itemName}:${startDate}:${endDate}`;
 };
 
 /**

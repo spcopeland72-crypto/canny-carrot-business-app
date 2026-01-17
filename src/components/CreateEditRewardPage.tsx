@@ -14,7 +14,7 @@ import {Colors} from '../constants/Colors';
 import PageTemplate from './PageTemplate';
 import QRCodeModal from './QRCodeModal';
 // Products and actions are now stored in business profile, not separate storage
-import {generateRewardQRCode} from '../utils/qrCodeUtils';
+import {generateRewardQRCode, generateCampaignItemQRCode} from '../utils/qrCodeUtils';
 import {businessRepository, rewardsRepository, campaignsRepository} from '../services/localRepository';
 import {getStoredAuth} from '../services/authService';
 import type {BusinessProfile, Reward, Campaign, CampaignType} from '../types';
@@ -90,6 +90,11 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
   const [endDatePickerVisible, setEndDatePickerVisible] = useState(false);
   const [tempStartDate, setTempStartDate] = useState<string>('');
   const [tempEndDate, setTempEndDate] = useState<string>('');
+  // Campaign product/action QR codes state
+  const [campaignItemQRCodes, setCampaignItemQRCodes] = useState<Map<string, string>>(new Map());
+  const [campaignQRModalVisible, setCampaignQRModalVisible] = useState(false);
+  const [campaignQRModalTitle, setCampaignQRModalTitle] = useState('');
+  const [campaignQRModalValue, setCampaignQRModalValue] = useState('');
 
   // Load reward/campaign data and form fields on mount (if editing)
   useEffect(() => {
@@ -137,8 +142,40 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
               // Load campaign dates
               const now = new Date().toISOString();
               const defaultEndDate = new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString();
-              setStartDate(loadedCampaign.startDate ? new Date(loadedCampaign.startDate).toISOString().split('T')[0] : new Date(now).toISOString().split('T')[0]);
-              setEndDate(loadedCampaign.endDate ? new Date(loadedCampaign.endDate).toISOString().split('T')[0] : new Date(defaultEndDate).toISOString().split('T')[0]);
+              const loadedStartDate = loadedCampaign.startDate ? new Date(loadedCampaign.startDate).toISOString().split('T')[0] : new Date(now).toISOString().split('T')[0];
+              const loadedEndDate = loadedCampaign.endDate ? new Date(loadedCampaign.endDate).toISOString().split('T')[0] : new Date(defaultEndDate).toISOString().split('T')[0];
+              setStartDate(loadedStartDate);
+              setEndDate(loadedEndDate);
+              
+              // Generate QR codes for loaded campaign products/actions
+              const loadedQRCodes = new Map<string, string>();
+              if (loadedCampaign.selectedProducts && loadedCampaign.selectedProducts.length > 0) {
+                loadedCampaign.selectedProducts.forEach((product: string) => {
+                  const qrCode = generateCampaignItemQRCode(
+                    loadedCampaign.businessId,
+                    loadedCampaign.name,
+                    'product',
+                    product,
+                    loadedStartDate,
+                    loadedEndDate
+                  );
+                  loadedQRCodes.set(`product:${product}`, qrCode);
+                });
+              }
+              if (loadedCampaign.selectedActions && loadedCampaign.selectedActions.length > 0) {
+                loadedCampaign.selectedActions.forEach((action: string) => {
+                  const qrCode = generateCampaignItemQRCode(
+                    loadedCampaign.businessId,
+                    loadedCampaign.name,
+                    'action',
+                    action,
+                    loadedStartDate,
+                    loadedEndDate
+                  );
+                  loadedQRCodes.set(`action:${action}`, qrCode);
+                });
+              }
+              setCampaignItemQRCodes(loadedQRCodes);
             }
           } else {
             // Load reward from repository (DB format)
@@ -581,6 +618,36 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
         // NOTE: For edits, this only saves locally (no immediate Redis write)
         // For new campaigns, this also writes to Redis immediately
         await campaignsRepository.save(campaignToSave);
+        
+        // Generate QR codes for each selected product and action
+        const newQRCodes = new Map<string, string>();
+        if (selectedProducts && selectedProducts.length > 0) {
+          selectedProducts.forEach((product) => {
+            const qrCode = generateCampaignItemQRCode(
+              auth.businessId,
+              name,
+              'product',
+              product,
+              startDateISO.split('T')[0], // Just the date part
+              endDateISO.split('T')[0]    // Just the date part
+            );
+            newQRCodes.set(`product:${product}`, qrCode);
+          });
+        }
+        if (selectedActions && selectedActions.length > 0) {
+          selectedActions.forEach((action) => {
+            const qrCode = generateCampaignItemQRCode(
+              auth.businessId,
+              name,
+              'action',
+              action,
+              startDateISO.split('T')[0], // Just the date part
+              endDateISO.split('T')[0]    // Just the date part
+            );
+            newQRCodes.set(`action:${action}`, qrCode);
+          });
+        }
+        setCampaignItemQRCodes(newQRCodes);
         
         // Show success modal for both create and edit
         if (!isEdit) {
@@ -1532,31 +1599,61 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
             <View style={styles.campaignSummary}>
               <Text style={styles.campaignSummaryTitle}>Campaign Summary</Text>
               
-              <View style={styles.summarySection}>
-                <Text style={styles.summaryLabel}>Products defined:</Text>
-                {selectedProducts.length > 0 ? (
-                  <View style={styles.summaryList}>
-                    {selectedProducts.map((product, idx) => (
-                      <Text key={idx} style={styles.summaryItem}>• {product}</Text>
-                    ))}
+              {/* Products Table */}
+              {selectedProducts.length > 0 && (
+                <View style={styles.summaryTable}>
+                  <View style={styles.summaryTableHeader}>
+                    <Text style={styles.summaryTableHeaderText}>Products</Text>
+                    <Text style={styles.summaryTableHeaderText}>QR Code</Text>
                   </View>
-                ) : (
-                  <Text style={styles.summaryEmpty}>None</Text>
-                )}
-              </View>
+                  {selectedProducts.map((product, idx) => (
+                    <View key={`product-${idx}`} style={styles.summaryTableRow}>
+                      <Text style={styles.summaryTableCell}>{product}</Text>
+                      <TouchableOpacity
+                        style={styles.qrCodeButton}
+                        onPress={() => {
+                          const qrKey = `product:${product}`;
+                          const qrValue = campaignItemQRCodes.get(qrKey);
+                          if (qrValue) {
+                            setCampaignQRModalTitle(`Product: ${product}`);
+                            setCampaignQRModalValue(qrValue);
+                            setCampaignQRModalVisible(true);
+                          }
+                        }}>
+                        <Text style={styles.qrCodeButtonText}>View QR</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </View>
+              )}
 
-              <View style={styles.summarySection}>
-                <Text style={styles.summaryLabel}>Actions defined:</Text>
-                {selectedActions.length > 0 ? (
-                  <View style={styles.summaryList}>
-                    {selectedActions.map((action, idx) => (
-                      <Text key={idx} style={styles.summaryItem}>• {action}</Text>
-                    ))}
+              {/* Actions Table */}
+              {selectedActions.length > 0 && (
+                <View style={styles.summaryTable}>
+                  <View style={styles.summaryTableHeader}>
+                    <Text style={styles.summaryTableHeaderText}>Actions</Text>
+                    <Text style={styles.summaryTableHeaderText}>QR Code</Text>
                   </View>
-                ) : (
-                  <Text style={styles.summaryEmpty}>None</Text>
-                )}
-              </View>
+                  {selectedActions.map((action, idx) => (
+                    <View key={`action-${idx}`} style={styles.summaryTableRow}>
+                      <Text style={styles.summaryTableCell}>{action}</Text>
+                      <TouchableOpacity
+                        style={styles.qrCodeButton}
+                        onPress={() => {
+                          const qrKey = `action:${action}`;
+                          const qrValue = campaignItemQRCodes.get(qrKey);
+                          if (qrValue) {
+                            setCampaignQRModalTitle(`Action: ${action}`);
+                            setCampaignQRModalValue(qrValue);
+                            setCampaignQRModalVisible(true);
+                          }
+                        }}>
+                        <Text style={styles.qrCodeButtonText}>View QR</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </View>
+              )}
 
               <View style={styles.summarySection}>
                 <Text style={styles.summaryLabel}>Reward defined:</Text>
@@ -1628,6 +1725,15 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
             setSuccessModalVisible(true);
           }
         }}
+      />
+      
+      {/* Campaign Product/Action QR Code Modal */}
+      <QRCodeModal
+        visible={campaignQRModalVisible}
+        title={campaignQRModalTitle}
+        qrValue={campaignQRModalValue}
+        onClose={() => setCampaignQRModalVisible(false)}
+        showSuccessMessage={false}
       />
       
       {/* Error Modal for Missing Fields */}
@@ -2096,6 +2202,53 @@ const styles = StyleSheet.create({
     color: Colors.text.light,
     fontStyle: 'italic',
     marginLeft: 8,
+  },
+  summaryTable: {
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: Colors.neutral[200],
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  summaryTableHeader: {
+    flexDirection: 'row',
+    backgroundColor: Colors.neutral[100],
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.neutral[200],
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  summaryTableHeaderText: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '700',
+    color: Colors.text.primary,
+  },
+  summaryTableRow: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.neutral[100],
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+  },
+  summaryTableCell: {
+    flex: 1,
+    fontSize: 14,
+    color: Colors.text.primary,
+  },
+  qrCodeButton: {
+    backgroundColor: Colors.primary,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 6,
+    minWidth: 80,
+    alignItems: 'center',
+  },
+  qrCodeButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.background,
   },
   successModal: {
     backgroundColor: Colors.background,
