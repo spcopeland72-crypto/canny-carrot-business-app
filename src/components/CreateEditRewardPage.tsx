@@ -19,112 +19,6 @@ import {businessRepository, rewardsRepository, campaignsRepository} from '../ser
 import {getStoredAuth} from '../services/authService';
 import type {BusinessProfile, Reward, Campaign, CampaignType} from '../types';
 
-// Simple Date Picker Component for Native Mobile
-const DatePickerComponent: React.FC<{
-  initialDate: Date;
-  onDateSelect: (year: number, month: number, day: number) => void;
-  onCancel: () => void;
-}> = ({ initialDate, onDateSelect, onCancel }) => {
-  const [selectedYear, setSelectedYear] = useState(initialDate.getFullYear());
-  const [selectedMonth, setSelectedMonth] = useState(initialDate.getMonth() + 1);
-  const [selectedDay, setSelectedDay] = useState(initialDate.getDate());
-
-  const currentYear = new Date().getFullYear();
-  const years = Array.from({ length: 10 }, (_, i) => currentYear + i);
-  const months = Array.from({ length: 12 }, (_, i) => i + 1);
-  const daysInMonth = new Date(selectedYear, selectedMonth, 0).getDate();
-  const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
-
-  const handleConfirm = () => {
-    onDateSelect(selectedYear, selectedMonth, selectedDay);
-  };
-
-  return (
-    <View style={styles.datePickerContainer}>
-      <View style={styles.datePickerRow}>
-        <View style={styles.datePickerColumn}>
-          <Text style={styles.datePickerLabel}>Year</Text>
-          <ScrollView style={styles.datePickerScroll}>
-            {years.map((year) => (
-              <TouchableOpacity
-                key={year}
-                style={[
-                  styles.datePickerOption,
-                  selectedYear === year && styles.datePickerOptionSelected,
-                ]}
-                onPress={() => setSelectedYear(year)}>
-                <Text
-                  style={[
-                    styles.datePickerOptionText,
-                    selectedYear === year && styles.datePickerOptionTextSelected,
-                  ]}>
-                  {year}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-        <View style={styles.datePickerColumn}>
-          <Text style={styles.datePickerLabel}>Month</Text>
-          <ScrollView style={styles.datePickerScroll}>
-            {months.map((month) => (
-              <TouchableOpacity
-                key={month}
-                style={[
-                  styles.datePickerOption,
-                  selectedMonth === month && styles.datePickerOptionSelected,
-                ]}
-                onPress={() => setSelectedMonth(month)}>
-                <Text
-                  style={[
-                    styles.datePickerOptionText,
-                    selectedMonth === month && styles.datePickerOptionTextSelected,
-                  ]}>
-                  {month}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-        <View style={styles.datePickerColumn}>
-          <Text style={styles.datePickerLabel}>Day</Text>
-          <ScrollView style={styles.datePickerScroll}>
-            {days.map((day) => (
-              <TouchableOpacity
-                key={day}
-                style={[
-                  styles.datePickerOption,
-                  selectedDay === day && styles.datePickerOptionSelected,
-                ]}
-                onPress={() => setSelectedDay(day)}>
-                <Text
-                  style={[
-                    styles.datePickerOptionText,
-                    selectedDay === day && styles.datePickerOptionTextSelected,
-                  ]}>
-                  {day}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-      </View>
-      <View style={styles.modalButtonContainer}>
-        <TouchableOpacity
-          style={[styles.modalButton, styles.cancelButton]}
-          onPress={onCancel}>
-          <Text style={styles.cancelButtonText}>Cancel</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.modalButton, styles.createButton]}
-          onPress={handleConfirm}>
-          <Text style={styles.createButtonText}>Select</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
-};
-
 interface CreateEditRewardPageProps {
   currentScreen: string;
   onNavigate: (screen: string) => void;
@@ -299,6 +193,112 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
+  };
+
+  // Date Picker Component (defined inside CreateEditRewardPage to access styles)
+  const DatePickerComponent: React.FC<{
+    initialDate: Date;
+    onDateSelect: (year: number, month: number, day: number) => void;
+    onCancel: () => void;
+  }> = ({ initialDate, onDateSelect, onCancel }) => {
+    const [selectedYear, setSelectedYear] = useState(initialDate.getFullYear());
+    const [selectedMonth, setSelectedMonth] = useState(initialDate.getMonth() + 1);
+    const [selectedDay, setSelectedDay] = useState(initialDate.getDate());
+
+    const currentYear = new Date().getFullYear();
+    const years = Array.from({ length: 10 }, (_, i) => currentYear + i);
+    const months = Array.from({ length: 12 }, (_, i) => i + 1);
+    const daysInMonth = new Date(selectedYear, selectedMonth, 0).getDate();
+    const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+
+    const handleConfirm = () => {
+      onDateSelect(selectedYear, selectedMonth, selectedDay);
+    };
+
+    return (
+      <View style={styles.datePickerContainer}>
+        <View style={styles.datePickerRow}>
+          <View style={styles.datePickerColumn}>
+            <Text style={styles.datePickerLabel}>Year</Text>
+            <ScrollView style={styles.datePickerScroll}>
+              {years.map((year) => (
+                <TouchableOpacity
+                  key={year}
+                  style={[
+                    styles.datePickerOption,
+                    selectedYear === year && styles.datePickerOptionSelected,
+                  ]}
+                  onPress={() => setSelectedYear(year)}>
+                  <Text
+                    style={[
+                      styles.datePickerOptionText,
+                      selectedYear === year && styles.datePickerOptionTextSelected,
+                    ]}>
+                    {year}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+          <View style={styles.datePickerColumn}>
+            <Text style={styles.datePickerLabel}>Month</Text>
+            <ScrollView style={styles.datePickerScroll}>
+              {months.map((month) => (
+                <TouchableOpacity
+                  key={month}
+                  style={[
+                    styles.datePickerOption,
+                    selectedMonth === month && styles.datePickerOptionSelected,
+                  ]}
+                  onPress={() => setSelectedMonth(month)}>
+                  <Text
+                    style={[
+                      styles.datePickerOptionText,
+                      selectedMonth === month && styles.datePickerOptionTextSelected,
+                    ]}>
+                    {month}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+          <View style={styles.datePickerColumn}>
+            <Text style={styles.datePickerLabel}>Day</Text>
+            <ScrollView style={styles.datePickerScroll}>
+              {days.map((day) => (
+                <TouchableOpacity
+                  key={day}
+                  style={[
+                    styles.datePickerOption,
+                    selectedDay === day && styles.datePickerOptionSelected,
+                  ]}
+                  onPress={() => setSelectedDay(day)}>
+                  <Text
+                    style={[
+                      styles.datePickerOptionText,
+                      selectedDay === day && styles.datePickerOptionTextSelected,
+                    ]}>
+                    {day}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+        <View style={styles.modalButtonContainer}>
+          <TouchableOpacity
+            style={[styles.modalButton, styles.cancelButton]}
+            onPress={onCancel}>
+            <Text style={styles.cancelButtonText}>Cancel</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.modalButton, styles.createButton]}
+            onPress={handleConfirm}>
+            <Text style={styles.createButtonText}>Select</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
   };
 
   // Helper function to parse date string to Date object
