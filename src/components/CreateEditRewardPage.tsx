@@ -124,66 +124,92 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
               // Note: startDate and endDate are stored in the campaign but not editable in this form
               // They are preserved when saving
               
-              // Load reward data - check both new structure (conditions.rewardData) and old structure (reward)
-              let rewardData: any = null;
+              // Load campaign data - USE SAME LOGIC AS REWARDS (direct fields first)
+              // Check direct fields first (same as rewards - this is the working model)
+              const hasDirectFields = loadedCampaign.selectedProducts || loadedCampaign.selectedActions || loadedCampaign.pinCode;
               
-              // New structure: reward data in conditions.rewardData
-              if (loadedCampaign.conditions?.rewardData) {
-                rewardData = loadedCampaign.conditions.rewardData;
-              }
-              // Old structure: reward data in campaign.reward (backward compatibility)
-              else if ((loadedCampaign as any).reward) {
-                const oldReward = (loadedCampaign as any).reward;
-                // Convert old reward structure to new rewardData format
-                rewardData = {
-                  selectedProducts: oldReward.selectedProducts,
-                  selectedActions: oldReward.selectedActions,
-                  pinCode: oldReward.pinCode,
-                  qrCode: oldReward.qrCode,
-                  stampsRequired: oldReward.stampsRequired || oldReward.costStamps,
-                  pointsPerPurchase: oldReward.pointsPerPurchase,
-                  rewardType: oldReward.type === 'discount' ? 'discount' : 
-                             (oldReward.type === 'freebie' || oldReward.type === 'product') ? 'free_product' : 'other',
-                };
-              }
-              
-              if (rewardData) {
-                setRequirement((rewardData.stampsRequired || 10).toString());
-                setPointsPerPurchase((rewardData.pointsPerPurchase || 1).toString());
-                // For campaigns, load the campaign.type; for rewards, use rewardType from rewardData
-                if (isCampaign && loadedCampaign?.type) {
-                  // Check if it's a standard CampaignType or custom
+              if (hasDirectFields) {
+                // Use direct fields (same as rewards) - this is the working model
+                setRequirement((loadedCampaign.conditions?.rewardData?.stampsRequired || 10).toString());
+                setPointsPerPurchase((loadedCampaign.pointsPerPurchase || 1).toString());
+                
+                // For campaigns, load the campaign.type
+                if (loadedCampaign?.type) {
                   const standardTypes: CampaignType[] = ['double_stamps', 'bonus_reward', 'flash_sale', 'referral', 'birthday', 'happy_hour', 'loyalty_tier'];
-                  // Also check legacy reward types that might be in campaigns
                   const legacyRewardTypes = ['free_product', 'discount', 'other'];
                   const allStandardTypes = [...standardTypes, ...legacyRewardTypes];
                   
                   if (allStandardTypes.includes(loadedCampaign.type as any)) {
                     setRewardType(loadedCampaign.type);
-                    setCustomTypeText(''); // Clear custom text for standard types
+                    setCustomTypeText('');
                   } else {
-                    // Custom type - set to 'other' and populate custom text
                     setRewardType('other');
                     setCustomTypeText(loadedCampaign.type);
                   }
-                } else {
-                  setRewardType(rewardData.rewardType || 'bonus_reward');
-                  setCustomTypeText('');
                 }
                 
-                // Determine type based on selectedProducts vs selectedActions
-                if (rewardData.selectedProducts && rewardData.selectedProducts.length > 0) {
+                // Load products/actions from direct fields (same as rewards)
+                if (loadedCampaign.selectedProducts && loadedCampaign.selectedProducts.length > 0) {
                   setType('product');
-                  setSelectedProducts(rewardData.selectedProducts);
-                } else if (rewardData.selectedActions && rewardData.selectedActions.length > 0) {
+                  setSelectedProducts(loadedCampaign.selectedProducts);
+                } else if (loadedCampaign.selectedActions && loadedCampaign.selectedActions.length > 0) {
                   setType('action');
-                  setSelectedActions(rewardData.selectedActions);
+                  setSelectedActions(loadedCampaign.selectedActions);
                 } else {
                   setType('product'); // Default
                 }
                 
-                setPinCode(rewardData.pinCode || '');
+                setPinCode(loadedCampaign.pinCode || '');
               } else {
+                // Fallback: check nested structure (conditions.rewardData) for backward compatibility
+                let rewardData: any = null;
+                
+                if (loadedCampaign.conditions?.rewardData) {
+                  rewardData = loadedCampaign.conditions.rewardData;
+                } else if ((loadedCampaign as any).reward) {
+                  const oldReward = (loadedCampaign as any).reward;
+                  rewardData = {
+                    selectedProducts: oldReward.selectedProducts,
+                    selectedActions: oldReward.selectedActions,
+                    pinCode: oldReward.pinCode,
+                    qrCode: oldReward.qrCode,
+                    stampsRequired: oldReward.stampsRequired || oldReward.costStamps,
+                    pointsPerPurchase: oldReward.pointsPerPurchase,
+                    rewardType: oldReward.type === 'discount' ? 'discount' : 
+                               (oldReward.type === 'freebie' || oldReward.type === 'product') ? 'free_product' : 'other',
+                  };
+                }
+                
+                if (rewardData) {
+                  setRequirement((rewardData.stampsRequired || 10).toString());
+                  setPointsPerPurchase((rewardData.pointsPerPurchase || 1).toString());
+                  
+                  if (loadedCampaign?.type) {
+                    const standardTypes: CampaignType[] = ['double_stamps', 'bonus_reward', 'flash_sale', 'referral', 'birthday', 'happy_hour', 'loyalty_tier'];
+                    const legacyRewardTypes = ['free_product', 'discount', 'other'];
+                    const allStandardTypes = [...standardTypes, ...legacyRewardTypes];
+                    
+                    if (allStandardTypes.includes(loadedCampaign.type as any)) {
+                      setRewardType(loadedCampaign.type);
+                      setCustomTypeText('');
+                    } else {
+                      setRewardType('other');
+                      setCustomTypeText(loadedCampaign.type);
+                    }
+                  }
+                  
+                  if (rewardData.selectedProducts && rewardData.selectedProducts.length > 0) {
+                    setType('product');
+                    setSelectedProducts(rewardData.selectedProducts);
+                  } else if (rewardData.selectedActions && rewardData.selectedActions.length > 0) {
+                    setType('action');
+                    setSelectedActions(rewardData.selectedActions);
+                  } else {
+                    setType('product');
+                  }
+                  
+                  setPinCode(rewardData.pinCode || '');
+                } else {
                 // No reward data, use defaults
                 setRequirement('10');
                 setPointsPerPurchase('1');
@@ -427,7 +453,7 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
           }
         }
         
-        // Save as Campaign with reward data stored in conditions.rewardData
+        // Save as Campaign - USE SAME STRUCTURE AS REWARDS (direct fields, not nested)
         // Use selected rewardType (or customTypeText if "Other") as campaign.type
         const campaignTypeValue = rewardType === 'other' ? customTypeText.trim() : rewardType;
         const campaignToSave: Campaign = {
@@ -441,18 +467,14 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
           endDate: existingCampaign?.endDate || new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString(), // Default to 1 year from now
           status: existingCampaign?.status || 'active',
           targetAudience: existingCampaign?.targetAudience || 'all',
-          conditions: {
-            ...existingCampaign?.conditions,
-            rewardData: {
-              selectedProducts: type === 'product' ? selectedProducts : undefined,
-              selectedActions: type === 'action' ? selectedActions : undefined,
-              pinCode,
-              qrCode: qrCodeValue,
-              stampsRequired: requirementValue,
-              pointsPerPurchase: pointsValue,
-              rewardType: rewardType === 'other' ? customTypeText.trim() : rewardType,
-            },
-          },
+          // Store products/actions/pinCode DIRECTLY (same as rewards) - this is the working model
+          selectedProducts: type === 'product' ? selectedProducts : undefined,
+          selectedActions: type === 'action' ? selectedActions : undefined,
+          pinCode,
+          qrCode: qrCodeValue,
+          pointsPerPurchase: pointsValue,
+          // Preserve existing conditions (if any) but don't duplicate data in rewardData
+          conditions: existingCampaign?.conditions,
           createdAt: existingCampaign?.createdAt || now,
           updatedAt: now,
           stats: existingCampaign?.stats || {

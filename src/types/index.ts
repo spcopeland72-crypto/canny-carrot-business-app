@@ -137,6 +137,12 @@ export interface Campaign {
   createdAt: string;
   updatedAt: string;
   stats: CampaignStats;
+  // App-specific fields (same as Reward - stored directly, not nested)
+  qrCode?: string;                // QR code data
+  pinCode?: string;               // 4-digit PIN for redemption
+  selectedProducts?: string[];    // Product IDs for product campaigns (same as Reward)
+  selectedActions?: string[];     // Action types for action campaigns (same as Reward)
+  pointsPerPurchase?: number;     // Points per purchase/action (same as Reward)
 }
 
 // ============================================
