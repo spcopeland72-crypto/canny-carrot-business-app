@@ -163,7 +163,10 @@ const uploadAllData = async (businessId: string): Promise<{
     if (profile) {
       const profileResponse = await fetch(`${API_BASE_URL}/api/v1/businesses/${businessId}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'X-Sync-Context': 'manual-sync', // Required by Redis write monitor
+        },
         body: JSON.stringify({
           ...profile,
           updatedAt: localTimestamp, // Preserve local timestamp
@@ -201,7 +204,10 @@ const uploadAllData = async (businessId: string): Promise<{
       try {
         const rewardResponse = await fetch(`${API_BASE_URL}/api/v1/rewards`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            'X-Sync-Context': 'manual-sync', // Required by Redis write monitor
+          },
           body: JSON.stringify({
             ...reward,
             businessId: reward.businessId || businessId,
@@ -279,7 +285,10 @@ const uploadAllData = async (businessId: string): Promise<{
         
         const campaignResponse = await fetch(`${API_BASE_URL}/api/v1/campaigns`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            'X-Sync-Context': 'manual-sync', // Required by Redis write monitor
+          },
           body: JSON.stringify(campaignToSend),
         });
         
@@ -338,7 +347,10 @@ const uploadAllData = async (businessId: string): Promise<{
           
           await fetch(`${API_BASE_URL}/api/v1/businesses/${businessId}`, {
             method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+              'Content-Type': 'application/json',
+              'X-Sync-Context': 'manual-sync', // Required by Redis write monitor
+            },
             body: JSON.stringify(updatedBusiness),
           });
         }
