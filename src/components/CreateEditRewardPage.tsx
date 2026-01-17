@@ -61,6 +61,9 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
   const [businessProfile, setBusinessProfile] = useState<BusinessProfile | null>(null);
   const [loadedRewardId, setLoadedRewardId] = useState<string | null>(null);
   const [campaignTypeDropdownVisible, setCampaignTypeDropdownVisible] = useState(false);
+  // Campaign date state (only for campaigns)
+  const [startDate, setStartDate] = useState<string>('');
+  const [endDate, setEndDate] = useState<string>('');
   
   // Product management state
   const [products, setProducts] = useState<string[]>([]);
@@ -123,6 +126,12 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
               setSelectedProducts(loadedCampaign.selectedProducts || []);
               setSelectedActions(loadedCampaign.selectedActions || []);
               setPinCode(loadedCampaign.pinCode || '');
+              
+              // Load campaign dates
+              const now = new Date().toISOString();
+              const defaultEndDate = new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString();
+              setStartDate(loadedCampaign.startDate ? new Date(loadedCampaign.startDate).toISOString().split('T')[0] : new Date(now).toISOString().split('T')[0]);
+              setEndDate(loadedCampaign.endDate ? new Date(loadedCampaign.endDate).toISOString().split('T')[0] : new Date(defaultEndDate).toISOString().split('T')[0]);
             }
           } else {
             // Load reward from repository (DB format)
@@ -171,6 +180,17 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
     loadRewardData();
   }, [isEdit, rewardId, reward]);
   
+  // Initialize campaign dates for new campaigns
+  useEffect(() => {
+    if (isCampaign && !isEdit) {
+      const now = new Date();
+      const defaultEndDate = new Date(now);
+      defaultEndDate.setFullYear(now.getFullYear() + 1);
+      setStartDate(now.toISOString().split('T')[0]);
+      setEndDate(defaultEndDate.toISOString().split('T')[0]);
+    }
+  }, [isCampaign, isEdit]);
+
   // Load products, actions, and business profile on mount
   useEffect(() => {
     const loadInitialData = async () => {
@@ -378,14 +398,18 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
         // Use selected rewardType (or customTypeText if "Other") as campaign.type
         const campaignTypeValue = rewardType === 'other' ? customTypeText.trim() : rewardType;
         // EXACT SAME PATTERN AS REWARDS - copy field order exactly
+        // Convert date strings to ISO format (add time if not present)
+        const startDateISO = startDate ? (startDate.includes('T') ? startDate : `${startDate}T00:00:00.000Z`) : now;
+        const endDateISO = endDate ? (endDate.includes('T') ? endDate : `${endDate}T23:59:59.999Z`) : new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString();
+        
         const campaignToSave: Campaign = {
           id: rewardIdToSave,
           businessId: auth.businessId,
           name,
           description: existingCampaign?.description || '',
           type: (campaignTypeValue || 'bonus_reward') as CampaignType,
-          startDate: existingCampaign?.startDate || now,
-          endDate: existingCampaign?.endDate || new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString(),
+          startDate: startDateISO,
+          endDate: endDateISO,
           status: existingCampaign?.status || 'active',
           targetAudience: existingCampaign?.targetAudience || 'all',
           createdAt: existingCampaign?.createdAt || now,
@@ -1279,6 +1303,33 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
               placeholder="Enter custom reward type"
               placeholderTextColor={Colors.text.light}
             />
+          )}
+
+          {/* Campaign Date Pickers (only for campaigns) */}
+          {isCampaign && (
+            <>
+              <Text style={styles.label}>Start Date *</Text>
+              <TextInput
+                style={styles.input}
+                value={startDate}
+                onChangeText={setStartDate}
+                placeholder="YYYY-MM-DD"
+                placeholderTextColor={Colors.text.light}
+                // @ts-ignore - type="date" works on web
+                type="date"
+              />
+              
+              <Text style={styles.label}>End Date *</Text>
+              <TextInput
+                style={styles.input}
+                value={endDate}
+                onChangeText={setEndDate}
+                placeholder="YYYY-MM-DD"
+                placeholderTextColor={Colors.text.light}
+                // @ts-ignore - type="date" works on web
+                type="date"
+              />
+            </>
           )}
 
           <Text style={styles.label}>4-Digit PIN Code *</Text>

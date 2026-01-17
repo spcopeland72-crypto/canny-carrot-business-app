@@ -252,6 +252,10 @@ const uploadAllData = async (businessId: string): Promise<{
           qrCodeLength: campaign.qrCode?.length || 0,
           hasPointsPerPurchase: !!campaign.pointsPerPurchase,
           pointsPerPurchaseValue: campaign.pointsPerPurchase,
+          hasStartDate: !!campaign.startDate,
+          startDateValue: campaign.startDate,
+          hasEndDate: !!campaign.endDate,
+          endDateValue: campaign.endDate,
           allKeys: Object.keys(campaign),
         });
         
@@ -261,8 +265,19 @@ const uploadAllData = async (businessId: string): Promise<{
           businessId: campaign.businessId || businessId,
         };
         
-        // Debug: Log the actual JSON being sent
-        console.log(`📤 [UNIFIED SYNC] Campaign JSON payload (first 1000 chars):`, JSON.stringify(campaignToSend).substring(0, 1000));
+        // Debug: Log the actual JSON being sent (FULL payload for critical fields check)
+        console.log(`📤 [UNIFIED SYNC] Campaign JSON payload (first 2000 chars):`, JSON.stringify(campaignToSend).substring(0, 2000));
+        console.log(`📤 [UNIFIED SYNC] Campaign FULL JSON payload length:`, JSON.stringify(campaignToSend).length, 'chars');
+        // Log critical fields separately to ensure they're in the payload
+        console.log(`📤 [UNIFIED SYNC] Campaign critical fields in payload:`, {
+          selectedProducts: campaignToSend.selectedProducts,
+          selectedActions: campaignToSend.selectedActions,
+          pinCode: campaignToSend.pinCode,
+          qrCode: campaignToSend.qrCode ? `[${campaignToSend.qrCode.length} chars]` : undefined,
+          pointsPerPurchase: campaignToSend.pointsPerPurchase,
+          startDate: campaignToSend.startDate,
+          endDate: campaignToSend.endDate,
+        });
         
         const campaignResponse = await fetch(`${API_BASE_URL}/api/v1/campaigns`, {
           method: 'POST',
@@ -336,7 +351,7 @@ const uploadAllData = async (businessId: string): Promise<{
           });
           
           if (updateResponse.ok) {
-            console.log(`✅ [UNIFIED SYNC] Business timestamp updated to ${localTimestamp}`);
+            console.log(`✅ [UNIFIED SYNC] Business timestamp updated to ${now}`);
           } else {
             const errorText = await updateResponse.text();
             console.error(`❌ [UNIFIED SYNC] Failed to update business timestamp: ${updateResponse.status} ${errorText.substring(0, 200)}`);
