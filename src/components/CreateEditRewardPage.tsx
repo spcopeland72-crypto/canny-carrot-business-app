@@ -91,122 +91,33 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
               // Store the loaded campaign ID to prevent duplicate creation
               setLoadedRewardId(loadedCampaign.id);
               
-              // Map DB format to UI form fields
+              // Map DB format to UI form fields - EXACT SAME AS REWARDS
               setName(loadedCampaign.name || '');
+              setRequirement((loadedCampaign.conditions?.rewardData?.stampsRequired || 10).toString());
+              setPointsPerPurchase((loadedCampaign.pointsPerPurchase || 1).toString());
               
-              // Note: startDate and endDate are stored in the campaign but not editable in this form
-              // They are preserved when saving
-              
-              // Load campaign data - USE SAME LOGIC AS REWARDS (direct fields first)
-              // Check direct fields first (same as rewards - this is the working model)
-              // IMPORTANT: Check if property exists (not just truthy) - empty arrays are falsy but still valid
-              const hasDirectFields = 'selectedProducts' in loadedCampaign || 
-                                     'selectedActions' in loadedCampaign || 
-                                     'pinCode' in loadedCampaign;
-              
-              if (hasDirectFields) {
-                // Use direct fields (same as rewards) - this is the working model
-                setRequirement((loadedCampaign.conditions?.rewardData?.stampsRequired || 10).toString());
-                setPointsPerPurchase((loadedCampaign.pointsPerPurchase || 1).toString());
+              // For campaigns, load the campaign.type
+              if (loadedCampaign?.type) {
+                const standardTypes: CampaignType[] = ['double_stamps', 'bonus_reward', 'flash_sale', 'referral', 'birthday', 'happy_hour', 'loyalty_tier'];
+                const legacyRewardTypes = ['free_product', 'discount', 'other'];
+                const allStandardTypes = [...standardTypes, ...legacyRewardTypes];
                 
-                // For campaigns, load the campaign.type
-                if (loadedCampaign?.type) {
-                  const standardTypes: CampaignType[] = ['double_stamps', 'bonus_reward', 'flash_sale', 'referral', 'birthday', 'happy_hour', 'loyalty_tier'];
-                  const legacyRewardTypes = ['free_product', 'discount', 'other'];
-                  const allStandardTypes = [...standardTypes, ...legacyRewardTypes];
-                  
-                  if (allStandardTypes.includes(loadedCampaign.type as any)) {
-                    setRewardType(loadedCampaign.type);
-                    setCustomTypeText('');
-                  } else {
-                    setRewardType('other');
-                    setCustomTypeText(loadedCampaign.type);
-                  }
-                }
-                
-                // Load products/actions from direct fields (same as rewards)
-                // IMPORTANT: Check if property exists (not just truthy) - empty arrays are valid
-                console.log('[CreateEditReward] Loading products/actions - selectedProducts in campaign:', 'selectedProducts' in loadedCampaign, 'value:', loadedCampaign.selectedProducts);
-                console.log('[CreateEditReward] Loading products/actions - selectedActions in campaign:', 'selectedActions' in loadedCampaign, 'value:', loadedCampaign.selectedActions);
-                if ('selectedProducts' in loadedCampaign) {
-                  setType('product');
-                  const productsToSet = loadedCampaign.selectedProducts || [];
-                  setSelectedProducts(productsToSet);
-                  console.log('[CreateEditReward] Set selectedProducts to:', productsToSet);
-                } else if ('selectedActions' in loadedCampaign) {
-                  setType('action');
-                  const actionsToSet = loadedCampaign.selectedActions || [];
-                  setSelectedActions(actionsToSet);
-                  console.log('[CreateEditReward] Set selectedActions to:', actionsToSet);
-                } else {
-                  // Default to product type if neither exists
-                  setType('product');
-                  setSelectedProducts([]);
-                  console.log('[CreateEditReward] No products/actions found, defaulting to empty products array');
-                }
-                
-                setPinCode(loadedCampaign.pinCode || '');
-              } else {
-                // Fallback: check nested structure (conditions.rewardData) for backward compatibility
-                let rewardData: any = null;
-                
-                if (loadedCampaign.conditions?.rewardData) {
-                  rewardData = loadedCampaign.conditions.rewardData;
-                } else if ((loadedCampaign as any).reward) {
-                  const oldReward = (loadedCampaign as any).reward;
-                  rewardData = {
-                    selectedProducts: oldReward.selectedProducts,
-                    selectedActions: oldReward.selectedActions,
-                    pinCode: oldReward.pinCode,
-                    qrCode: oldReward.qrCode,
-                    stampsRequired: oldReward.stampsRequired || oldReward.costStamps,
-                    pointsPerPurchase: oldReward.pointsPerPurchase,
-                    rewardType: oldReward.type === 'discount' ? 'discount' : 
-                               (oldReward.type === 'freebie' || oldReward.type === 'product') ? 'free_product' : 'other',
-                  };
-                }
-                
-                if (rewardData) {
-                  setRequirement((rewardData.stampsRequired || 10).toString());
-                  setPointsPerPurchase((rewardData.pointsPerPurchase || 1).toString());
-                  
-                  if (loadedCampaign?.type) {
-                    const standardTypes: CampaignType[] = ['double_stamps', 'bonus_reward', 'flash_sale', 'referral', 'birthday', 'happy_hour', 'loyalty_tier'];
-                    const legacyRewardTypes = ['free_product', 'discount', 'other'];
-                    const allStandardTypes = [...standardTypes, ...legacyRewardTypes];
-                    
-                    if (allStandardTypes.includes(loadedCampaign.type as any)) {
-                      setRewardType(loadedCampaign.type);
-                      setCustomTypeText('');
-                    } else {
-                      setRewardType('other');
-                      setCustomTypeText(loadedCampaign.type);
-                    }
-                  }
-                  
-                  if (rewardData.selectedProducts && rewardData.selectedProducts.length > 0) {
-                    setType('product');
-                    setSelectedProducts(rewardData.selectedProducts);
-                  } else if (rewardData.selectedActions && rewardData.selectedActions.length > 0) {
-                    setType('action');
-                    setSelectedActions(rewardData.selectedActions);
-                  } else {
-                    setType('product');
-                  }
-                  
-                  setPinCode(rewardData.pinCode || '');
-                } else {
-                  // No reward data, use defaults
-                  setRequirement('10');
-                  setPointsPerPurchase('1');
-                  setRewardType(isCampaign ? 'bonus_reward' : 'free_product');
+                if (allStandardTypes.includes(loadedCampaign.type as any)) {
+                  setRewardType(loadedCampaign.type);
                   setCustomTypeText('');
-                  setType('product');
-                  setSelectedProducts([]);
-                  setSelectedActions([]);
-                  setPinCode('');
+                } else {
+                  setRewardType('other');
+                  setCustomTypeText(loadedCampaign.type);
                 }
               }
+              
+              // Default to 'product' for UI type (same as rewards)
+              setType('product');
+              
+              // EXACT SAME AS REWARDS - set both products and actions, no if/else
+              setSelectedProducts(loadedCampaign.selectedProducts || []);
+              setSelectedActions(loadedCampaign.selectedActions || []);
+              setPinCode(loadedCampaign.pinCode || '');
             }
           } else {
             // Load reward from repository (DB format)
