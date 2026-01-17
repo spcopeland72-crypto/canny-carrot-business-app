@@ -435,7 +435,10 @@ export const campaignsRepository = {
       if (!skipMarkDirty) {
         await markDirty(); // Updates top-level lastModified timestamp
       }
-      console.log(`✅ ${campaigns.length} campaigns saved to local repository`);
+      // Only log if not skipping dirty (to avoid duplicate logs)
+      if (!skipMarkDirty) {
+        console.log(`✅ [REPOSITORY] ${campaigns.length} campaigns saved to local repository`);
+      }
     } catch (error) {
       console.error('Error saving campaigns:', error);
       throw error;
@@ -477,18 +480,24 @@ export const campaignsRepository = {
     const campaigns = await campaignsRepository.getAll();
     const index = campaigns.findIndex(c => c.id === campaign.id);
     const now = new Date().toISOString();
+    const isEdit = index >= 0;
     
-    if (index >= 0) {
+    if (isEdit) {
       campaigns[index] = { ...campaign, updatedAt: now };
+      console.log(`✅ [REPOSITORY] Updating campaign "${campaign.name}" (${campaign.id}) in local repository`);
     } else {
       campaigns.push({ ...campaign, createdAt: now, updatedAt: now });
+      console.log(`✅ [REPOSITORY] Adding new campaign "${campaign.name}" (${campaign.id}) to local repository`);
     }
     
     // saveAll() will call markDirty() which updates top-level lastModified timestamp
     await campaignsRepository.saveAll(campaigns);
+    console.log(`✅ [REPOSITORY] Saved ${campaigns.length} campaigns total (${isEdit ? 'updated' : 'created'} 1 campaign)`);
     
-    // IMMEDIATELY write to Redis
-    try {
+    // IMMEDIATELY write to Redis ONLY for new campaigns (not edits)
+    // Edits should only sync on manual sync or logout
+    if (!isEdit) {
+      try {
       const { getStoredAuth } = await import('./authService');
       const auth = await getStoredAuth();
       if (auth?.businessId && (campaign as any).businessId) {
@@ -565,12 +574,15 @@ export const campaignsRepository = {
           }
         } else {
           const errorText = await response.text();
-          console.error(`❌ [REPOSITORY] Failed to write campaign to Redis: ${response.status} ${errorText.substring(0, 200)}`);
+          console.error(`❌ [REPOSITORY] Failed to write new campaign to Redis: ${response.status} ${errorText.substring(0, 200)}`);
         }
       }
     } catch (redisError: any) {
-      console.error('[REPOSITORY] Error writing campaign to Redis:', redisError.message);
+      console.error('[REPOSITORY] Error writing new campaign to Redis:', redisError.message);
       // Don't fail the save if Redis write fails - local save already succeeded
+    }
+    } else {
+      console.log(`ℹ️ [REPOSITORY] Campaign edit - skipping immediate Redis write (will sync on manual sync or logout)`);
     }
   },
 

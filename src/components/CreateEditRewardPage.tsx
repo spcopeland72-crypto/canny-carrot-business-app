@@ -155,16 +155,23 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
                 
                 // Load products/actions from direct fields (same as rewards)
                 // IMPORTANT: Check if property exists (not just truthy) - empty arrays are valid
+                console.log('[CreateEditReward] Loading products/actions - selectedProducts in campaign:', 'selectedProducts' in loadedCampaign, 'value:', loadedCampaign.selectedProducts);
+                console.log('[CreateEditReward] Loading products/actions - selectedActions in campaign:', 'selectedActions' in loadedCampaign, 'value:', loadedCampaign.selectedActions);
                 if ('selectedProducts' in loadedCampaign) {
                   setType('product');
-                  setSelectedProducts(loadedCampaign.selectedProducts || []);
+                  const productsToSet = loadedCampaign.selectedProducts || [];
+                  setSelectedProducts(productsToSet);
+                  console.log('[CreateEditReward] Set selectedProducts to:', productsToSet);
                 } else if ('selectedActions' in loadedCampaign) {
                   setType('action');
-                  setSelectedActions(loadedCampaign.selectedActions || []);
+                  const actionsToSet = loadedCampaign.selectedActions || [];
+                  setSelectedActions(actionsToSet);
+                  console.log('[CreateEditReward] Set selectedActions to:', actionsToSet);
                 } else {
                   // Default to product type if neither exists
                   setType('product');
                   setSelectedProducts([]);
+                  console.log('[CreateEditReward] No products/actions found, defaulting to empty products array');
                 }
                 
                 setPinCode(loadedCampaign.pinCode || '');
@@ -496,14 +503,13 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
         console.log('[CreateEditReward] Saving campaign:', campaignToSave);
         console.log('[CreateEditReward] Campaign selectedProducts:', campaignToSave.selectedProducts);
         console.log('[CreateEditReward] Campaign selectedActions:', campaignToSave.selectedActions);
+        console.log('[CreateEditReward] Form state - type:', type, 'selectedProducts:', selectedProducts, 'selectedActions:', selectedActions);
+        console.log('[CreateEditReward] Full campaignToSave object:', JSON.stringify(campaignToSave, null, 2));
         
-        // Save to campaigns repository (DB format) - this will also write to Redis
+        // Save to campaigns repository (DB format)
+        // NOTE: For edits, this only saves locally (no immediate Redis write)
+        // For new campaigns, this also writes to Redis immediately
         await campaignsRepository.save(campaignToSave);
-        
-        // Verify the save by loading it back
-        const savedCampaign = await campaignsRepository.getById(rewardIdToSave);
-        console.log('[CreateEditReward] Campaign saved and verified:', savedCampaign);
-        console.log('[CreateEditReward] Saved campaign selectedProducts:', savedCampaign?.selectedProducts);
         
         // Show success modal for both create and edit
         if (!isEdit) {
