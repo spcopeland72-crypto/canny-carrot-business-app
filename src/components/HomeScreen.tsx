@@ -1082,13 +1082,16 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
               
               return (
                 <View style={styles.campaignItemsGridContainer}>
-                  <View style={[styles.campaignItemsGrid, {flexDirection: 'row', flexWrap: 'wrap'}]}>
-                    {items.map((item, idx) => (
+                  <View style={[styles.campaignItemsGrid, {flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center'}]}>
+                    {items.map((item, idx) => {
+                      // Calculate width: for 2x2, use ~48% (allowing for margins), for 3x3 use ~31%
+                      const itemWidth = gridSize === 2 ? '48%' : '31%';
+                      return (
                       <TouchableOpacity
                         key={`${item.type}-${idx}`}
                         style={[
                           styles.campaignItemBox,
-                          {width: `${100 / itemsPerRow}%`, padding: 8}
+                          {width: itemWidth, padding: 8}
                         ]}
                         onPress={() => {
                           const qrKey = `${item.type}:${item.name}`;
@@ -1104,7 +1107,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                           {item.name}
                         </Text>
                       </TouchableOpacity>
-                    ))}
+                      );
+                    })}
                   </View>
                   
                   <View style={styles.campaignItemsModalButtons}>
