@@ -138,9 +138,9 @@ const uploadAllData = async (businessId: string): Promise<{
 
   try {
     // Get local repository timestamp
-    const localTimestamp = await getLocalRepositoryTimestamp();
-
     // Upload business profile (includes products)
+    // Use CURRENT time for timestamp - sync is a current action, not preserving old timestamp
+    const now = new Date().toISOString();
     const profile = await businessRepository.get();
     if (profile) {
       const profileResponse = await fetch(`${API_BASE_URL}/api/v1/businesses/${businessId}`, {
@@ -151,7 +151,7 @@ const uploadAllData = async (businessId: string): Promise<{
         },
         body: JSON.stringify({
           ...profile,
-          updatedAt: localTimestamp, // Preserve local timestamp
+          updatedAt: now, // Use current time - sync is happening now
         }),
       });
       
@@ -279,7 +279,7 @@ const uploadAllData = async (businessId: string): Promise<{
     }
     console.log(`  ✅ Uploaded ${result.customers}/${allCustomers.length} customers`);
 
-    // Update business.updatedAt in Redis to match local timestamp
+    // Update business.updatedAt in Redis to current time (sync just happened)
     try {
       const businessResponse = await fetch(`${API_BASE_URL}/api/v1/businesses/${businessId}`, {
         method: 'GET',
@@ -291,7 +291,7 @@ const uploadAllData = async (businessId: string): Promise<{
         if (businessResult.success && businessResult.data) {
           const updatedBusiness = {
             ...businessResult.data,
-            updatedAt: localTimestamp, // Preserve local timestamp
+            updatedAt: now, // Use current time - sync just completed
           };
           
           const updateResponse = await fetch(`${API_BASE_URL}/api/v1/businesses/${businessId}`, {
