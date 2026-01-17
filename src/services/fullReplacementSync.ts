@@ -210,55 +210,17 @@ const writeAllCampaigns = async (campaigns: Campaign[], businessId: string): Pro
   
   for (const campaign of campaigns) {
     try {
-      // Normalize campaign to ensure all required fields are present
-      // IMPORTANT: Include ALL fields from local campaign, including selectedProducts, selectedActions, pinCode, qrCode
-      const now = new Date().toISOString();
-      const campaignToSend: Campaign = {
-        id: campaign.id,
-        businessId: campaign.businessId || businessId,
-        name: campaign.name || 'Unnamed Campaign',
-        description: campaign.description || '',
-        type: campaign.type || 'bonus_reward', // Required: default to 'bonus_reward'
-        startDate: campaign.startDate || now, // Required: default to now
-        endDate: campaign.endDate || new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString(), // Required: default to 1 year from now
-        status: campaign.status || 'active',
-        targetAudience: campaign.targetAudience || 'all',
-        conditions: campaign.conditions || {},
-        createdAt: campaign.createdAt || now,
-        updatedAt: campaign.updatedAt || now,
-        stats: campaign.stats || { impressions: 0, clicks: 0, conversions: 0 },
-        // Include direct fields (same as rewards) - selectedProducts, selectedActions, pinCode, qrCode, pointsPerPurchase
-        selectedProducts: campaign.selectedProducts || [],
-        selectedActions: campaign.selectedActions || [],
-        pinCode: campaign.pinCode,
-        qrCode: campaign.qrCode,
-        pointsPerPurchase: campaign.pointsPerPurchase,
-        ...(campaign.objective && { objective: campaign.objective }),
-        ...(campaign.segmentId && { segmentId: campaign.segmentId }),
-        ...(campaign.channelMasks && { channelMasks: campaign.channelMasks }),
-        ...(campaign.notificationMessage && { notificationMessage: campaign.notificationMessage }),
-        ...(campaign.customerProgress && { customerProgress: campaign.customerProgress }),
-      };
-      
-      // Validate required fields before sending
-      if (!campaignToSend.businessId || !campaignToSend.name || !campaignToSend.type || !campaignToSend.startDate || !campaignToSend.endDate) {
-        console.error(`  ❌ Campaign "${campaign.name}" missing required fields:`, {
-          businessId: !!campaignToSend.businessId,
-          name: !!campaignToSend.name,
-          type: !!campaignToSend.type,
-          startDate: !!campaignToSend.startDate,
-          endDate: !!campaignToSend.endDate,
-        });
-        continue; // Skip invalid campaigns
-      }
-      
+      // Same pattern as rewards - simple spread, no normalization
       const response = await fetch(`${API_BASE_URL}/api/v1/campaigns`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
           'X-Sync-Context': 'logout', // Required by Redis write monitor
         },
-        body: JSON.stringify(campaignToSend),
+        body: JSON.stringify({
+          ...campaign,
+          businessId: campaign.businessId || businessId,
+        }),
       });
       
       if (response.ok) {
