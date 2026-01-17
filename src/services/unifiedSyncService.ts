@@ -228,17 +228,39 @@ const uploadAllData = async (businessId: string): Promise<{
     // Upload all local campaigns (same pattern as rewards - simple spread, no normalization)
     const allCampaigns = await campaignsRepository.getAll();
     console.log(`📤 [UNIFIED SYNC] Uploading ${allCampaigns.length} campaigns`);
+    
+    // Debug: Log first campaign's actual keys to see what fields exist
+    if (allCampaigns.length > 0) {
+      const firstCampaign = allCampaigns[0];
+      console.log(`🔍 [UNIFIED SYNC] First campaign keys:`, Object.keys(firstCampaign));
+      console.log(`🔍 [UNIFIED SYNC] First campaign full object:`, JSON.stringify(firstCampaign).substring(0, 500));
+    }
+    
     for (const campaign of allCampaigns) {
       try {
         // Debug: Log what we're sending
-        console.log(`📤 [UNIFIED SYNC] Campaign "${campaign.name}":`, {
+        console.log(`📤 [UNIFIED SYNC] Campaign "${campaign.name}" (ID: ${campaign.id}):`, {
           hasSelectedProducts: !!campaign.selectedProducts,
           selectedProductsCount: campaign.selectedProducts?.length || 0,
+          selectedProductsValue: campaign.selectedProducts,
           hasSelectedActions: !!campaign.selectedActions,
           selectedActionsCount: campaign.selectedActions?.length || 0,
+          selectedActionsValue: campaign.selectedActions,
           hasPinCode: !!campaign.pinCode,
+          pinCodeValue: campaign.pinCode,
           hasQrCode: !!campaign.qrCode,
+          qrCodeLength: campaign.qrCode?.length || 0,
+          hasPointsPerPurchase: !!campaign.pointsPerPurchase,
+          pointsPerPurchaseValue: campaign.pointsPerPurchase,
+          allKeys: Object.keys(campaign),
         });
+        
+        // Debug: Log the actual JSON being sent
+        const campaignToSend = {
+          ...campaign,
+          businessId: campaign.businessId || businessId,
+        };
+        console.log(`📤 [UNIFIED SYNC] Campaign JSON payload (first 1000 chars):`, JSON.stringify(campaignToSend).substring(0, 1000));
         
         const campaignResponse = await fetch(`${API_BASE_URL}/api/v1/campaigns`, {
           method: 'POST',
