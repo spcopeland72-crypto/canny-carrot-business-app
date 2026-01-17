@@ -242,6 +242,7 @@ const uploadAllData = async (businessId: string): Promise<{
     for (const campaign of allCampaigns) {
       try {
         // Normalize campaign to ensure all required fields are present
+        // IMPORTANT: Include ALL fields from campaign, including selectedProducts, selectedActions, pinCode, qrCode
         const now = new Date().toISOString();
         const campaignToSend: Campaign = {
           id: campaign.id,
@@ -257,6 +258,12 @@ const uploadAllData = async (businessId: string): Promise<{
           createdAt: campaign.createdAt || now,
           updatedAt: campaign.updatedAt || now,
           stats: campaign.stats || { impressions: 0, clicks: 0, conversions: 0 },
+          // Include direct fields (same as rewards) - selectedProducts, selectedActions, pinCode, qrCode, pointsPerPurchase
+          ...(campaign.selectedProducts !== undefined && { selectedProducts: campaign.selectedProducts }),
+          ...(campaign.selectedActions !== undefined && { selectedActions: campaign.selectedActions }),
+          ...(campaign.pinCode !== undefined && { pinCode: campaign.pinCode }),
+          ...(campaign.qrCode !== undefined && { qrCode: campaign.qrCode }),
+          ...(campaign.pointsPerPurchase !== undefined && { pointsPerPurchase: campaign.pointsPerPurchase }),
           ...(campaign.objective && { objective: campaign.objective }),
           ...(campaign.segmentId && { segmentId: campaign.segmentId }),
           ...(campaign.channelMasks && { channelMasks: campaign.channelMasks }),
