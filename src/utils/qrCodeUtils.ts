@@ -146,16 +146,13 @@ export const parseQRCode = (qrValue: string): ParsedQR => {
   }
   
   // Handle REWARD QR codes
+  // Format: REWARD:{businessId}:{id}:{name}:{requirement}:{rewardType}:{products}:{pinCode}
   if (normalizedQr.startsWith('REWARD:')) {
     const withoutPrefix = normalizedQr.substring(7); // Remove 'REWARD:'
     const parts = withoutPrefix.split(':');
     
-    if (parts.length < 2) {
-      return { type: 'unknown', data: null };
-    }
-    
     if (parts.length >= 7) {
-      // New format with businessId and PIN: {businessId}:{id}:{name}:{requirement}:{rewardType}:{products}:{pinCode}
+      // Format with businessId and PIN: {businessId}:{id}:{name}:{requirement}:{rewardType}:{products}:{pinCode}
       const businessId = parts[0] || '';
       const id = parts[1] || 'unknown';
       const pinCode = parts[parts.length - 1] || '';
@@ -178,64 +175,10 @@ export const parseQRCode = (qrValue: string): ParsedQR => {
           pinCode,
         },
       };
-    } else if (parts.length >= 6) {
-      // Legacy format with PIN but no businessId: {id}:{name}:{requirement}:{rewardType}:{products}:{pinCode}
-      const id = parts[0] || 'unknown';
-      const pinCode = parts[parts.length - 1] || '';
-      const productsStr = parts[parts.length - 2] || '';
-      const rewardType = parts[parts.length - 3] || 'free_product';
-      const requirement = parseInt(parts[parts.length - 4], 10) || 1;
-      // Everything between id and requirement is the name
-      const name = parts.slice(1, parts.length - 4).join(':') || 'Unnamed Reward';
-      const products = productsStr ? productsStr.split(',').filter(p => p.trim()) : [];
-      
-      return {
-        type: 'reward',
-        data: {
-          id,
-          name,
-          requirement,
-          rewardType,
-          products,
-          pinCode,
-        },
-      };
-    } else if (parts.length >= 5) {
-      // Legacy format without PIN: {id}:{name}:{requirement}:{rewardType}:{products}
-      const id = parts[0] || 'unknown';
-      const productsStr = parts[parts.length - 1] || '';
-      const rewardType = parts[parts.length - 2] || 'free_product';
-      const requirement = parseInt(parts[parts.length - 3], 10) || 1;
-      // Everything between id and requirement is the name
-      const name = parts.slice(1, parts.length - 3).join(':') || 'Unnamed Reward';
-      const products = productsStr ? productsStr.split(',').filter(p => p.trim()) : [];
-      
-      return {
-        type: 'reward',
-        data: {
-          id,
-          name,
-          requirement,
-          rewardType,
-          products,
-        },
-      };
-    } else {
-      // Minimal format: {id}:{name} (or {id}:{name}:{requirement} etc.)
-      const id = parts[0] || 'unknown';
-      const name = parts.slice(1).join(':') || 'Unnamed Reward';
-      
-      return {
-        type: 'reward',
-        data: {
-          id,
-          name,
-          requirement: 1,
-          rewardType: 'free_product',
-          products: [],
-        },
-      };
     }
+    
+    // Invalid format
+    return { type: 'unknown', data: null };
   }
   
   return { type: 'unknown', data: null };
