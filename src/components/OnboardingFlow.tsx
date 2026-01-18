@@ -148,7 +148,8 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({onComplete, onSkip}) => 
             website: profile.website,
             socialMedia: profile.socialMedia,
           } : undefined,
-          1 // points per purchase
+          1, // points per purchase
+          businessId // business ID from registration
         );
       } catch (qrError) {
         console.error('[Onboarding] Error generating QR code:', qrError);

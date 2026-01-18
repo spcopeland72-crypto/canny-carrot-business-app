@@ -1189,6 +1189,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                 website: '',
                 socialMedia: {},
               };
+              const auth = await getStoredAuth();
               qrValue = generateRewardQRCode(
                 selectedRewardForQR.id,
                 selectedRewardForQR.name,
@@ -1199,7 +1200,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                 selectedRewardForQR.selectedActions,
                 selectedRewardForQR.pinCode,
                 businessProfile,
-                selectedRewardForQR.pointsPerPurchase
+                selectedRewardForQR.pointsPerPurchase,
+                auth?.businessId || selectedRewardForQR.businessId
               );
             } catch (error) {
               console.error('[HomeScreen] Error generating QR code:', error);
