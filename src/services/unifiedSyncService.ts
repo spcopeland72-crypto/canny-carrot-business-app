@@ -210,89 +210,72 @@ const uploadAllData = async (businessId: string): Promise<{
     }
     console.log(`  ✅ Uploaded ${result.rewards}/${activeRewards.length} rewards`);
 
-    // Delete all existing campaigns in Redis first (full replacement)
+    // Get existing campaigns from Redis to determine which to update vs create
     const existingCampaignsResponse = await fetch(`${API_BASE_URL}/api/v1/campaigns?businessId=${businessId}`);
+    const existingCampaignIds = new Set<string>();
     if (existingCampaignsResponse.ok) {
       const existingCampaignsResult = await existingCampaignsResponse.json();
       if (existingCampaignsResult.success && Array.isArray(existingCampaignsResult.data)) {
         for (const campaign of existingCampaignsResult.data) {
-          try {
-            await fetch(`${API_BASE_URL}/api/v1/campaigns/${campaign.id}`, { method: 'DELETE' });
-          } catch (error) {
-            // Continue even if delete fails
-          }
+          existingCampaignIds.add(campaign.id);
         }
       }
     }
 
-    // Upload all local campaigns (same pattern as rewards - simple spread, no normalization)
+    // Get local campaigns
     const allCampaigns = await campaignsRepository.getAll();
-    console.log(`📤 [UNIFIED SYNC] Uploading ${allCampaigns.length} campaigns`);
+    console.log(`📤 [UNIFIED SYNC] Uploading ${allCampaigns.length} campaigns (${existingCampaignIds.size} existing in Redis)`);
     
-    // Debug: Log first campaign's actual keys to see what fields exist
-    if (allCampaigns.length > 0) {
-      const firstCampaign = allCampaigns[0];
-      console.log(`🔍 [UNIFIED SYNC] First campaign keys:`, Object.keys(firstCampaign));
-      console.log(`🔍 [UNIFIED SYNC] First campaign full object:`, JSON.stringify(firstCampaign).substring(0, 500));
-    }
+    // Track which campaigns we've uploaded
+    const uploadedCampaignIds = new Set<string>();
     
     for (const campaign of allCampaigns) {
       try {
-        // Debug: Log what we're sending
-        console.log(`📤 [UNIFIED SYNC] Campaign "${campaign.name}" (ID: ${campaign.id}):`, {
-          hasSelectedProducts: !!campaign.selectedProducts,
-          selectedProductsCount: campaign.selectedProducts?.length || 0,
-          selectedProductsValue: campaign.selectedProducts,
-          hasSelectedActions: !!campaign.selectedActions,
-          selectedActionsCount: campaign.selectedActions?.length || 0,
-          selectedActionsValue: campaign.selectedActions,
-          hasPinCode: !!campaign.pinCode,
-          pinCodeValue: campaign.pinCode,
-          hasQrCode: !!campaign.qrCode,
-          qrCodeLength: campaign.qrCode?.length || 0,
-          hasPointsPerPurchase: !!campaign.pointsPerPurchase,
-          pointsPerPurchaseValue: campaign.pointsPerPurchase,
-          hasStartDate: !!campaign.startDate,
-          startDateValue: campaign.startDate,
-          hasEndDate: !!campaign.endDate,
-          endDateValue: campaign.endDate,
-          allKeys: Object.keys(campaign),
-        });
-        
-        // Create campaign object to send (same pattern as rewards - simple spread)
+        if (!campaign.id) {
+          console.error(`  ❌ Campaign "${campaign.name}" has no ID - skipping`);
+          continue;
+        }
+
+        // Create campaign object to send
         const campaignToSend = {
           ...campaign,
           businessId: campaign.businessId || businessId,
         };
         
-        // Debug: Log the actual JSON being sent (FULL payload for critical fields check)
-        console.log(`📤 [UNIFIED SYNC] Campaign JSON payload (first 2000 chars):`, JSON.stringify(campaignToSend).substring(0, 2000));
-        console.log(`📤 [UNIFIED SYNC] Campaign FULL JSON payload length:`, JSON.stringify(campaignToSend).length, 'chars');
-        // Log critical fields separately to ensure they're in the payload
-        console.log(`📤 [UNIFIED SYNC] Campaign critical fields in payload:`, {
-          selectedProducts: campaignToSend.selectedProducts,
-          selectedActions: campaignToSend.selectedActions,
-          pinCode: campaignToSend.pinCode,
-          qrCode: campaignToSend.qrCode ? `[${campaignToSend.qrCode.length} chars]` : undefined,
-          pointsPerPurchase: campaignToSend.pointsPerPurchase,
-          startDate: campaignToSend.startDate,
-          endDate: campaignToSend.endDate,
-        });
+        // Use PUT if campaign exists in Redis, POST if new (POST now preserves ID if provided)
+        let campaignResponse: Response;
+        const campaignExists = campaign.id && existingCampaignIds.has(campaign.id);
         
-        const campaignResponse = await fetch(`${API_BASE_URL}/api/v1/campaigns`, {
-          method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json',
-            'X-Sync-Context': 'manual-sync', // Required by Redis write monitor
-          },
-          body: JSON.stringify(campaignToSend),
-        });
+        if (campaignExists) {
+          // Campaign exists in Redis - use PUT to update
+          console.log(`📤 [UNIFIED SYNC] PUT campaign "${campaign.name}" (ID: ${campaign.id}) - updating existing`);
+          campaignResponse = await fetch(`${API_BASE_URL}/api/v1/campaigns/${campaign.id}`, {
+            method: 'PUT',
+            headers: { 
+              'Content-Type': 'application/json',
+              'X-Sync-Context': 'manual-sync',
+            },
+            body: JSON.stringify(campaignToSend),
+          });
+        } else {
+          // Campaign doesn't exist - use POST (will preserve ID if provided in body)
+          console.log(`📤 [UNIFIED SYNC] POST campaign "${campaign.name}" (ID: ${campaign.id || 'new'}) - creating`);
+          campaignResponse = await fetch(`${API_BASE_URL}/api/v1/campaigns`, {
+            method: 'POST',
+            headers: { 
+              'Content-Type': 'application/json',
+              'X-Sync-Context': 'manual-sync',
+            },
+            body: JSON.stringify(campaignToSend), // Includes id field if present
+          });
+        }
         
         if (campaignResponse.ok) {
           result.campaigns++;
+          uploadedCampaignIds.add(campaign.id);
         } else {
           const errorText = await campaignResponse.text();
-          console.error(`  ❌ Failed to upload campaign "${campaign.name}": ${campaignResponse.status} ${errorText.substring(0, 200)}`);
+          console.error(`  ❌ Failed to sync campaign "${campaign.name}": ${campaignResponse.status} ${errorText.substring(0, 200)}`);
           return result; // Fail early - all or nothing
         }
       } catch (error: any) {
@@ -300,6 +283,23 @@ const uploadAllData = async (businessId: string): Promise<{
         return result; // Fail early - all or nothing
       }
     }
+
+    // Delete campaigns from Redis that no longer exist locally
+    for (const existingId of existingCampaignIds) {
+      if (!uploadedCampaignIds.has(existingId)) {
+        try {
+          console.log(`🗑️ [UNIFIED SYNC] Deleting campaign ${existingId} (no longer in local repository)`);
+          await fetch(`${API_BASE_URL}/api/v1/campaigns/${existingId}`, { 
+            method: 'DELETE',
+            headers: { 'X-Sync-Context': 'manual-sync' },
+          });
+        } catch (error) {
+          console.error(`  ❌ Failed to delete campaign ${existingId}:`, error);
+          // Continue - don't fail sync if delete fails
+        }
+      }
+    }
+    
     console.log(`  ✅ Uploaded ${result.campaigns}/${allCampaigns.length} campaigns`);
 
     // Upload all local customers
