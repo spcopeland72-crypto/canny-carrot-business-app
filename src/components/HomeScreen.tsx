@@ -791,35 +791,44 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                     if (fullCampaign) {
                       setSelectedCampaign(fullCampaign as Campaign);
                       
-                      // Generate QR codes for products/actions
                       const auth = await getStoredAuth();
+                      const profile = await businessRepository.get();
+                      const businessName = profile?.name ?? '';
                       const qrCodes = new Map<string, string>();
                       
                       const startDate = fullCampaign.startDate ? new Date(fullCampaign.startDate).toISOString().split('T')[0] : '';
                       const endDate = fullCampaign.endDate ? new Date(fullCampaign.endDate).toISOString().split('T')[0] : '';
                       
-                      if (fullCampaign.selectedProducts && fullCampaign.selectedProducts.length > 0 && auth?.businessId) {
-                        fullCampaign.selectedProducts.forEach((product: string) => {
+                      const prods = fullCampaign.selectedProducts || [];
+                      const acts = fullCampaign.selectedActions || [];
+                      if (prods.length > 0 && auth?.businessId) {
+                        prods.forEach((product: string) => {
                           const qrCode = generateCampaignItemQRCode(
                             auth.businessId,
+                            businessName,
                             fullCampaign.name,
                             'product',
                             product,
                             startDate,
-                            endDate
+                            endDate,
+                            prods,
+                            acts
                           );
                           qrCodes.set(`product:${product}`, qrCode);
                         });
                       }
-                      if (fullCampaign.selectedActions && fullCampaign.selectedActions.length > 0 && auth?.businessId) {
-                        fullCampaign.selectedActions.forEach((action: string) => {
+                      if (acts.length > 0 && auth?.businessId) {
+                        acts.forEach((action: string) => {
                           const qrCode = generateCampaignItemQRCode(
                             auth.businessId,
+                            businessName,
                             fullCampaign.name,
                             'action',
                             action,
                             startDate,
-                            endDate
+                            endDate,
+                            prods,
+                            acts
                           );
                           qrCodes.set(`action:${action}`, qrCode);
                         });

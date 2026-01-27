@@ -5,9 +5,10 @@
  * for reward codes, campaign codes, and business codes.
  * 
  * Formats:
- * - Reward: REWARD:{businessId}:{id}:{name}:{requirement}:{rewardType}:{products}:{pinCode}
+ * - Reward: REWARD:{businessId}:{businessName}:{id}:{name}:{requirement}:{rewardType}:{products}:{pinCode}
  * - Company: COMPANY:{number}:{name}
  * - Campaign: CAMPAIGN:{id}:{name}:{description}
+ * - Campaign item: CAMPAIGN_ITEM:{businessId}:{businessName}:{campaignName}:{itemType}:{itemName}:{startDate}:{endDate}
  */
 
 export interface ParsedRewardQR {
@@ -39,7 +40,7 @@ export type ParsedQR =
 
 /**
  * Generate QR code for a reward
- * Format: REWARD:{businessId}:{id}:{name}:{requirement}:{rewardType}:{products}:{pinCode}
+ * Format: REWARD:{businessId}:{businessName}:{id}:{name}:{requirement}:{rewardType}:{products}:{pinCode}
  */
 export const generateRewardQRCode = (
   id: string,
@@ -58,7 +59,10 @@ export const generateRewardQRCode = (
     : '';
   const pinCodeValue = pinCode || '';
   const businessIdValue = businessId || '';
-  return `REWARD:${businessIdValue}:${id}:${name}:${requirement}:${rewardType}:${productsValue}:${pinCodeValue}`;
+  const businessNameValue = (businessProfile?.name ?? '')
+    .replace(/:/g, '-')
+    .trim() || '';
+  return `REWARD:${businessIdValue}:${businessNameValue}:${id}:${name}:${requirement}:${rewardType}:${productsValue}:${pinCodeValue}`;
 };
 
 /**
@@ -90,18 +94,26 @@ export const generateCampaignQRCode = (
 };
 
 /**
- * Generate QR code for a campaign product or action
- * Format: CAMPAIGN_ITEM:{businessId}:{campaignName}:{itemType}:{itemName}:{startDate}:{endDate}
+ * Generate QR code for a campaign product or action.
+ * Each QR embeds ALL campaign data (all products + all actions) so the customer app
+ * can store it locally on first scan. Delimiter || for lists; names must not contain ||.
+ * Format: CAMPAIGN_ITEM:{businessId}:{businessName}:{campaignName}:{itemType}:{itemName}:{startDate}:{endDate}:{productsPart}:{actionsPart}
  */
 export const generateCampaignItemQRCode = (
   businessId: string,
+  businessName: string,
   campaignName: string,
   itemType: 'product' | 'action',
   itemName: string,
   startDate: string,
-  endDate: string
+  endDate: string,
+  allProducts?: string[],
+  allActions?: string[]
 ): string => {
-  return `CAMPAIGN_ITEM:${businessId}:${campaignName}:${itemType}:${itemName}:${startDate}:${endDate}`;
+  const safeBusinessName = (businessName ?? '').replace(/:/g, '-').trim();
+  const productsPart = (allProducts && allProducts.length > 0) ? allProducts.join('||') : '';
+  const actionsPart = (allActions && allActions.length > 0) ? allActions.join('||') : '';
+  return `CAMPAIGN_ITEM:${businessId}:${safeBusinessName}:${campaignName}:${itemType}:${itemName}:${startDate}:${endDate}:${productsPart}:${actionsPart}`;
 };
 
 /**

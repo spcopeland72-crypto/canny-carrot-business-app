@@ -148,29 +148,39 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
               setEndDate(loadedEndDate);
               
               // Generate QR codes for loaded campaign products/actions
+              const profile = await businessRepository.get();
+              const businessName = profile?.name ?? '';
               const loadedQRCodes = new Map<string, string>();
-              if (loadedCampaign.selectedProducts && loadedCampaign.selectedProducts.length > 0) {
-                loadedCampaign.selectedProducts.forEach((product: string) => {
+              const prods = loadedCampaign.selectedProducts || [];
+              const acts = loadedCampaign.selectedActions || [];
+              if (prods.length > 0) {
+                prods.forEach((product: string) => {
                   const qrCode = generateCampaignItemQRCode(
-                    loadedCampaign.businessId,
+                    loadedCampaign.businessId ?? '',
+                    businessName,
                     loadedCampaign.name,
                     'product',
                     product,
                     loadedStartDate,
-                    loadedEndDate
+                    loadedEndDate,
+                    prods,
+                    acts
                   );
                   loadedQRCodes.set(`product:${product}`, qrCode);
                 });
               }
-              if (loadedCampaign.selectedActions && loadedCampaign.selectedActions.length > 0) {
-                loadedCampaign.selectedActions.forEach((action: string) => {
+              if (acts.length > 0) {
+                acts.forEach((action: string) => {
                   const qrCode = generateCampaignItemQRCode(
-                    loadedCampaign.businessId,
+                    loadedCampaign.businessId ?? '',
+                    businessName,
                     loadedCampaign.name,
                     'action',
                     action,
                     loadedStartDate,
-                    loadedEndDate
+                    loadedEndDate,
+                    prods,
+                    acts
                   );
                   loadedQRCodes.set(`action:${action}`, qrCode);
                 });
@@ -677,28 +687,37 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
         
         // Generate QR codes for each selected product and action
         const newQRCodes = new Map<string, string>();
-        if (selectedProducts && selectedProducts.length > 0) {
-          selectedProducts.forEach((product) => {
+        const businessName = businessProfile?.name ?? '';
+        const prods = selectedProducts || [];
+        const acts = selectedActions || [];
+        if (prods.length > 0) {
+          prods.forEach((product) => {
             const qrCode = generateCampaignItemQRCode(
               auth.businessId,
+              businessName,
               name,
               'product',
               product,
-              startDateISO.split('T')[0], // Just the date part
-              endDateISO.split('T')[0]    // Just the date part
+              startDateISO.split('T')[0],
+              endDateISO.split('T')[0],
+              prods,
+              acts
             );
             newQRCodes.set(`product:${product}`, qrCode);
           });
         }
-        if (selectedActions && selectedActions.length > 0) {
-          selectedActions.forEach((action) => {
+        if (acts.length > 0) {
+          acts.forEach((action) => {
             const qrCode = generateCampaignItemQRCode(
               auth.businessId,
+              businessName,
               name,
               'action',
               action,
-              startDateISO.split('T')[0], // Just the date part
-              endDateISO.split('T')[0]    // Just the date part
+              startDateISO.split('T')[0],
+              endDateISO.split('T')[0],
+              prods,
+              acts
             );
             newQRCodes.set(`action:${action}`, qrCode);
           });
@@ -1770,7 +1789,7 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
             reward.selectedProducts,
             reward.selectedActions,
             reward.pinCode || '',
-            undefined, // businessProfile
+            businessProfile ? { name: businessProfile.name } : undefined,
             undefined, // pointsPerPurchase
             reward.businessId // businessId
           );
