@@ -1550,7 +1550,7 @@ const styles = StyleSheet.create({
     height: 48,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 5,
   },
   rewardTitle: {
     fontSize: 12,
@@ -1560,7 +1560,7 @@ const styles = StyleSheet.create({
   },
   rewardProgressContainer: {
     position: 'relative',
-    marginBottom: 8,
+    marginBottom: 5,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1590,7 +1590,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: Colors.text.secondary,
     textAlign: 'center',
-    marginTop: 4,
+    marginTop: 0,
   },
   campaignStatus: {
     fontSize: 10,
