@@ -1,11 +1,13 @@
 /**
  * Unified Sync Service
- * 
- * Treats account data, rewards, products, and campaigns as ONE logical unit.
- * Sync decision (upload vs download) is based on timestamp comparison:
- * - If local timestamp > remote timestamp → UPLOAD all data
- * - If remote timestamp > local timestamp → DOWNLOAD all data
- * - All data syncs together as one atomic operation
+ *
+ * 1 RULE, 3 USE CASES.
+ * 1 rule: Newest overwrites oldest. Always. Timestamp decides.
+ * 3 use cases: Sync occurs ONLY on (1) click Sync, (2) login, (3) logout. No other time.
+ *
+ * Used for: click Sync + Logout. (Login uses timestamp compare + downloadAllData; same rule.)
+ * Local newer → upload. Remote newer → download. Equal + unsynced → upload. Else none.
+ * Never overwrite Redis with older data. Timestamp changes only on create/edit.
  */
 
 import { businessRepository, rewardsRepository, campaignsRepository, customersRepository, getSyncStatus, getLocalRepositoryTimestamp, updateSyncMetadata as updateLocalSyncMetadata } from './localRepository';

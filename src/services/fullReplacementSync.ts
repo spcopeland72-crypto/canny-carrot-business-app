@@ -1,10 +1,9 @@
 /**
  * Full Replacement Sync Service
- * 
- * Performs a complete replacement sync on logout:
- * 1. Deletes ALL existing data from Redis for this business
- * 2. Writes ALL local data to Redis
- * 3. Ensures Redis is an exact copy of local repository
+ *
+ * 1 RULE, 3 USE CASES. Sync only on Sync click, login, logout. Newest overwrites oldest.
+ * This module VIOLATES that: it overwrites Redis with local regardless of timestamps.
+ * MUST NOT be used. Logout uses performUnifiedSync only. Legacy/dead code.
  */
 
 import { businessRepository, rewardsRepository, campaignsRepository, customersRepository, getLocalRepositoryTimestamp } from './localRepository';

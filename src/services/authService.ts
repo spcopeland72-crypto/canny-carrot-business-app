@@ -1,7 +1,11 @@
 /**
  * Authentication Service for Business App
- * Handles login, invitation verification, and session management
- * Redis is the single source of truth for all authentication
+ *
+ * 1 RULE, 3 USE CASES. 1 rule: Newest overwrites oldest. 3 use cases: Sync ONLY on
+ * (1) click Sync, (2) login, (3) logout. No other time.
+ *
+ * Login: timestamp compare → download if Redis newer. Logout: performUnifiedSync (same rule).
+ * Redis is the single source of truth for authentication.
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -333,32 +337,30 @@ export const loginBusiness = async (email: string, password: string): Promise<Bu
               console.log('✅ [LOGIN] Repository created and populated from database');
             }
           } else {
-            // REPOSITORY MATCHES: Compare timestamps to decide whether to load locally or from Redis
+            // REPOSITORY MATCHES: IMMUTABLE — timestamp decides. Newest wins. Never upload on login.
             const localTimestamp = await repoModule.getLocalRepositoryTimestamp();
             const dbTimestamp = await repoModule.getDatabaseRecordTimestamp(existingAuth.businessId, API_BASE_URL);
             
             if (dbTimestamp) {
-              const localTime = new Date(localTimestamp).getTime();
-              const dbTime = new Date(dbTimestamp).getTime();
-              
-              console.log(`📊 [LOGIN] Comparing timestamps:`);
-              console.log(`   Local: ${localTimestamp} (${localTime})`);
-              console.log(`   Redis: ${dbTimestamp} (${dbTime})`);
-              
-              if (localTime >= dbTime) {
-                // LOCAL IS NEWER OR EQUAL: Load from local storage
-                console.log('✅ [LOGIN] Local repository is newer or equal - loading from local storage');
-                console.log('ℹ️ [LOGIN] No sync on login - use manual sync or logout to sync');
-              } else {
-                // REDIS IS NEWER: Load from Redis
-                console.log('⬇️ [LOGIN] Redis is newer - downloading from Redis');
+              if (!localTimestamp) {
+                // Local null, Redis exists → take Redis as truth. Never overwrite Redis.
+                console.log('📥 [LOGIN] Local timestamp null, Redis exists → downloading (no upload)');
                 await repoModule.downloadAllData(existingAuth.businessId, API_BASE_URL);
                 console.log('✅ [LOGIN] Repository downloaded from Redis and stored locally');
+              } else {
+                const localTime = new Date(localTimestamp).getTime();
+                const dbTime = new Date(dbTimestamp).getTime();
+                console.log(`📊 [LOGIN] Comparing timestamps: Local ${localTimestamp} | Redis ${dbTimestamp}`);
+                if (localTime >= dbTime) {
+                  console.log('✅ [LOGIN] Local newer or equal → keep local. No sync on login.');
+                } else {
+                  console.log('⬇️ [LOGIN] Redis newer → downloading');
+                  await repoModule.downloadAllData(existingAuth.businessId, API_BASE_URL);
+                  console.log('✅ [LOGIN] Repository downloaded from Redis and stored locally');
+                }
               }
             } else {
-              // NO REDIS TIMESTAMP: Load from local storage
-              console.log('✅ [LOGIN] No Redis timestamp found - loading from local storage');
-              console.log('ℹ️ [LOGIN] No sync on login - use manual sync or logout to sync');
+              console.log('✅ [LOGIN] No Redis timestamp → keep local. No sync on login.');
             }
           }
         }
@@ -453,32 +455,29 @@ export const loginBusiness = async (email: string, password: string): Promise<Bu
         // Check if repository matches this business
         const matchesBusiness = await repoModule.repositoryMatchesBusiness(businessId);
         if (matchesBusiness) {
-          // REPOSITORY MATCHES: Compare timestamps to decide whether to load locally or from Redis
+          // REPOSITORY MATCHES: IMMUTABLE — timestamp decides. Newest wins. Never upload on login.
           const localTimestamp = await repoModule.getLocalRepositoryTimestamp();
           const dbTimestamp = await repoModule.getDatabaseRecordTimestamp(businessId, API_BASE_URL);
           
           if (dbTimestamp) {
-            const localTime = new Date(localTimestamp).getTime();
-            const dbTime = new Date(dbTimestamp).getTime();
-            
-            console.log(`📊 [LOGIN] Comparing timestamps:`);
-            console.log(`   Local: ${localTimestamp} (${localTime})`);
-            console.log(`   Redis: ${dbTimestamp} (${dbTime})`);
-            
-            if (localTime >= dbTime) {
-              // LOCAL IS NEWER OR EQUAL: Load from local storage
-              console.log('✅ [LOGIN] Local repository is newer or equal - loading from local storage');
-              console.log('ℹ️ [LOGIN] No sync on login - use manual sync or logout to sync');
-            } else {
-              // REDIS IS NEWER: Load from Redis
-              console.log('⬇️ [LOGIN] Redis is newer - downloading from Redis');
+            if (!localTimestamp) {
+              console.log('📥 [LOGIN] Local timestamp null, Redis exists → downloading (no upload)');
               await repoModule.downloadAllData(businessId, API_BASE_URL);
               console.log('✅ [LOGIN] Repository downloaded from Redis and stored locally');
+            } else {
+              const localTime = new Date(localTimestamp).getTime();
+              const dbTime = new Date(dbTimestamp).getTime();
+              console.log(`📊 [LOGIN] Comparing timestamps: Local ${localTimestamp} | Redis ${dbTimestamp}`);
+              if (localTime >= dbTime) {
+                console.log('✅ [LOGIN] Local newer or equal → keep local. No sync on login.');
+              } else {
+                console.log('⬇️ [LOGIN] Redis newer → downloading');
+                await repoModule.downloadAllData(businessId, API_BASE_URL);
+                console.log('✅ [LOGIN] Repository downloaded from Redis and stored locally');
+              }
             }
           } else {
-            // NO REDIS TIMESTAMP: Load from local storage
-            console.log('✅ [LOGIN] No Redis timestamp found - loading from local storage');
-            console.log('ℹ️ [LOGIN] No sync on login - use manual sync or logout to sync');
+            console.log('✅ [LOGIN] No Redis timestamp → keep local. No sync on login.');
           }
         } else {
           // Repository exists but for different business - download for this business
@@ -552,22 +551,26 @@ export const logoutBusiness = async (): Promise<void> => {
     const businessId = auth?.businessId;
     
     if (businessId) {
-      // Perform FULL REPLACEMENT sync - makes Redis identical to local repository
-      console.log('🔄 [LOGOUT] Performing full replacement sync - Redis will be identical to local repository...');
+      // Use case 3 of 3: Sync only on Sync click, login, logout. 1 rule: newest overwrites oldest.
+      console.log('🔄 [LOGOUT] Logout sync — 1 rule: newest overwrites oldest');
       try {
-        const { performFullReplacementSync } = require('./fullReplacementSync');
-        const syncResult = await performFullReplacementSync(businessId);
+        const { performUnifiedSync } = require('./unifiedSyncService');
+        const syncResult = await performUnifiedSync(businessId);
         
-        if (syncResult.success) {
-          console.log('✅ [LOGOUT] Full replacement sync completed successfully');
-          console.log('✅ [LOGOUT] Redis is now identical to local repository');
-          console.log('   Synced:', syncResult.synced);
+        if (syncResult.direction === 'upload') {
+          console.log('✅ [LOGOUT] Uploaded local → Redis (local was newer)');
+        } else if (syncResult.direction === 'download') {
+          console.log('✅ [LOGOUT] Downloaded Redis → local (Redis was newer); no overwrite of Redis');
         } else {
-          console.warn('⚠️ [LOGOUT] Some data failed to sync:', syncResult.errors);
-          // Continue with logout even if sync fails (data is still in local repo)
+          console.log('✅ [LOGOUT] No sync (equal/none); Redis unchanged');
+        }
+        const s = syncResult.synced;
+        console.log('   Direction:', syncResult.direction, '| Profile:', !!s?.profile, '| Rewards:', s?.rewards ?? 0, '| Campaigns:', s?.campaigns ?? 0);
+        if (syncResult.errors?.length) {
+          console.warn('⚠️ [LOGOUT] Sync warnings:', syncResult.errors);
         }
       } catch (syncError) {
-        console.error('❌ [LOGOUT] Error during full replacement sync:', syncError);
+        console.error('❌ [LOGOUT] Error during sync:', syncError);
         // Continue with logout even if sync fails
       }
     }

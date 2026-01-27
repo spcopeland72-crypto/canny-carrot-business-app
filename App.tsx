@@ -45,7 +45,7 @@ import {generateRewardQRCode} from './src/utils/qrCodeUtils';
 import {isAuthenticated, getStoredAuth} from './src/services/authService';
 import {rewardsRepository, campaignsRepository, customersRepository} from './src/services/localRepository';
 import {RefreshProvider} from './src/contexts/RefreshContext';
-// CRITICAL: No automatic daily sync - Redis only accessed on login/logout, create/submit, or manual sync
+// CRITICAL: 1 rule (newest overwrites oldest). Sync ONLY on: click Sync, login, logout. No other time.
 import {dumpRepository} from './src/utils/dumpRepository';
 
 function App(): React.JSX.Element {
@@ -186,9 +186,8 @@ function App(): React.JSX.Element {
             setCampaigns([]);
           }
           
-          // CRITICAL: Do NOT start automatic daily sync
-          // Redis should only be accessed on login/logout, create/submit, or manual sync
-          // No automatic sync intervals allowed
+          // CRITICAL: 1 rule (newest overwrites oldest), 3 use cases only.
+          // Sync ONLY on: click Sync, login, logout. No other time. No daily/background sync.
         }
       }
     } catch (error) {
@@ -257,24 +256,10 @@ function App(): React.JSX.Element {
     console.log(`💾 [App] Saving new reward "${newReward.name}" to local repository...`);
     await rewardsRepository.save(newReward);
     
-    // Mark repository as having unsynced changes
+    // Mark repository as having unsynced changes (sync only on Sync click, login, logout)
     const { updateSyncMetadata } = await import('./src/services/localRepository');
     await updateSyncMetadata({ hasUnsyncedChanges: true });
     console.log(`✅ [App] Reward saved to local repository and marked as dirty`);
-    
-    // IMPORTANT: Immediately sync to Redis so it's available on other devices
-    try {
-      const auth = await getStoredAuth();
-      if (auth?.businessId) {
-        console.log(`🔄 [App] Immediately syncing reward to Redis...`);
-        const { performDailySync } = await import('./src/services/dailySyncService');
-        await performDailySync(auth.businessId);
-        console.log(`✅ [App] Reward synced to Redis - should now appear on other devices`);
-      }
-    } catch (syncError) {
-      console.error('❌ [App] Failed to immediately sync reward to Redis:', syncError);
-      // Don't fail reward creation if sync fails - it will retry on daily sync
-    }
     
     // Also save to legacy storage for backward compatibility
     saveRewards(updatedRewards);

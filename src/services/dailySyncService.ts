@@ -1,8 +1,9 @@
 /**
  * Daily Sync Service
- * 
- * Syncs local repository data to Redis once per day.
- * Only syncs data that has changed (marked as dirty).
+ *
+ * 1 RULE, 3 USE CASES. Sync ONLY on Sync click, login, logout. No other time.
+ * This service is NOT one of the 3. Do NOT use. No daily/background/interval sync.
+ * Dead code. Use unifiedSyncService for Sync + logout; authService for login.
  */
 
 import { businessRepository, rewardsRepository, campaignsRepository, customersRepository, getSyncStatus, updateSyncMetadata } from './localRepository';

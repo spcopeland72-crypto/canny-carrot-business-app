@@ -67,12 +67,13 @@ const CompanyMenuModal: React.FC<CompanyMenuModalProps> = ({
     }
   }, [visible]);
 
+  // Use case 1 of 3: Sync only on Sync click, login, logout. 1 rule: newest overwrites oldest.
   const handleSync = async () => {
     try {
       onClose();
       const auth = await getStoredAuth();
       if (auth?.businessId) {
-        console.log('🔄 [SYNC] Starting unified sync (all data as one unit)...');
+        console.log('🔄 [SYNC] Sync click — 1 rule: newest overwrites oldest');
         const syncResult = await performUnifiedSync(auth.businessId);
         if (syncResult.success) {
           console.log(`✅ [SYNC] Unified sync completed successfully (${syncResult.direction})`);

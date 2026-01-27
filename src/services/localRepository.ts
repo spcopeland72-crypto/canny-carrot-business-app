@@ -86,6 +86,7 @@ export const updateSyncMetadata = async (updates: Partial<SyncMetadata>): Promis
 /**
  * Mark repository as having unsynced changes and update lastModified timestamp.
  * Only place we set lastModified to "now": create/edit in the business app (or admin server-side). Nowhere else.
+ * Create/edit: local save + markDirty only. No Redis write. Redis writes only on sync/logout (timestamp-based).
  */
 const markDirty = async (): Promise<void> => {
   const now = new Date().toISOString();
@@ -821,12 +822,12 @@ export const downloadAllData = async (businessId: string, apiBaseUrl: string = '
       console.error(`❌ [REPOSITORY] API error ${customersResponse.status} - customers download failed`);
     }
 
-    // DO NOT update timestamp on download - timestamp ONLY changes on user create/edit/submit
-    // Just record that we downloaded, but preserve existing timestamp
+    // Store Redis timestamp as our local lastModified when we have it. We received this record
+    // from Redis; its timestamp is the source truth. Not fabrication — we never set "now" here.
     await updateSyncMetadata({
       lastDownloadedAt: new Date().toISOString(),
       hasUnsyncedChanges: false,
-      // DO NOT update lastModified - it only changes when user creates/edits/submits
+      ...(dbRepositoryTimestamp != null && { lastModified: dbRepositoryTimestamp }),
     });
 
     // Set current business ID for this repository
