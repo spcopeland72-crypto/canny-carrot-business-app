@@ -572,61 +572,6 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
         type,
       });
       
-      // Generate QR code value using shared utility with business profile data
-      // Use rewardId prop, loadedRewardId, reward prop id, or generate new unique ID (in that order)
-      // For new items, generate a unique ID that includes timestamp and random suffix to prevent duplicates
-      let rewardIdToSave = rewardId || loadedRewardId || reward?.id;
-      if (!rewardIdToSave) {
-        // Generate unique ID: timestamp + random suffix to prevent duplicates even if created in same millisecond
-        rewardIdToSave = `${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-      }
-      // For campaigns, use default requirement value (1) since campaigns don't have requirement field
-      const requirementValue = isCampaign ? 1 : parseInt(requirement, 10) || 1;
-      const pointsValue = parseInt(pointsPerPurchase, 10) || 1;
-      
-      let qrCodeValue: string;
-      try {
-        qrCodeValue = generateRewardQRCode(
-          rewardIdToSave,
-          name,
-          requirementValue,
-          rewardType,
-          // NOTE: type field is only for UI presentation - pass products/actions if they exist
-          selectedProducts && selectedProducts.length > 0 ? selectedProducts : undefined,
-          selectedActions && selectedActions.length > 0 ? selectedActions : undefined,
-          pinCode,
-          businessProfile ? {
-            name: businessProfile.name,
-            address: businessProfile.address,
-            addressLine1: businessProfile.addressLine1,
-            addressLine2: businessProfile.addressLine2,
-            city: businessProfile.city,
-            postcode: businessProfile.postcode,
-            country: businessProfile.country,
-            phone: businessProfile.phone,
-            email: businessProfile.email,
-            website: businessProfile.website,
-            // Logo excluded from QR code to prevent data overflow
-            // Logo is stored separately in business profile
-            socialMedia: businessProfile.socialMedia,
-          } : undefined,
-          pointsValue, // Include points per purchase
-          auth.businessId // Include business ID
-        );
-        
-        // QR code size validation is now handled in generateRewardQRCode
-        // If it throws an error, it means the data is too large even after optimization
-        const qrCodeSize = qrCodeValue.length;
-        console.log(`[CreateEditReward] QR code generated successfully: ${qrCodeSize} bytes`);
-      } catch (qrError) {
-        console.error('[CreateEditReward] Error generating QR code:', qrError);
-        Alert.alert(
-          'Error',
-          'Failed to generate QR code. Please check your reward details and try again.'
-        );
-        return;
-      }
-      
       if (isCampaign) {
         // Get existing campaign data if editing to preserve dates and other fields
         let existingCampaign: Campaign | null = null;

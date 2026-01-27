@@ -115,6 +115,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   const [businessLogo, setBusinessLogo] = useState<string | null>(null); // Business logo from profile
   const [rewardQRModalVisible, setRewardQRModalVisible] = useState(false);
   const [selectedRewardForQR, setSelectedRewardForQR] = useState<Reward | null>(null);
+  const [generatedQRValue, setGeneratedQRValue] = useState<string>('');
   // Campaign items modal state
   const [campaignItemsModalVisible, setCampaignItemsModalVisible] = useState(false);
   const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
@@ -220,6 +221,52 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
       linkedin: linkedinIcon,
     });
   }, []);
+
+  // Generate QR when RewardQRCodeModal opens and reward has no qrCode
+  useEffect(() => {
+    if (!rewardQRModalVisible || !selectedRewardForQR || selectedRewardForQR.qrCode) {
+      setGeneratedQRValue('');
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const auth = await getStoredAuth();
+        if (cancelled) return;
+        const businessProfile = {
+          name: businessName,
+          address: '',
+          addressLine1: '',
+          addressLine2: '',
+          city: '',
+          postcode: '',
+          country: 'UK',
+          phone: '',
+          email: '',
+          website: '',
+          socialMedia: {},
+        };
+        const qr = generateRewardQRCode(
+          selectedRewardForQR.id,
+          selectedRewardForQR.name,
+          selectedRewardForQR.stampsRequired || selectedRewardForQR.costStamps || 10,
+          selectedRewardForQR.type === 'freebie' ? 'free_product' :
+            selectedRewardForQR.type === 'discount' ? 'discount' : 'other',
+          selectedRewardForQR.selectedProducts,
+          selectedRewardForQR.selectedActions,
+          selectedRewardForQR.pinCode,
+          businessProfile,
+          selectedRewardForQR.pointsPerPurchase,
+          auth?.businessId || selectedRewardForQR.businessId,
+        );
+        if (!cancelled) setGeneratedQRValue(qr);
+      } catch (error) {
+        console.error('[HomeScreen] Error generating QR code:', error);
+        if (!cancelled) setGeneratedQRValue('');
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [rewardQRModalVisible, selectedRewardForQR, businessName]);
 
   // Fallback: Load rewards directly from repository if props are empty
   useEffect(() => {
@@ -1179,50 +1226,12 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
       <RewardQRCodeModal
         visible={rewardQRModalVisible}
         rewardName={selectedRewardForQR?.name || ''}
-        qrValue={(() => {
-          if (!selectedRewardForQR) return '';
-          let qrValue = selectedRewardForQR.qrCode;
-          if (!qrValue) {
-            // Generate QR code if not stored
-            try {
-              const businessProfile = {
-                name: businessName,
-                address: '',
-                addressLine1: '',
-                addressLine2: '',
-                city: '',
-                postcode: '',
-                country: 'UK',
-                phone: '',
-                email: '',
-                website: '',
-                socialMedia: {},
-              };
-              const auth = await getStoredAuth();
-              qrValue = generateRewardQRCode(
-                selectedRewardForQR.id,
-                selectedRewardForQR.name,
-                selectedRewardForQR.stampsRequired || selectedRewardForQR.costStamps || 10,
-                selectedRewardForQR.type === 'freebie' ? 'free_product' : 
-                selectedRewardForQR.type === 'discount' ? 'discount' : 'other',
-                selectedRewardForQR.selectedProducts,
-                selectedRewardForQR.selectedActions,
-                selectedRewardForQR.pinCode,
-                businessProfile,
-                selectedRewardForQR.pointsPerPurchase,
-                auth?.businessId || selectedRewardForQR.businessId
-              );
-            } catch (error) {
-              console.error('[HomeScreen] Error generating QR code:', error);
-              qrValue = '';
-            }
-          }
-          return qrValue;
-        })()}
+        qrValue={selectedRewardForQR?.qrCode ?? generatedQRValue ?? ''}
         rewardId={selectedRewardForQR?.id}
         onClose={() => {
           setRewardQRModalVisible(false);
           setSelectedRewardForQR(null);
+          setGeneratedQRValue('');
         }}
         onNavigate={onNavigate}
       />
