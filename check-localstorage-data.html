@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Check localStorage Data</title>
+    <style>
+        body { font-family: monospace; padding: 20px; }
+        .section { margin: 20px 0; padding: 10px; border: 1px solid #ccc; }
+        .found { color: green; }
+        .not-found { color: red; }
+        pre { background: #f5f5f5; padding: 10px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>localStorage Data Checker</h1>
+    <p>Open this file after navigating to business.cannycarrot.com in the same browser</p>
+    
+    <div class="section">
+        <h2>Rewards</h2>
+        <div id="rewards"></div>
+    </div>
+    
+    <div class="section">
+        <h2>Campaigns</h2>
+        <div id="campaigns"></div>
+    </div>
+    
+    <script>
+        const rewardsKey = 'local_repo:rewards';
+        const campaignsKey = 'local_repo:campaigns';
+        
+        function checkStorage() {
+            // Check rewards
+            const rewardsData = localStorage.getItem(rewardsKey);
+            const rewardsDiv = document.getElementById('rewards');
+            if (rewardsData) {
+                try {
+                    const rewards = JSON.parse(rewardsData);
+                    rewardsDiv.innerHTML = `<span class="found">✅ Found ${rewards.length} reward(s)</span><pre>${JSON.stringify(rewards, null, 2)}</pre>`;
+                } catch (e) {
+                    rewardsDiv.innerHTML = `<span class="not-found">❌ Error parsing: ${e.message}</span>`;
+                }
+            } else {
+                rewardsDiv.innerHTML = `<span class="not-found">❌ No rewards data found</span>`;
+            }
+            
+            // Check campaigns
+            const campaignsData = localStorage.getItem(campaignsKey);
+            const campaignsDiv = document.getElementById('campaigns');
+            if (campaignsData) {
+                try {
+                    const campaigns = JSON.parse(campaignsData);
+                    campaignsDiv.innerHTML = `<span class="found">✅ Found ${campaigns.length} campaign(s)</span><pre>${JSON.stringify(campaigns, null, 2)}</pre>`;
+                } catch (e) {
+                    campaignsDiv.innerHTML = `<span class="not-found">❌ Error parsing: ${e.message}</span>`;
+                }
+            } else {
+                campaignsDiv.innerHTML = `<span class="not-found">❌ No campaigns data found</span>`;
+            }
+        }
+        
+        checkStorage();
+    </script>
+</body>
+</html>
+
+
+
+

@@ -1,0 +1,17 @@
+{
+  "timestamp": "2026-01-15T22:54:14.756Z",
+  "source": "Edge LocalStorage LevelDB (binary files)",
+  "note": "Database was locked, read from binary .ldb files",
+  "keys": {
+    "local_repo:rewards": {
+      "found": true,
+      "note": "Data found but requires proper LevelDB parsing - see raw export",
+      "rawLocation": "file: 005803.ldb, position: 449042"
+    },
+    "local_repo:campaigns": {
+      "found": true,
+      "note": "Data found but requires proper LevelDB parsing - see raw export",
+      "rawLocation": "file: 005803.ldb, position: 65982"
+    }
+  }
+}

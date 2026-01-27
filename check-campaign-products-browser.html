@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Check Campaign Products</title>
+  <style>
+    body {
+      font-family: monospace;
+      padding: 20px;
+      background: #1e1e1e;
+      color: #d4d4d4;
+    }
+    pre {
+      background: #252526;
+      padding: 10px;
+      border-radius: 4px;
+      overflow-x: auto;
+    }
+    button {
+      background: #007acc;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      margin: 10px 0;
+    }
+    button:hover {
+      background: #005a9e;
+    }
+    .result {
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Check Campaign Products</h1>
+  <button onclick="checkCampaigns()">Check Campaigns</button>
+  <div id="result" class="result"></div>
+
+  <script>
+    async function checkCampaigns() {
+      const resultDiv = document.getElementById('result');
+      resultDiv.innerHTML = '<pre>Checking campaigns...</pre>';
+      
+      try {
+        console.log('🔍 Checking campaigns for selectedProducts...\n');
+        
+        const campaignsData = localStorage.getItem('local_repo:campaigns');
+        
+        if (!campaignsData) {
+          resultDiv.innerHTML = '<pre>⚠️ No campaigns found in localStorage</pre>';
+          return;
+        }
+        
+        const campaigns = JSON.parse(campaignsData);
+        console.log(`📊 Found ${campaigns.length} campaigns\n`);
+        
+        let output = `📊 Found ${campaigns.length} campaigns\n\n`;
+        
+        campaigns.forEach((campaign, index) => {
+          const hasProducts = 'selectedProducts' in campaign;
+          const productsValue = campaign.selectedProducts;
+          const productsLength = Array.isArray(productsValue) ? productsValue.length : 'N/A';
+          const hasActions = 'selectedActions' in campaign;
+          const hasPinCode = 'pinCode' in campaign;
+          
+          output += `${index + 1}. Campaign: "${campaign.name}" (${campaign.id})\n`;
+          output += `   - Has selectedProducts property: ${hasProducts}\n`;
+          output += `   - selectedProducts value: ${JSON.stringify(productsValue)}\n`;
+          output += `   - selectedProducts length: ${productsLength}\n`;
+          output += `   - Has selectedActions property: ${hasActions}\n`;
+          output += `   - selectedActions value: ${JSON.stringify(campaign.selectedActions)}\n`;
+          output += `   - Has pinCode property: ${hasPinCode}\n`;
+          output += `   - pinCode value: ${campaign.pinCode || 'N/A'}\n`;
+          output += `   - All keys: ${Object.keys(campaign).join(', ')}\n\n`;
+        });
+        
+        const campaignsWithProducts = campaigns.filter(c => 
+          'selectedProducts' in c && Array.isArray(c.selectedProducts) && c.selectedProducts.length > 0
+        );
+        
+        output += `✅ Summary:\n`;
+        output += `   - Total campaigns: ${campaigns.length}\n`;
+        output += `   - Campaigns with products: ${campaignsWithProducts.length}\n`;
+        output += `   - Campaigns with selectedProducts property: ${campaigns.filter(c => 'selectedProducts' in c).length}\n`;
+        
+        resultDiv.innerHTML = `<pre>${output}</pre>`;
+        console.log(output);
+        
+      } catch (error) {
+        resultDiv.innerHTML = `<pre>❌ Error: ${error.message}\n${error.stack}</pre>`;
+        console.error('❌ Error checking campaigns:', error);
+      }
+    }
+    
+    // Auto-run on load
+    window.addEventListener('load', () => {
+      checkCampaigns();
+    });
+  </script>
+</body>
+</html>
+
+

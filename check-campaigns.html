@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Check Stables Campaign</title>
+    <style>
+        body { font-family: monospace; padding: 20px; background: #1e1e1e; color: #d4d4d4; }
+        .result { margin: 10px 0; padding: 10px; border-radius: 5px; }
+        .success { background: #1e4d1e; }
+        .error { background: #4d1e1e; }
+        .warning { background: #4d4d1e; }
+        pre { background: #252526; padding: 10px; border-radius: 5px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Checking for "The Stables" Campaign</h1>
+    <div id="results"></div>
+
+    <script>
+        (async () => {
+            const results = document.getElementById('results');
+            const log = (msg, type = 'info') => {
+                const div = document.createElement('div');
+                div.className = `result ${type}`;
+                div.textContent = msg;
+                results.appendChild(div);
+            };
+            const logPre = (msg, type = 'info') => {
+                const div = document.createElement('div');
+                div.className = `result ${type}`;
+                const pre = document.createElement('pre');
+                pre.textContent = msg;
+                div.appendChild(pre);
+                results.appendChild(div);
+            };
+
+            log('🔍 Checking localStorage for "stables bingo"...\n', 'info');
+            
+            const campaignsKey = 'local_repo:campaigns';
+            const campaignsData = localStorage.getItem(campaignsKey);
+            
+            if (!campaignsData) {
+                log('❌ No campaigns found in localStorage', 'error');
+                log(`   Key: ${campaignsKey}`, 'error');
+                return;
+            }
+            
+            try {
+                const campaigns = JSON.parse(campaignsData);
+                log(`✅ Found ${campaigns.length} items in localStorage (raw data)\n`, 'success');
+                
+                const campaignTypes = ['double_stamps', 'bonus_reward', 'flash_sale', 'referral', 'birthday', 'happy_hour', 'loyalty_tier'];
+                const campaignStatuses = ['draft', 'scheduled', 'active', 'paused', 'completed', 'cancelled'];
+                
+                const validCampaigns = campaigns.filter((item) => {
+                    const isReward = item.isActive !== undefined || item.stampsRequired || item.costStamps;
+                    if (isReward) return false;
+                    const hasCampaignType = item.type && campaignTypes.includes(item.type);
+                    const hasCampaignStatus = item.status && campaignStatuses.includes(item.status);
+                    return hasCampaignType && hasCampaignStatus;
+                });
+                
+                log(`📊 Valid campaigns (pass validation): ${validCampaigns.length}`, 'info');
+                log(`📊 Invalid/filtered out: ${campaigns.length - validCampaigns.length}\n`, 'warning');
+                
+                const stablesBingoRaw = campaigns.filter(c => 
+                    c.name && c.name.toLowerCase().includes('stables') && c.name.toLowerCase().includes('bingo')
+                );
+                
+                const stablesBingoValid = validCampaigns.filter(c => 
+                    c.name && c.name.toLowerCase().includes('stables') && c.name.toLowerCase().includes('bingo')
+                );
+                
+                // Also check for any stables campaigns
+                const stablesCampaignsRaw = campaigns.filter(c => 
+                    c.name && c.name.toLowerCase().includes('stables')
+                );
+                
+                const stablesCampaignsValid = validCampaigns.filter(c => 
+                    c.name && c.name.toLowerCase().includes('stables')
+                );
+                
+                if (stablesBingoRaw.length > 0) {
+                    log(`🔍 Found "Stables bingo" campaign in localStorage:\n`, 'info');
+                    
+                    stablesBingoRaw.forEach((campaign, idx) => {
+                        let report = `${idx + 1}. "${campaign.name}"\n`;
+                        report += `   ID: ${campaign.id}\n`;
+                        report += `   Business ID: ${campaign.businessId}\n`;
+                        report += `   Type: ${campaign.type || '❌ MISSING'}\n`;
+                        report += `   Status: ${campaign.status || '❌ MISSING'}\n`;
+                        report += `   Created: ${campaign.createdAt || 'N/A'}\n`;
+                        report += `   Updated: ${campaign.updatedAt || 'N/A'}\n`;
+                        
+                        const isReward = campaign.isActive !== undefined || campaign.stampsRequired || campaign.costStamps;
+                        const hasValidType = campaign.type && campaignTypes.includes(campaign.type);
+                        const hasValidStatus = campaign.status && campaignStatuses.includes(campaign.status);
+                        
+                        if (isReward) report += `   ⚠️ ISSUE: Looks like a reward, not a campaign\n`;
+                        if (!hasValidType) {
+                            report += `   ⚠️ ISSUE: Missing/invalid 'type'. Required: [${campaignTypes.join(', ')}]\n`;
+                            report += `   ⚠️        Current: "${campaign.type || 'undefined'}"\n`;
+                        }
+                        if (!hasValidStatus) {
+                            report += `   ⚠️ ISSUE: Missing/invalid 'status'. Required: [${campaignStatuses.join(', ')}]\n`;
+                            report += `   ⚠️        Current: "${campaign.status || 'undefined'}"\n`;
+                        }
+                        
+                        if (hasValidType && hasValidStatus && !isReward) {
+                            report += `   ✅ VALID: Would appear in app\n`;
+                        } else {
+                            report += `   ❌ FILTERED OUT: Won't appear due to validation\n`;
+                        }
+                        
+                        logPre(report, hasValidType && hasValidStatus && !isReward ? 'success' : 'error');
+                    });
+                    
+                    if (stablesBingoValid.length === 0 && stablesBingoRaw.length > 0) {
+                        log('⚠️ WARNING: "Stables bingo" exists in localStorage but is being FILTERED OUT by validation!\n', 'warning');
+                        log('   This is why it\'s missing from the app.\n', 'warning');
+                    }
+                } else if (stablesCampaignsRaw.length > 0) {
+                    log(`🔍 Found ${stablesCampaignsRaw.length} campaign(s) related to "Stables" (but not "stables bingo"):\n`, 'info');
+                    
+                    stablesCampaignsRaw.forEach((campaign, idx) => {
+                        let report = `${idx + 1}. "${campaign.name}"\n`;
+                        report += `   ID: ${campaign.id}\n`;
+                        report += `   Business ID: ${campaign.businessId}\n`;
+                        report += `   Type: ${campaign.type || '❌ MISSING'}\n`;
+                        report += `   Status: ${campaign.status || '❌ MISSING'}\n`;
+                        report += `   Created: ${campaign.createdAt || 'N/A'}\n`;
+                        report += `   Updated: ${campaign.updatedAt || 'N/A'}\n`;
+                        
+                        const isReward = campaign.isActive !== undefined || campaign.stampsRequired || campaign.costStamps;
+                        const hasValidType = campaign.type && campaignTypes.includes(campaign.type);
+                        const hasValidStatus = campaign.status && campaignStatuses.includes(campaign.status);
+                        
+                        if (isReward) report += `   ⚠️ ISSUE: Looks like a reward, not a campaign\n`;
+                        if (!hasValidType) {
+                            report += `   ⚠️ ISSUE: Missing/invalid 'type'. Required: [${campaignTypes.join(', ')}]\n`;
+                            report += `   ⚠️        Current: "${campaign.type || 'undefined'}"\n`;
+                        }
+                        if (!hasValidStatus) {
+                            report += `   ⚠️ ISSUE: Missing/invalid 'status'. Required: [${campaignStatuses.join(', ')}]\n`;
+                            report += `   ⚠️        Current: "${campaign.status || 'undefined'}"\n`;
+                        }
+                        
+                        if (hasValidType && hasValidStatus && !isReward) {
+                            report += `   ✅ VALID: Would appear in app\n`;
+                        } else {
+                            report += `   ❌ FILTERED OUT: Won't appear due to validation\n`;
+                        }
+                        
+                        logPre(report, hasValidType && hasValidStatus && !isReward ? 'success' : 'error');
+                    });
+                    
+                    if (stablesCampaignsValid.length === 0 && stablesCampaignsRaw.length > 0) {
+                        log('⚠️ WARNING: Campaign exists but is being FILTERED OUT by validation!\n', 'warning');
+                    }
+                } else {
+                    log('❌ No campaigns found with "stables bingo" in the name\n', 'error');
+                    if (stablesCampaignsRaw.length > 0) {
+                        log(`   But found ${stablesCampaignsRaw.length} other "Stables" campaign(s):`, 'warning');
+                        stablesCampaignsRaw.forEach((c, i) => {
+                            log(`   ${i+1}. "${c.name}"`, 'warning');
+                        });
+                        log('');
+                    }
+                    log('All campaigns in storage:', 'info');
+                    campaigns.forEach((campaign, idx) => {
+                        const isValid = validCampaigns.some(c => c.id === campaign.id);
+                        const marker = isValid ? '✅' : '❌';
+                        log(`${marker} ${idx + 1}. "${campaign.name || 'Unnamed'}" - Type: ${campaign.type || 'MISSING'}, Status: ${campaign.status || 'MISSING'}`, isValid ? 'success' : 'error');
+                    });
+                }
+                
+                const businessProfileKey = 'local_repo:business_profile';
+                const businessProfileData = localStorage.getItem(businessProfileKey);
+                if (businessProfileData) {
+                    const profile = JSON.parse(businessProfileData);
+                    log(`\n📋 Business Profile: ${profile.name || 'Unnamed'}`, 'info');
+                    log(`   Business ID: ${profile.id || profile.businessId || 'N/A'}`, 'info');
+                }
+                
+            } catch (error) {
+                log(`❌ Error parsing data: ${error.message}`, 'error');
+            }
+        })();
+    </script>
+</body>
+</html>
+

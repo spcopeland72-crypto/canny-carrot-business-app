@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Read local_repo Data</title>
+    <style>
+        body { font-family: monospace; padding: 20px; background: #f5f5f5; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .section { margin: 20px 0; padding: 15px; background: white; border: 1px solid #ddd; border-radius: 5px; }
+        h1 { color: #2D5A27; }
+        h2 { color: #666; margin-top: 0; }
+        .found { color: green; font-weight: bold; }
+        .not-found { color: red; font-weight: bold; }
+        .count { font-size: 1.2em; margin: 10px 0; }
+        pre { background: #f9f9f9; padding: 15px; overflow-x: auto; border: 1px solid #eee; border-radius: 3px; max-height: 500px; overflow-y: auto; }
+        .item { margin: 10px 0; padding: 10px; background: #fafafa; border-left: 3px solid #2D5A27; }
+        .key { font-weight: bold; color: #2D5A27; }
+        button { padding: 10px 20px; margin: 5px; background: #2D5A27; color: white; border: none; border-radius: 3px; cursor: pointer; }
+        button:hover { background: #1e3d1a; }
+        .info { padding: 10px; background: #e3f2fd; border-left: 3px solid #2196F3; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Local Repository Data Reader</h1>
+        <div class="info">
+            <strong>Note:</strong> This page reads localStorage data. Make sure you've navigated to business.cannycarrot.com first, then open this file in the same browser.
+        </div>
+        
+        <div class="section">
+            <h2>📋 Rewards (<span class="key">local_repo:rewards</span>)</h2>
+            <div id="rewards-status" class="count">Loading...</div>
+            <div id="rewards-data"></div>
+        </div>
+        
+        <div class="section">
+            <h2>🎯 Campaigns (<span class="key">local_repo:campaigns</span>)</h2>
+            <div id="campaigns-status" class="count">Loading...</div>
+            <div id="campaigns-data"></div>
+        </div>
+        
+        <div class="section">
+            <h2>📊 All Repository Keys</h2>
+            <div id="all-keys"></div>
+        </div>
+        
+        <button onclick="refreshData()">🔄 Refresh Data</button>
+        <button onclick="exportData()">💾 Export JSON</button>
+    </div>
+    
+    <script>
+        const REPOSITORY_KEYS = {
+            REWARDS: 'local_repo:rewards',
+            CAMPAIGNS: 'local_repo:campaigns',
+            BUSINESS_PROFILE: 'local_repo:business_profile',
+            CUSTOMERS: 'local_repo:customers',
+        };
+        
+        function readData() {
+            // Read rewards
+            const rewardsData = localStorage.getItem(REPOSITORY_KEYS.REWARDS);
+            const rewardsStatus = document.getElementById('rewards-status');
+            const rewardsDiv = document.getElementById('rewards-data');
+            
+            if (rewardsData) {
+                try {
+                    const rewards = JSON.parse(rewardsData);
+                    rewardsStatus.innerHTML = `<span class="found">✅ Found ${rewards.length} reward(s)</span>`;
+                    
+                    let html = '<div class="items">';
+                    rewards.forEach((r, i) => {
+                        html += `
+                            <div class="item">
+                                <strong>${i + 1}. ${r.name || 'Unnamed'}</strong><br>
+                                <small>ID: ${r.id}</small><br>
+                                ${r.rewardType ? `<small>Type: ${r.rewardType}</small>` : ''}
+                                ${r.type ? `<small>| Type: ${r.type}</small>` : ''}
+                                ${r.requirement ? `<small>| Requirement: ${r.requirement}</small>` : ''}
+                            </div>
+                        `;
+                    });
+                    html += '</div>';
+                    html += `<details><summary>Full JSON Data</summary><pre>${JSON.stringify(rewards, null, 2)}</pre></details>`;
+                    rewardsDiv.innerHTML = html;
+                } catch (e) {
+                    rewardsStatus.innerHTML = `<span class="not-found">❌ Error parsing: ${e.message}</span>`;
+                    rewardsDiv.innerHTML = `<pre>${rewardsData}</pre>`;
+                }
+            } else {
+                rewardsStatus.innerHTML = `<span class="not-found">❌ No rewards data found</span>`;
+                rewardsDiv.innerHTML = '<p>Key <code>local_repo:rewards</code> not found in localStorage</p>';
+            }
+            
+            // Read campaigns
+            const campaignsData = localStorage.getItem(REPOSITORY_KEYS.CAMPAIGNS);
+            const campaignsStatus = document.getElementById('campaigns-status');
+            const campaignsDiv = document.getElementById('campaigns-data');
+            
+            if (campaignsData) {
+                try {
+                    const campaigns = JSON.parse(campaignsData);
+                    campaignsStatus.innerHTML = `<span class="found">✅ Found ${campaigns.length} campaign(s)</span>`;
+                    
+                    let html = '<div class="items">';
+                    campaigns.forEach((c, i) => {
+                        html += `
+                            <div class="item">
+                                <strong>${i + 1}. ${c.name || 'Unnamed'}</strong><br>
+                                <small>ID: ${c.id}</small><br>
+                                ${c.type ? `<small>Type: ${c.type}</small>` : ''}
+                                ${c.status ? `<small>| Status: ${c.status}</small>` : ''}
+                                ${c.startDate ? `<small>| Start: ${new Date(c.startDate).toLocaleDateString()}</small>` : ''}
+                                ${c.endDate ? `<small>| End: ${new Date(c.endDate).toLocaleDateString()}</small>` : ''}
+                            </div>
+                        `;
+                    });
+                    html += '</div>';
+                    html += `<details><summary>Full JSON Data</summary><pre>${JSON.stringify(campaigns, null, 2)}</pre></details>`;
+                    campaignsDiv.innerHTML = html;
+                } catch (e) {
+                    campaignsStatus.innerHTML = `<span class="not-found">❌ Error parsing: ${e.message}</span>`;
+                    campaignsDiv.innerHTML = `<pre>${campaignsData}</pre>`;
+                }
+            } else {
+                campaignsStatus.innerHTML = `<span class="not-found">❌ No campaigns data found</span>`;
+                campaignsDiv.innerHTML = '<p>Key <code>local_repo:campaigns</code> not found in localStorage</p>';
+            }
+            
+            // Show all repository keys
+            const allKeysDiv = document.getElementById('all-keys');
+            const allKeys = [];
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && key.startsWith('local_repo:')) {
+                    allKeys.push(key);
+                }
+            }
+            if (allKeys.length > 0) {
+                allKeysDiv.innerHTML = `<p><strong>Found ${allKeys.length} repository key(s):</strong></p><ul>${allKeys.map(k => `<li><code>${k}</code></li>`).join('')}</ul>`;
+            } else {
+                allKeysDiv.innerHTML = '<p class="not-found">No repository keys found. Make sure you are logged into business.cannycarrot.com</p>';
+            }
+        }
+        
+        function refreshData() {
+            readData();
+        }
+        
+        function exportData() {
+            const data = {
+                timestamp: new Date().toISOString(),
+                rewards: null,
+                campaigns: null,
+            };
+            
+            try {
+                const rewardsData = localStorage.getItem(REPOSITORY_KEYS.REWARDS);
+                if (rewardsData) data.rewards = JSON.parse(rewardsData);
+            } catch (e) {}
+            
+            try {
+                const campaignsData = localStorage.getItem(REPOSITORY_KEYS.CAMPAIGNS);
+                if (campaignsData) data.campaigns = JSON.parse(campaignsData);
+            } catch (e) {}
+            
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `local-repo-data-${new Date().toISOString().replace(/:/g, '-')}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+        
+        // Load data on page load
+        readData();
+    </script>
+</body>
+</html>
+
+
+
+

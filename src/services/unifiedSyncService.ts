@@ -476,8 +476,15 @@ export const performUnifiedSync = async (businessId: string): Promise<{
         console.log('📥 [UNIFIED SYNC] Remote is newer → downloading');
         direction = 'download';
       } else {
-        console.log('✅ [UNIFIED SYNC] Timestamps equal → no sync');
-        direction = 'none';
+        // Timestamps equal: upload if we have local unsynced changes, else no sync
+        const status = await getSyncStatus();
+        if (status.hasUnsyncedChanges) {
+          console.log('📤 [UNIFIED SYNC] Timestamps equal but hasUnsyncedChanges → uploading');
+          direction = 'upload';
+        } else {
+          console.log('✅ [UNIFIED SYNC] Timestamps equal, no unsynced changes → no sync');
+          direction = 'none';
+        }
       }
     }
 
