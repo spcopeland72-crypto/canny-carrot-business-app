@@ -699,8 +699,10 @@ export const downloadAllData = async (businessId: string, apiBaseUrl: string = '
       if (businessResult.success && businessResult.data) {
         const businessData = businessResult.data;
         // Capture business.updatedAt as the top-level repository timestamp
-        // This represents when ANY part of the repository was last updated in Redis
         dbRepositoryTimestamp = businessData.updatedAt || businessData.profile?.updatedAt || null;
+        if (dbRepositoryTimestamp) {
+          console.log(`📥 [REPOSITORY] Redis repository timestamp from business GET: ${dbRepositoryTimestamp}`);
+        }
         
         const profile: BusinessProfile = {
           id: businessData.id || businessId,
@@ -809,8 +811,8 @@ export const downloadAllData = async (businessId: string, apiBaseUrl: string = '
       console.error(`❌ [REPOSITORY] Campaigns API error ${campaignsResponse.status}: ${errorText.substring(0, 200)}`);
     }
 
-    // 4. Download customers (members)
-    const customersResponse = await fetch(`${apiBaseUrl}/api/v1/businesses/${businessId}/members`);
+    // 4. Download customers (API route is /customers not /members)
+    const customersResponse = await fetch(`${apiBaseUrl}/api/v1/businesses/${businessId}/customers`);
     if (customersResponse.ok) {
       const customersResult = await customersResponse.json();
       if (customersResult.success && Array.isArray(customersResult.data)) {
@@ -822,12 +824,18 @@ export const downloadAllData = async (businessId: string, apiBaseUrl: string = '
       console.error(`❌ [REPOSITORY] API error ${customersResponse.status} - customers download failed`);
     }
 
-    // Store Redis timestamp as our local lastModified when we have it. We received this record
-    // from Redis; its timestamp is the source truth. Not fabrication — we never set "now" here.
+    // Store Redis timestamp as our local lastModified. We received it from Redis; never retain
+    // stale local value after download. Set to Redis ts when we have it, else null.
+    const lastModifiedValue = dbRepositoryTimestamp ?? null;
+    if (dbRepositoryTimestamp) {
+      console.log(`✅ [REPOSITORY] Setting lastModified to Redis timestamp: ${dbRepositoryTimestamp}`);
+    } else {
+      console.log(`⚠️ [REPOSITORY] No Redis timestamp from business GET; lastModified → null`);
+    }
     await updateSyncMetadata({
       lastDownloadedAt: new Date().toISOString(),
       hasUnsyncedChanges: false,
-      ...(dbRepositoryTimestamp != null && { lastModified: dbRepositoryTimestamp }),
+      lastModified: lastModifiedValue,
     });
 
     // Set current business ID for this repository

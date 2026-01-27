@@ -212,7 +212,8 @@ const uploadAllData = async (businessId: string): Promise<{
         return result; // Fail early - all or nothing
       }
     }
-    console.log(`  ✅ Uploaded ${result.rewards}/${activeRewards.length} rewards`);
+    const activeCount = allRewards.filter((r) => r.isActive !== false).length;
+    console.log(`  ✅ Uploaded ${result.rewards}/${allRewards.length} rewards (${activeCount} active, ${allRewards.length - activeCount} inactive)`);
 
     // Get existing campaigns from Redis to determine which to update vs create
     const existingCampaignsResponse = await fetch(`${API_BASE_URL}/api/v1/campaigns?businessId=${businessId}`);

@@ -552,6 +552,7 @@ export const logoutBusiness = async (): Promise<void> => {
     
     if (businessId) {
       // Use case 3 of 3: Sync only on Sync click, login, logout. 1 rule: newest overwrites oldest.
+      // MUST use performUnifiedSync only. Never full-replacement. If you see "full replacement" on logout, rebuild the app.
       console.log('🔄 [LOGOUT] Logout sync — 1 rule: newest overwrites oldest');
       try {
         const { performUnifiedSync } = require('./unifiedSyncService');

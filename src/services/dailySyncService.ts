@@ -210,7 +210,7 @@ export const performDailySync = async (businessId: string, forceSync: boolean = 
       }
     }
 
-    // Sync rewards - only sync active rewards (exclude deleted/inactive)
+    // Sync rewards - only sync active (exclude deleted/inactive). Service is dead / do not use.
     const rewards = await rewardsRepository.getActive();
     result.rewards = await syncRewards(rewards, businessId);
     if (result.rewards < rewards.length) {
