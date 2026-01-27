@@ -897,7 +897,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                       color={progressColor}
                       backgroundColor={Colors.neutral[200]}
                     />
-                    <View style={styles.rewardIconOverlay}>
+                    <View style={styles.rewardIconOverlayCampaign}>
                       <Text style={styles.rewardIcon}>{displayFields.icon}</Text>
                     </View>
                   </View>
@@ -1569,7 +1569,16 @@ const styles = StyleSheet.create({
     width: 68,
     height: 68,
     borderRadius: 34,
-    backgroundColor: '#000000',
+    backgroundColor: '#737373',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  rewardIconOverlayCampaign: {
+    position: 'absolute',
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    backgroundColor: '#4AE261',
     justifyContent: 'center',
     alignItems: 'center',
   },
