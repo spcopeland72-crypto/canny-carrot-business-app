@@ -8,7 +8,7 @@
  * - All data syncs together as one atomic operation
  */
 
-import { businessRepository, rewardsRepository, campaignsRepository, customersRepository, getSyncStatus, getLocalRepositoryTimestamp, markDirty } from './localRepository';
+import { businessRepository, rewardsRepository, campaignsRepository, customersRepository, getSyncStatus, getLocalRepositoryTimestamp, updateSyncMetadata as updateLocalSyncMetadata } from './localRepository';
 import type { BusinessProfile, Reward, Campaign, Customer } from '../types';
 
 const API_BASE_URL = 'https://api.cannycarrot.com';
@@ -137,10 +137,12 @@ const uploadAllData = async (businessId: string): Promise<{
   };
 
   try {
-    // Get local repository timestamp
-    // Upload business profile (includes products)
-    // Use CURRENT time for timestamp - sync is a current action, not preserving old timestamp
-    const now = new Date().toISOString();
+    // Timestamp only changes on create/edit in app or admin server-side. Use local lastModified, never "now".
+    const localTs = await getLocalRepositoryTimestamp();
+    if (!localTs) {
+      console.error('❌ [UNIFIED SYNC] Cannot upload: no local lastModified (timestamp only set on create/edit).');
+      return result;
+    }
     const profile = await businessRepository.get();
     if (profile) {
       const profileResponse = await fetch(`${API_BASE_URL}/api/v1/businesses/${businessId}`, {
@@ -151,7 +153,7 @@ const uploadAllData = async (businessId: string): Promise<{
         },
         body: JSON.stringify({
           ...profile,
-          updatedAt: now, // Use current time - sync is happening now
+          updatedAt: localTs,
         }),
       });
       
@@ -326,7 +328,7 @@ const uploadAllData = async (businessId: string): Promise<{
     }
     console.log(`  ✅ Uploaded ${result.customers}/${allCustomers.length} customers`);
 
-    // Update business.updatedAt in Redis to current time (sync just happened)
+    // Ensure business.updatedAt in Redis matches local lastModified (from create/edit). Never use "now".
     try {
       const businessResponse = await fetch(`${API_BASE_URL}/api/v1/businesses/${businessId}`, {
         method: 'GET',
@@ -338,7 +340,7 @@ const uploadAllData = async (businessId: string): Promise<{
         if (businessResult.success && businessResult.data) {
           const updatedBusiness = {
             ...businessResult.data,
-            updatedAt: now, // Use current time - sync just completed
+            updatedAt: localTs,
           };
           
           const updateResponse = await fetch(`${API_BASE_URL}/api/v1/businesses/${businessId}`, {
@@ -351,7 +353,7 @@ const uploadAllData = async (businessId: string): Promise<{
           });
           
           if (updateResponse.ok) {
-            console.log(`✅ [UNIFIED SYNC] Business timestamp updated to ${now}`);
+            console.log(`✅ [UNIFIED SYNC] Business timestamp set to local lastModified: ${localTs}`);
           } else {
             const errorText = await updateResponse.text();
             console.error(`❌ [UNIFIED SYNC] Failed to update business timestamp: ${updateResponse.status} ${errorText.substring(0, 200)}`);
@@ -362,7 +364,6 @@ const uploadAllData = async (businessId: string): Promise<{
       }
     } catch (error: any) {
       console.error(`❌ [UNIFIED SYNC] Error updating business timestamp: ${error.message || error}`);
-      // Don't fail sync if timestamp update fails
     }
 
     // All data uploaded successfully
@@ -432,72 +433,52 @@ export const performUnifiedSync = async (businessId: string): Promise<{
       console.log('⚠️ [DEBUG] Error collecting local storage dump:', debugError.message);
     }
 
-    // Get timestamps - RETRY if missing
+    // Get timestamps. Retry remote only (transient API issues). Local is never fabricated.
     let localTimestamp = await getLocalRepositoryTimestamp();
     let remoteTimestamp = await getRemoteRepositoryTimestamp(businessId);
-    
-    // Retry fetching timestamps if missing (up to 2 retries)
     let retryCount = 0;
     const maxRetries = 2;
-    while ((!localTimestamp || !remoteTimestamp) && retryCount < maxRetries) {
+    while (!remoteTimestamp && retryCount < maxRetries) {
       retryCount++;
-      console.warn(`⚠️ [UNIFIED SYNC] Missing timestamps (attempt ${retryCount}/${maxRetries}) - retrying...`);
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
-      
-      if (!localTimestamp) {
-        localTimestamp = await getLocalRepositoryTimestamp();
-      }
-      if (!remoteTimestamp) {
-        remoteTimestamp = await getRemoteRepositoryTimestamp(businessId);
-      }
+      console.warn(`⚠️ [UNIFIED SYNC] Remote timestamp missing (attempt ${retryCount}/${maxRetries}) - retrying...`);
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      remoteTimestamp = await getRemoteRepositoryTimestamp(businessId);
     }
 
     console.log(`📊 [UNIFIED SYNC] Timestamp comparison:`);
-    console.log(`   Local:  ${localTimestamp || 'MISSING'}`);
-    console.log(`   Remote: ${remoteTimestamp || 'MISSING'}`);
-    
-    // CRITICAL DEBUG: Log actual values being compared
+    console.log(`   Local:  ${localTimestamp ?? 'null'}`);
+    console.log(`   Remote: ${remoteTimestamp ?? 'null'}`);
     if (localTimestamp && remoteTimestamp) {
-      const localTime = new Date(localTimestamp).getTime();
-      const remoteTime = new Date(remoteTimestamp).getTime();
-      console.log(`   Local time (ms):  ${localTime}`);
-      console.log(`   Remote time (ms): ${remoteTime}`);
-      console.log(`   Local > Remote:   ${localTime > remoteTime}`);
-      console.log(`   Remote > Local:   ${remoteTime > localTime}`);
-      console.log(`   Difference (ms):  ${Math.abs(localTime - remoteTime)} (${Math.abs(localTime - remoteTime) / 1000 / 60} minutes)`);
+      const localMs = new Date(localTimestamp).getTime();
+      const remoteMs = new Date(remoteTimestamp).getTime();
+      console.log(`   Local (ms): ${localMs}, Remote (ms): ${remoteMs}, diff: ${Math.abs(localMs - remoteMs) / 1000 / 60} min`);
     }
 
-    // CRITICAL: Both timestamps MUST exist to perform comparison test
-    // If either is missing after retries, we CANNOT perform the test - fail gracefully
-    if (!localTimestamp || !remoteTimestamp) {
-      const errorMsg = `❌ [UNIFIED SYNC] Cannot perform timestamp comparison after ${maxRetries} retries - missing required data: localTimestamp=${localTimestamp ? 'exists' : 'MISSING'}, remoteTimestamp=${remoteTimestamp ? 'exists' : 'MISSING'}`;
-      console.error(errorMsg);
-      errors.push(errorMsg);
-      return {
-        success: false,
-        direction: 'none',
-        synced: result,
-        errors,
-      };
-    }
-    
-    // Both timestamps exist - perform comparison test
+    // Decide direction. Timestamp only changes on create/edit (or admin). Never upload when local is null.
     let direction: 'upload' | 'download' | 'none' = 'none';
-    const localTime = new Date(localTimestamp).getTime();
-    const remoteTime = new Date(remoteTimestamp).getTime();
-    
-    if (localTime > remoteTime) {
-      // Local is newer - upload
-      console.log('📤 [UNIFIED SYNC] Local is newer - uploading all data');
-      direction = 'upload';
-    } else if (remoteTime > localTime) {
-      // Remote is newer - download
-      console.log('📥 [UNIFIED SYNC] Remote is newer - downloading all data');
+    if (!localTimestamp && remoteTimestamp) {
+      // No valid local timestamp (e.g. stale device, fresh restore) → take Redis as truth. Never overwrite.
+      console.log('📥 [UNIFIED SYNC] Local timestamp null, remote exists → downloading (no upload)');
       direction = 'download';
-    } else {
-      // Timestamps are equal - no sync needed
-      console.log('✅ [UNIFIED SYNC] Timestamps are equal - no sync needed');
+    } else if (!localTimestamp && !remoteTimestamp) {
+      console.log('✅ [UNIFIED SYNC] Both timestamps null → no sync');
       direction = 'none';
+    } else if (localTimestamp && !remoteTimestamp) {
+      console.log('📤 [UNIFIED SYNC] Local exists, remote null → uploading');
+      direction = 'upload';
+    } else {
+      const localTime = new Date(localTimestamp!).getTime();
+      const remoteTime = new Date(remoteTimestamp!).getTime();
+      if (localTime > remoteTime) {
+        console.log('📤 [UNIFIED SYNC] Local is newer → uploading');
+        direction = 'upload';
+      } else if (remoteTime > localTime) {
+        console.log('📥 [UNIFIED SYNC] Remote is newer → downloading');
+        direction = 'download';
+      } else {
+        console.log('✅ [UNIFIED SYNC] Timestamps equal → no sync');
+        direction = 'none';
+      }
     }
 
     // Perform sync based on direction
@@ -577,13 +558,11 @@ export const performUnifiedSync = async (businessId: string): Promise<{
   }
 };
 
-// Helper function to update sync metadata (re-exported from localRepository)
-const updateSyncMetadata = async (updates: {
-  lastSyncedAt: string;
-  lastModified: string;
+const updateSyncMetadata = async (updates: Partial<{
+  lastSyncedAt: string | null;
+  lastModified: string | null;
   hasUnsyncedChanges: boolean;
-}): Promise<void> => {
-  const { updateSyncMetadata: update } = await import('./localRepository');
-  await update(updates);
+}>): Promise<void> => {
+  await updateLocalSyncMetadata(updates);
 };
 

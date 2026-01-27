@@ -52,41 +52,31 @@ export const mapDbRewardToFormFields = (reward: Reward) => {
 };
 
 /**
- * Campaign icon pool - randomly assigned for UI display
+ * Campaign icon: always star (no demo/random icons)
  */
-const CAMPAIGN_ICONS = ['🎄', '🎆', '💝', '🌸', '🎃', '🎁', '🎉', '🏆', '🎯', '🎊', '🌟', '⭐', '🎪', '🎨', '🎭'];
+const CAMPAIGN_ICON = '⭐';
 
 /**
  * Compute UI display fields from DB format campaign
- * Note: icon is NOT stored - randomly assigned for UI consistency
+ * Icon is always star. Count/total are not shown on business app campaign cards.
  */
 export const getCampaignDisplayFields = (campaign: Campaign): {
   icon: string;
   count: number;
   total: number;
 } => {
-  // Use campaign ID to deterministically assign icon (consistent per campaign)
-  const iconIndex = parseInt(campaign.id.slice(-2) || '0', 10) % CAMPAIGN_ICONS.length;
-  const icon = CAMPAIGN_ICONS[iconIndex];
-  
-  // Get total from rewardData if available, otherwise default
-  const total = campaign.conditions?.rewardData?.stampsRequired || 10;
-  
-  // Count is from customerProgress (sum of all customer points)
-  // customerProgress is Record<string, { points: number; actions: Record<string, number> }>
+  const total = campaign.conditions?.rewardData?.stampsRequired || 0;
   let count = 0;
   if (campaign.customerProgress) {
     count = Object.values(campaign.customerProgress).reduce((sum, progress) => {
       if (typeof progress === 'object' && progress !== null && 'points' in progress) {
         return sum + (progress.points || 0);
       }
-      // Backward compatibility: if it's just a number
       return sum + (typeof progress === 'number' ? progress : 0);
     }, 0);
   }
-  
   return {
-    icon,
+    icon: CAMPAIGN_ICON,
     count,
     total,
   };

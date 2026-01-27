@@ -901,11 +901,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                       <Text style={styles.rewardIcon}>{displayFields.icon}</Text>
                     </View>
                   </View>
-                  <Text style={styles.rewardCount}>
-                    {displayFields.count} / {displayFields.total}
-                  </Text>
-                  <Text style={styles.campaignStatus}>
-                    {campaign.status.toUpperCase()}
+                  <Text style={styles.rewardSubtitle} numberOfLines={1}>
+                    {businessName}
                   </Text>
                 </TouchableOpacity>
               );
@@ -1588,6 +1585,12 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: Colors.text.secondary,
     textAlign: 'center',
+  },
+  rewardSubtitle: {
+    fontSize: 11,
+    color: Colors.text.secondary,
+    textAlign: 'center',
+    marginTop: 4,
   },
   campaignStatus: {
     fontSize: 10,

@@ -39,33 +39,26 @@ interface SyncMetadata {
 
 /**
  * Get sync metadata
- * CRITICAL: ALWAYS returns a timestamp - if none exists, creates one with current time
+ * Timestamp (lastModified) is ONLY set on create/edit in the app or admin server-side — never fabricated here.
+ * If missing, it stays null. Sync logic must not treat null as "newer" (e.g. never upload based on null).
  */
 export const getSyncMetadata = async (): Promise<SyncMetadata> => {
   try {
     const data = await AsyncStorage.getItem(REPOSITORY_KEYS.SYNC_METADATA);
     if (data) {
       const metadata = JSON.parse(data);
-      // ENSURE timestamp always exists - if null or missing, set to current time
-      if (!metadata.lastModified) {
-        metadata.lastModified = new Date().toISOString();
-        await AsyncStorage.setItem(REPOSITORY_KEYS.SYNC_METADATA, JSON.stringify(metadata));
-      }
       return metadata;
     }
   } catch (error) {
     console.error('Error getting sync metadata:', error);
   }
-  // If no metadata exists, create it with current timestamp
-  const now = new Date().toISOString();
-  const initialMetadata = {
+  const initialMetadata: SyncMetadata = {
     lastSyncedAt: null,
     lastDownloadedAt: null,
     hasUnsyncedChanges: false,
     version: 0,
-    lastModified: now, // ALWAYS set timestamp on creation
+    lastModified: null,
   };
-  // Save initial metadata
   try {
     await AsyncStorage.setItem(REPOSITORY_KEYS.SYNC_METADATA, JSON.stringify(initialMetadata));
   } catch (e) {
@@ -76,42 +69,31 @@ export const getSyncMetadata = async (): Promise<SyncMetadata> => {
 
 /**
  * Update sync metadata
- * CRITICAL: If updating lastModified, ensures it's never null
+ * lastModified is only altered on create/edit (or when storing received Redis timestamp after download). Never fabricated.
  */
 export const updateSyncMetadata = async (updates: Partial<SyncMetadata>): Promise<void> => {
   try {
     const current = await getSyncMetadata();
     const updated = { ...current, ...updates };
-    // ENSURE lastModified is never null - if being set, must be a valid ISO string
-    if (updated.lastModified === null || updated.lastModified === undefined) {
-      console.warn('⚠️ [REPOSITORY] Attempted to set lastModified to null - using current time instead');
-      updated.lastModified = new Date().toISOString();
-    }
     await AsyncStorage.setItem(REPOSITORY_KEYS.SYNC_METADATA, JSON.stringify(updated));
-    console.log(`✅ [REPOSITORY] Sync metadata updated - lastModified: ${updated.lastModified}`);
+    console.log(`✅ [REPOSITORY] Sync metadata updated - lastModified: ${updated.lastModified ?? 'null'}`);
   } catch (error) {
     console.error('Error updating sync metadata:', error);
-    throw error; // Don't silently fail - this is critical
+    throw error;
   }
 };
 
 /**
- * Mark repository as having unsynced changes and update lastModified timestamp
- * CRITICAL: ALWAYS sets timestamp - never allows null
+ * Mark repository as having unsynced changes and update lastModified timestamp.
+ * Only place we set lastModified to "now": create/edit in the business app (or admin server-side). Nowhere else.
  */
 const markDirty = async (): Promise<void> => {
   const now = new Date().toISOString();
   console.log(`[REPOSITORY] Marking dirty with timestamp: ${now}`);
-  await updateSyncMetadata({ 
+  await updateSyncMetadata({
     hasUnsyncedChanges: true,
-    lastModified: now  // ALWAYS set - never null
+    lastModified: now,
   });
-  // Verify timestamp was set
-  const metadata = await getSyncMetadata();
-  if (!metadata.lastModified) {
-    console.error('❌ [REPOSITORY] CRITICAL: Timestamp was not set! Forcing update...');
-    await updateSyncMetadata({ lastModified: now });
-  }
 };
 
 /**

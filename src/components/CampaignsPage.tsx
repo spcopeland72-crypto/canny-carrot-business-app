@@ -6,9 +6,11 @@ import {
   TouchableOpacity,
   ScrollView,
   Alert,
+  Modal,
 } from 'react-native';
 import {Colors} from '../constants/Colors';
 import PageTemplate from './PageTemplate';
+import { campaignsRepository } from '../services/localRepository';
 
 interface Campaign {
   id: string;
@@ -35,28 +37,32 @@ const CampaignsPage: React.FC<CampaignsPageProps> = ({
   onNavigate,
   onBack,
   campaigns: propsCampaigns = [],
-  onDeleteCampaign,
+  onDeleteCampaign: _onDeleteCampaign,
 }) => {
-  // Use campaigns from props (loaded from file), fallback to empty array
   const campaigns = propsCampaigns.length > 0 ? propsCampaigns : [];
+  const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
+  const [campaignToDelete, setCampaignToDelete] = useState<{ id: string; name: string } | null>(null);
 
-  const handleDelete = (id: string) => {
-    Alert.alert(
-      'Delete Campaign',
-      'Are you sure you want to delete this campaign?',
-      [
-        {text: 'Cancel', style: 'cancel'},
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => {
-            if (onDeleteCampaign) {
-              onDeleteCampaign(id);
-            }
-          },
-        },
-      ],
-    );
+  // Identical to CreateEditRewardPage dustbin: show modal, then confirmDeleteCampaign
+  const handleDeleteReward = (campaign: Campaign) => {
+    setCampaignToDelete({ id: campaign.id, name: campaign.name });
+    setDeleteConfirmVisible(true);
+  };
+
+  const confirmDeleteReward = async () => {
+    if (!campaignToDelete) return;
+    try {
+      await campaignsRepository.delete(campaignToDelete.id);
+      console.log(`✅ [CampaignsPage] Campaign ${campaignToDelete.id} deleted from local storage`);
+      setDeleteConfirmVisible(false);
+      setCampaignToDelete(null);
+      onNavigate('Home');
+    } catch (error) {
+      console.error('Error deleting campaign:', error);
+      Alert.alert('Error', 'Failed to delete campaign. Please try again.');
+      setDeleteConfirmVisible(false);
+      setCampaignToDelete(null);
+    }
   };
 
   return (
@@ -114,6 +120,34 @@ const CampaignsPage: React.FC<CampaignsPageProps> = ({
           ))}
         </ScrollView>
       </View>
+
+      {/* Delete Confirmation Modal — identical to CreateEditRewardPage dustbin */}
+      <Modal
+        visible={deleteConfirmVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => { setDeleteConfirmVisible(false); setCampaignToDelete(null); }}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.deleteModal}>
+            <Text style={styles.deleteModalTitle}>Delete Campaign?</Text>
+            <Text style={styles.deleteModalMessage}>
+              Are you sure you want to delete "{campaignToDelete?.name}"? This action cannot be undone.
+            </Text>
+            <View style={styles.deleteModalButtons}>
+              <TouchableOpacity
+                style={[styles.deleteModalButton, styles.deleteModalButtonCancel]}
+                onPress={() => { setDeleteConfirmVisible(false); setCampaignToDelete(null); }}>
+                <Text style={styles.deleteModalButtonTextCancel}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.deleteModalButton, styles.deleteModalButtonDelete]}
+                onPress={confirmDeleteReward}>
+                <Text style={styles.deleteModalButtonTextDelete}>Delete</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </PageTemplate>
   );
 };
@@ -199,6 +233,60 @@ const styles = StyleSheet.create({
   deleteButtonText: {
     color: Colors.background,
     fontWeight: '600',
+    fontSize: 18,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  deleteModal: {
+    backgroundColor: Colors.background,
+    borderRadius: 16,
+    padding: 24,
+    width: '85%',
+    maxWidth: 400,
+    alignItems: 'center',
+  },
+  deleteModalTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: Colors.text.primary,
+    marginBottom: 12,
+  },
+  deleteModalMessage: {
+    fontSize: 16,
+    color: Colors.text.secondary,
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  deleteModalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    width: '100%',
+  },
+  deleteModalButton: {
+    flex: 1,
+    padding: 14,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  deleteModalButtonCancel: {
+    backgroundColor: Colors.neutral[200],
+  },
+  deleteModalButtonDelete: {
+    backgroundColor: '#FF3B30',
+  },
+  deleteModalButtonTextCancel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: Colors.text.primary,
+  },
+  deleteModalButtonTextDelete: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: Colors.background,
   },
 });
 

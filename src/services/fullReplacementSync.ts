@@ -7,7 +7,7 @@
  * 3. Ensures Redis is an exact copy of local repository
  */
 
-import { businessRepository, rewardsRepository, campaignsRepository, customersRepository } from './localRepository';
+import { businessRepository, rewardsRepository, campaignsRepository, customersRepository, getLocalRepositoryTimestamp } from './localRepository';
 import type { BusinessProfile, Reward, Campaign, Customer } from '../types';
 
 const API_BASE_URL = 'https://api.cannycarrot.com';
@@ -359,48 +359,40 @@ export const performFullReplacementSync = async (businessId: string): Promise<{
       errors.push(`Failed to write ${allCustomers.length - result.customers} customers`);
     }
 
-    // STEP 3: Update business.updatedAt timestamp in Redis to match the local repository's timestamp
-    // This ensures Redis reflects the device's timestamp, not a new timestamp generated on sync
+    // STEP 3: Update business.updatedAt only when we have a valid local lastModified (from create/edit). Never use "now".
     try {
-      const { getLocalRepositoryTimestamp } = await import('./localRepository');
       const localTimestamp = await getLocalRepositoryTimestamp();
-      
-      // Fetch current business record and update its timestamp to match local repository
-      const businessResponse = await fetch(`${API_BASE_URL}/api/v1/businesses/${businessId}`, {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
-      });
-      
-      if (businessResponse.ok) {
-        const businessResult = await businessResponse.json();
-        if (businessResult.success && businessResult.data) {
-          const existingBusiness = businessResult.data;
-          // Update business.updatedAt to match the device's timestamp
-          const updatedBusiness = {
-            ...existingBusiness,
-            updatedAt: localTimestamp, // Use device's timestamp, not a new one
-          };
-          
-          const updateResponse = await fetch(`${API_BASE_URL}/api/v1/businesses/${businessId}`, {
-            method: 'PUT',
-            headers: { 
-              'Content-Type': 'application/json',
-              'X-Sync-Context': 'logout', // Required by Redis write monitor
-            },
-            body: JSON.stringify(updatedBusiness),
-          });
-          
-          if (updateResponse.ok) {
-            console.log(`✅ [FULL SYNC] Business repository timestamp updated to match local: ${localTimestamp}`);
-          } else {
-            const errorText = await updateResponse.text();
-            console.warn(`⚠️ [FULL SYNC] Failed to update business timestamp: ${updateResponse.status} ${errorText.substring(0, 100)}`);
+      if (!localTimestamp) {
+        console.log('ℹ️ [FULL SYNC] No local lastModified — skipping business.updatedAt update (timestamp only set on create/edit).');
+        // Still wrote profile/rewards/campaigns/customers; we just don't overwrite Redis timestamp.
+      } else {
+        const businessResponse = await fetch(`${API_BASE_URL}/api/v1/businesses/${businessId}`, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' },
+        });
+        if (businessResponse.ok) {
+          const businessResult = await businessResponse.json();
+          if (businessResult.success && businessResult.data) {
+            const updatedBusiness = {
+              ...businessResult.data,
+              updatedAt: localTimestamp,
+            };
+            const updateResponse = await fetch(`${API_BASE_URL}/api/v1/businesses/${businessId}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json', 'X-Sync-Context': 'logout' },
+              body: JSON.stringify(updatedBusiness),
+            });
+            if (updateResponse.ok) {
+              console.log(`✅ [FULL SYNC] Business timestamp set to local lastModified: ${localTimestamp}`);
+            } else {
+              const errorText = await updateResponse.text();
+              console.warn(`⚠️ [FULL SYNC] Failed to update business timestamp: ${updateResponse.status} ${errorText.substring(0, 100)}`);
+            }
           }
         }
       }
     } catch (error: any) {
       console.warn(`⚠️ [FULL SYNC] Error updating business timestamp: ${error.message || error}`);
-      // Don't fail the sync if timestamp update fails
     }
 
     console.log('\n✅ [FULL SYNC] Full replacement sync completed');

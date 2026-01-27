@@ -230,39 +230,21 @@ export const performDailySync = async (businessId: string, forceSync: boolean = 
       errors.push(`Failed to sync ${customers.length - result.customers} customers`);
     }
 
-    // CRITICAL: Do NOT update timestamps during sync
-    // Timestamps ONLY change when create/edit/delete actions occur in the app
-    // Sync just compares timestamps and copies data - it doesn't change timestamps
-    // The API is a transparent forwarder and preserves timestamps from requests
-
-    // Update sync metadata after sync
-    // CRITICAL: Only update lastModified if sync was actually successful
-    // If rewards failed to sync, keep the local timestamp to preserve local data
-    const syncTime = new Date().toISOString(); // Local sync timestamp (not written to Redis)
+    // Timestamp (lastModified) is ONLY altered on create/edit in app or admin server-side. Never on sync.
+    const syncTime = new Date().toISOString();
     const allRewardsSynced = result.rewards === rewards.length;
     const allCampaignsSynced = result.campaigns === campaigns.length;
     const allCustomersSynced = result.customers === customers.length;
     const syncFullySuccessful = allRewardsSynced && allCampaignsSynced && allCustomersSynced && errors.length === 0;
-    
+
+    await updateSyncMetadata({
+      lastSyncedAt: syncTime,
+      hasUnsyncedChanges: !syncFullySuccessful,
+    });
     if (syncFullySuccessful) {
-      // All data synced successfully - update timestamp to sync time
-      await updateSyncMetadata({
-        lastSyncedAt: syncTime,
-        lastModified: syncTime, // Repository is now in sync with Redis
-        hasUnsyncedChanges: false,
-      });
-      console.log(`✅ [SYNC] Sync metadata updated - timestamp: ${syncTime}`);
+      console.log(`✅ [SYNC] Sync metadata updated (lastModified unchanged)`);
     } else {
-      // Some data failed to sync - keep local timestamp and mark as dirty
-      // This ensures local data is preserved and will be retried
-      const currentMetadata = await getSyncStatus();
-      await updateSyncMetadata({
-        lastSyncedAt: syncTime,
-        lastModified: currentMetadata.lastModified || syncTime, // Keep existing timestamp
-        hasUnsyncedChanges: true, // Still has unsynced changes
-      });
-      console.warn(`⚠️ [SYNC] Sync incomplete - preserving local timestamp: ${currentMetadata.lastModified || syncTime}`);
-      console.warn(`   Rewards: ${result.rewards}/${rewards.length}, Campaigns: ${result.campaigns}/${campaigns.length}, Customers: ${result.customers}/${customers.length}`);
+      console.warn(`⚠️ [SYNC] Sync incomplete - lastModified unchanged. Rewards: ${result.rewards}/${rewards.length}, Campaigns: ${result.campaigns}/${campaigns.length}, Customers: ${result.customers}/${customers.length}`);
     }
 
     console.log('✅ [DAILY SYNC] Sync completed:', result);

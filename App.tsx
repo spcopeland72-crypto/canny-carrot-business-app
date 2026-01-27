@@ -44,6 +44,7 @@ import {saveRewards, loadRewards, saveCampaigns, loadCampaigns, type Reward, typ
 import {generateRewardQRCode} from './src/utils/qrCodeUtils';
 import {isAuthenticated, getStoredAuth} from './src/services/authService';
 import {rewardsRepository, campaignsRepository, customersRepository} from './src/services/localRepository';
+import {RefreshProvider} from './src/contexts/RefreshContext';
 // CRITICAL: No automatic daily sync - Redis only accessed on login/logout, create/submit, or manual sync
 import {dumpRepository} from './src/utils/dumpRepository';
 
@@ -390,6 +391,13 @@ function App(): React.JSX.Element {
     }
   };
 
+  // Refresh rewards + campaigns (e.g. after sync). Keeps current view; only redraws affected UI.
+  const handleSyncComplete = async () => {
+    await reloadRewards();
+    await reloadCampaigns();
+    console.log('✅ [App] Refreshed rewards and campaigns after sync');
+  };
+
   const handleNavigate = async (screen: ScreenName) => {
     setPreviousScreen(currentScreen);
     setCurrentScreen(screen);
@@ -404,12 +412,13 @@ function App(): React.JSX.Element {
     }
   };
 
-  const handleBack = () => {
-    if (previousScreen) {
-      setCurrentScreen(previousScreen);
-      setPreviousScreen(null);
-    } else {
-      setCurrentScreen('Home');
+  const handleBack = async () => {
+    const target = previousScreen ?? 'Home';
+    setPreviousScreen(null);
+    setCurrentScreen(target);
+    if (target === 'Home') {
+      await reloadRewards();
+      await reloadCampaigns();
     }
   };
 
@@ -689,14 +698,14 @@ function App(): React.JSX.Element {
   };
 
   return (
-    <>
+    <RefreshProvider refreshAfterSync={handleSyncComplete}>
       {renderScreen()}
       <ScanModal
         visible={scanModalVisible}
         onBarcodeScanned={handleBarcodeScanned}
         onClose={() => setScanModalVisible(false)}
       />
-    </>
+    </RefreshProvider>
   );
 }
 

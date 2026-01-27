@@ -12,6 +12,7 @@ import {Colors} from '../constants/Colors';
 import {businessRepository} from '../services/localRepository';
 import {logoutBusiness, getStoredAuth} from '../services/authService';
 import {performUnifiedSync} from '../services/unifiedSyncService';
+import {useRefresh} from '../contexts/RefreshContext';
 
 // Load CC logo image (same as customer app header)
 let ccLogoImage: any = null;
@@ -40,6 +41,7 @@ const CompanyMenuModal: React.FC<CompanyMenuModalProps> = ({
   businessName,
   businessLogo,
 }) => {
+  const {refreshAfterSync} = useRefresh();
   const [businessEmail, setBusinessEmail] = useState<string>('');
   const [theme, setTheme] = useState<'light' | 'dark'>('light'); // TODO: Implement theme system
 
@@ -75,6 +77,7 @@ const CompanyMenuModal: React.FC<CompanyMenuModalProps> = ({
         if (syncResult.success) {
           console.log(`✅ [SYNC] Unified sync completed successfully (${syncResult.direction})`);
           console.log('   Synced:', syncResult.synced);
+          await refreshAfterSync();
         } else {
           console.warn('⚠️ [SYNC] Sync failed:', syncResult.errors);
         }
