@@ -110,10 +110,13 @@ export const generateCampaignItemQRCode = (
   allProducts?: string[],
   allActions?: string[]
 ): string => {
-  const safeBusinessName = (businessName ?? '').replace(/:/g, '-').trim();
+  const safe = (s: string) => (s ?? '').replace(/:/g, '-').trim();
+  const safeBusinessName = safe(businessName ?? '');
+  const safeCampaignName = safe(campaignName);
+  const safeItemName = safe(itemName);
   const productsPart = (allProducts && allProducts.length > 0) ? allProducts.join('||') : '';
   const actionsPart = (allActions && allActions.length > 0) ? allActions.join('||') : '';
-  return `CAMPAIGN_ITEM:${businessId}:${safeBusinessName}:${campaignName}:${itemType}:${itemName}:${startDate}:${endDate}:${productsPart}:${actionsPart}`;
+  return `CAMPAIGN_ITEM:${businessId}:${safeBusinessName}:${safeCampaignName}:${itemType}:${safeItemName}:${startDate}:${endDate}:${productsPart}:${actionsPart}`;
 };
 
 /**
