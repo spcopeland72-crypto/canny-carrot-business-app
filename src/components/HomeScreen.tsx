@@ -131,15 +131,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
     linkedin?: any;
   }>({});
   const [mode, setMode] = useState<'instore' | 'online'>('instore');
-  const modeToggleAnim = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    Animated.timing(modeToggleAnim, {
-      toValue: mode === 'online' ? 26 : 0,
-      duration: 300,
-      useNativeDriver: true,
-      easing: Easing.bezier(0.23, 1, 0.32, 1),
-    }).start();
-  }, [mode, modeToggleAnim]);
 
   // Local state for rewards as fallback if props are empty
   const [localRewards, setLocalRewards] = useState<Reward[]>([]);
@@ -645,7 +636,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
             {businessName}
           </Text>
           
-          {/* Right icons */}
+          {/* Right: i button + mode button (Online when instore, In-store when online) */}
           <View style={styles.headerIcons}>
             <TouchableOpacity
               style={[styles.iconButton, {marginRight: 12}]}
@@ -655,35 +646,14 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
               </View>
             </TouchableOpacity>
             <TouchableOpacity
-              style={styles.iconButton}
-              onPress={() => setNotificationsModalVisible(true)}>
-              <View style={styles.bellIconContainer}>
-                {/* Bell handle/loop at top */}
-                <View style={styles.bellHandle} />
-                {/* Bell body - rounded shape, wider at bottom */}
-                <View style={styles.bellBody}>
-                  {/* Bottom horizontal band */}
-                  <View style={styles.bellBottomBand} />
-                </View>
-                {/* Clapper/opening at very bottom */}
-                <View style={styles.bellClapper} />
-                {/* Red dot indicator for unread notifications */}
-                {hasUnreadNotifications && (
-                  <View style={styles.notificationDot} />
-                )}
-              </View>
+              style={[styles.modeButton, mode === 'online' && styles.modeButtonActive]}
+              onPress={() => setMode(mode === 'online' ? 'instore' : 'online')}
+              activeOpacity={0.7}>
+              <Text style={[styles.modeButtonText, mode === 'online' && styles.modeButtonTextActive]}>
+                {mode === 'instore' ? 'Online' : 'In-store'}
+              </Text>
             </TouchableOpacity>
           </View>
-        </View>
-        {/* In-store / Online toggle - right-aligned under i and bell; label shows the other mode */}
-        <View style={styles.modeToggleRow}>
-          <Text style={styles.modeToggleLabel}>{mode === 'instore' ? 'Online' : 'In-store'}</Text>
-          <TouchableOpacity
-            activeOpacity={1}
-            onPress={() => setMode(mode === 'online' ? 'instore' : 'online')}
-            style={[styles.switchTrack, mode === 'online' && styles.switchTrackChecked]}>
-            <Animated.View style={[styles.switchThumb, {transform: [{translateX: modeToggleAnim}]}]} />
-          </TouchableOpacity>
         </View>
       </View>
 
@@ -796,9 +766,9 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
         </View>
         )}
 
-        {/* Store section - Online only: Install, Manage, Analytics */}
+        {/* Store section - Online only: Install, Manage, Analytics; 10px above STORE heading */}
         {mode === 'online' && (
-          <View style={styles.section}>
+          <View style={[styles.section, styles.storeSectionOnlineSpacing]}>
             <Text style={styles.sectionTitle}>STORE</Text>
             <View style={styles.storeButtonsRow}>
               <TouchableOpacity style={styles.storeButton} onPress={() => { /* TODO: Install plugin flow */ }}>
@@ -1515,43 +1485,27 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     marginBottom: 8,
   },
-  modeToggleRow: {
-    flexDirection: 'row',
+  modeButton: {
+    width: 56,
+    height: 32,
+    justifyContent: 'center',
     alignItems: 'center',
-    justifyContent: 'flex-end',
-    paddingVertical: 4,
-    paddingHorizontal: 12,
-    gap: 10,
+    borderRadius: 16,
+    backgroundColor: Colors.neutral[200],
   },
-  modeToggleLabel: {
-    fontSize: 14,
+  modeButtonActive: {
+    backgroundColor: Colors.primary,
+  },
+  modeButtonText: {
+    fontSize: 13,
     fontWeight: '600',
     color: Colors.text.primary,
   },
-  switchTrack: {
-    width: 56,
-    height: 32,
-    borderRadius: 50,
-    borderWidth: 2,
-    borderColor: '#414141',
-    justifyContent: 'center',
-    paddingHorizontal: 4,
+  modeButtonTextActive: {
+    color: Colors.background,
   },
-  switchTrackChecked: {
-    borderColor: '#0974f1',
-    ...Platform.select({
-      ios: {shadowColor: '#0974f1', shadowOffset: {width: 0, height: 0}, shadowOpacity: 0.8, shadowRadius: 10},
-      android: {elevation: 8},
-    }),
-  },
-  switchThumb: {
-    width: 22,
-    height: 22,
-    borderRadius: 50,
-    backgroundColor: '#FFFFFF',
-    position: 'absolute',
-    left: 4,
-    top: 4,
+  storeSectionOnlineSpacing: {
+    marginTop: 10,
   },
   storeButtonsRow: {
     flexDirection: 'row',
