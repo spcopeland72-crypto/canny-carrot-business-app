@@ -130,6 +130,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
     x?: any;
     linkedin?: any;
   }>({});
+  const [mode, setMode] = useState<'instore' | 'online'>('instore');
 
   // Local state for rewards as fallback if props are empty
   const [localRewards, setLocalRewards] = useState<Reward[]>([]);
@@ -511,6 +512,21 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
             </TouchableOpacity>
           </View>
         </View>
+        {/* In-store / Online toggle - below i and bell row */}
+        <View style={styles.modeToggleRow}>
+          <TouchableOpacity
+            style={[styles.modeToggleButton, mode === 'instore' && styles.modeToggleButtonActive]}
+            onPress={() => setMode('instore')}
+            activeOpacity={0.7}>
+            <Text style={[styles.modeToggleText, mode === 'instore' && styles.modeToggleTextActive]}>In-store</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.modeToggleButton, mode === 'online' && styles.modeToggleButtonActive]}
+            onPress={() => setMode('online')}
+            activeOpacity={0.7}>
+            <Text style={[styles.modeToggleText, mode === 'online' && styles.modeToggleTextActive]}>Online</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView
@@ -518,24 +534,81 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}>
         
-        {/* Marketing Banner Section - same as customer app */}
-        <View style={styles.bannerSection}>
-          {bannerImage && !bannerError ? (
-            <Image
-              source={bannerImage}
-              style={styles.bannerImage}
-              resizeMode="cover"
-              onError={() => {
-                console.log('Banner image failed to load');
-                setBannerError(true);
-              }}
-            />
-          ) : (
-            <View style={styles.banner}>
-              <View style={styles.bannerContent}>
-                <View style={styles.bannerTextContainer}>
-                  <Text style={styles.bannerTitle}>Canny Carrot</Text>
-                  <Text style={styles.bannerSubtitle}>Rewards</Text>
+        {/* Marketing Banner Section - 90% width; Online template when mode === 'online' */}
+        <View style={styles.bannerSectionWrapper}>
+          <View style={styles.bannerSection}>
+            {mode === 'online' ? (
+              /* Canny Carrot Online: grey ticker-style banner, white text */
+              <View style={styles.bannerOnline}>
+                <View style={styles.bannerContent}>
+                  <View style={styles.bannerTextContainer}>
+                    <Text style={styles.bannerTitleOnline}>Canny Carrot</Text>
+                    <Text style={styles.bannerSubtitleOnline}>Online</Text>
+                    <View style={styles.socialIconsContainer}>
+                      {socialIcons.facebook && (
+                        <TouchableOpacity
+                          style={[styles.socialIcon, {marginRight: 7}]}
+                          onPress={() => Linking.openURL('https://www.facebook.com/CannyCarrotRewards')}>
+                          <Image source={socialIcons.facebook} style={styles.socialIconImage} resizeMode="contain" />
+                        </TouchableOpacity>
+                      )}
+                      {socialIcons.instagram && (
+                        <TouchableOpacity
+                          style={[styles.socialIcon, {marginRight: 7}]}
+                          onPress={() => Linking.openURL('https://www.instagram.com/cannycarrotrewards')}>
+                          <Image source={socialIcons.instagram} style={styles.socialIconImage} resizeMode="contain" />
+                        </TouchableOpacity>
+                      )}
+                      {socialIcons.tiktok && (
+                        <TouchableOpacity
+                          style={[styles.socialIcon, {marginRight: 7}]}
+                          onPress={() => Linking.openURL('https://www.tiktok.com/@cannycarrotrewards')}>
+                          <Image source={socialIcons.tiktok} style={styles.socialIconImage} resizeMode="contain" />
+                        </TouchableOpacity>
+                      )}
+                      {socialIcons.x && (
+                        <TouchableOpacity
+                          style={[styles.socialIcon, {marginRight: 7}]}
+                          onPress={() => Linking.openURL('https://twitter.com/CannyCarrotRew')}>
+                          <Image source={socialIcons.x} style={styles.socialIconImage} resizeMode="contain" />
+                        </TouchableOpacity>
+                      )}
+                      {socialIcons.linkedin && (
+                        <TouchableOpacity
+                          style={styles.socialIcon}
+                          onPress={() => Linking.openURL('https://www.linkedin.com/company/canny-carrot-rewards')}>
+                          <Image source={socialIcons.linkedin} style={styles.socialIconImage} resizeMode="contain" />
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  </View>
+                  <View style={styles.bannerLogoContainer}>
+                    {ccIconImage ? (
+                      <Image source={ccIconImage} style={styles.bannerLogoImage} resizeMode="contain" />
+                    ) : (
+                      <View style={styles.bannerLogoPlaceholder}>
+                        <Text style={styles.bannerLogoText}>Logo</Text>
+                      </View>
+                    )}
+                  </View>
+                </View>
+              </View>
+            ) : bannerImage && !bannerError ? (
+              <Image
+                source={bannerImage}
+                style={styles.bannerImage}
+                resizeMode="cover"
+                onError={() => {
+                  console.log('Banner image failed to load');
+                  setBannerError(true);
+                }}
+              />
+            ) : (
+              <View style={styles.banner}>
+                <View style={styles.bannerContent}>
+                  <View style={styles.bannerTextContainer}>
+                    <Text style={styles.bannerTitle}>Canny Carrot</Text>
+                    <Text style={styles.bannerSubtitle}>Rewards</Text>
                   {/* Social Media Icons */}
                   <View style={styles.socialIconsContainer}>
                     {socialIcons.facebook && (
@@ -610,9 +683,9 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                 </View>
               </View>
             </View>
-          )}
-          {/* Social Media Icons for banner with image */}
-          {bannerImage && !bannerError && (
+            )))}
+          {/* Social Media Icons for banner with image (in-store only) */}
+          {mode !== 'online' && bannerImage && !bannerError && (
             <View style={styles.bannerSocialIconsOverlay}>
               <View style={styles.socialIconsContainer}>
                 {socialIcons.facebook && (
@@ -674,9 +747,10 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
             </View>
           )}
         </View>
+        </View>
         
-        {/* Ticker - Exact CodePen implementation - Below banner */}
-        {/* Ticker - EXACT CodePen: one string, seamless wrap */}
+        {/* Ticker - below banner (in-store only) */}
+        {mode === 'instore' && (
         <View style={styles.tickerWrap}>
           <Animated.View
             style={[
@@ -708,11 +782,30 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
             <Text style={styles.tickerItem}>{tickerText}</Text>
           </Animated.View>
         </View>
+        )}
+
+        {/* Store section - Online only: Install, Manage, Analytics */}
+        {mode === 'online' && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>STORE</Text>
+            <View style={styles.storeButtonsRow}>
+              <TouchableOpacity style={styles.storeButton} onPress={() => { /* TODO: Install plugin flow */ }}>
+                <Text style={styles.storeButtonText}>Install</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.storeButton} onPress={() => { /* TODO: Manage plugin */ }}>
+                <Text style={styles.storeButtonText}>Manage</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.storeButton} onPress={() => { /* TODO: Analytics */ }}>
+                <Text style={styles.storeButtonText}>Analytics</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
         
-        {/* Rewards Carousel - Round Elements (matching customer app) */}
+        {/* Rewards Carousel - "REWARDS" in-store, "ONLINE" when online */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>REWARDS</Text>
+            <Text style={styles.sectionTitle}>{mode === 'online' ? 'ONLINE' : 'REWARDS'}</Text>
             <View style={styles.sectionActions}>
               <TouchableOpacity 
                 onPress={() => onNavigate('CreateReward')}
@@ -1381,10 +1474,77 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: 100,
   },
+  bannerSectionWrapper: {
+    width: '90%',
+    alignSelf: 'center',
+    marginBottom: 0,
+  },
   bannerSection: {
     marginBottom: 0,
     width: '100%',
     position: 'relative',
+  },
+  bannerOnline: {
+    backgroundColor: '#6B7280',
+    paddingHorizontal: 20,
+    paddingVertical: 17,
+    minHeight: 128,
+    justifyContent: 'center',
+    width: '100%',
+  },
+  bannerTitleOnline: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    marginBottom: 4,
+  },
+  bannerSubtitleOnline: {
+    fontSize: 21,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    marginBottom: 8,
+  },
+  modeToggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    gap: 12,
+  },
+  modeToggleButton: {
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: Colors.neutral[200],
+  },
+  modeToggleButtonActive: {
+    backgroundColor: Colors.primary,
+  },
+  modeToggleText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: Colors.text.primary,
+  },
+  modeToggleTextActive: {
+    color: Colors.background,
+  },
+  storeButtonsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginTop: 8,
+  },
+  storeButton: {
+    backgroundColor: Colors.primary,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 20,
+  },
+  storeButtonText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: Colors.background,
   },
   bannerImage: {
     width: '100%',
