@@ -37,6 +37,7 @@ import ScanPage from './src/components/ScanPage';
 import HelpPage from './src/components/HelpPage';
 import MorePage from './src/components/MorePage';
 import ChatPage from './src/components/ChatPage';
+import OnlineAdminPage from './src/components/OnlineAdminPage';
 import ScanModal from './src/components/ScanModal';
 import LoginPage from './src/components/LoginPage';
 import type {ScreenName} from './src/types';
@@ -518,6 +519,15 @@ function App(): React.JSX.Element {
             currentScreen={currentScreen}
             onNavigate={handleNavigate}
             onBack={handleBack}
+          />
+        );
+      case 'OnlineAdmin':
+        return (
+          <OnlineAdminPage
+            currentScreen={currentScreen}
+            onNavigate={handleNavigate}
+            onBack={handleBack}
+            onLogout={handleLogout}
           />
         );
       case 'Customers':

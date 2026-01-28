@@ -283,6 +283,7 @@ export type ScreenName =
   | 'CreateReward'
   | 'AllCampaigns'
   | 'CreateCampaign'
+  | 'OnlineAdmin'
   | 'Settings'
   | 'Analytics'
   | 'Products'

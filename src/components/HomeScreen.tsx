@@ -774,7 +774,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
               <TouchableOpacity style={styles.storeButton} onPress={() => { /* TODO: Install plugin flow */ }}>
                 <Text style={styles.storeButtonText}>Install</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.storeButton} onPress={() => { /* TODO: Manage plugin */ }}>
+              <TouchableOpacity style={styles.storeButton} onPress={() => onNavigate('OnlineAdmin')}>
                 <Text style={styles.storeButtonText}>Manage</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.storeButton} onPress={() => { /* TODO: Analytics */ }}>
