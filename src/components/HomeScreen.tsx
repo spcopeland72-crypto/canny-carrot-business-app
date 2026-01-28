@@ -73,6 +73,20 @@ try {
   console.log('[HomeScreen] Social icons not found:', e);
 }
 
+// Store platform logos (Shopify, WooCommerce, eBay, Amazon) for Online STORES carousel
+let shopifyLogo: any = null;
+let woocommerceLogo: any = null;
+let ebayLogo: any = null;
+let amazonLogo: any = null;
+try {
+  shopifyLogo = require('../../assets/stores/shopify-logo.png');
+  woocommerceLogo = require('../../assets/stores/woocommerce-logo.png');
+  ebayLogo = require('../../assets/stores/ebay-logo.png');
+  amazonLogo = require('../../assets/stores/amazon-logo.png');
+} catch (e) {
+  console.log('[HomeScreen] Store logos not found:', e);
+}
+
 const SCREEN_WIDTH = Dimensions.get('window').width || 375;
 const CARD_WIDTH = SCREEN_WIDTH * 0.25; // Match customer app width
 const BOX_WIDTH = (SCREEN_WIDTH - 48) / 2; // 16px padding on each side + 16px gap
@@ -766,10 +780,39 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
         </View>
         )}
 
-        {/* Store section - Online only: Install, Manage, Analytics; 10px above STORE heading */}
+        {/* Stores section - Online only: carousel of store logos, then Install, Manage, Analytics */}
         {mode === 'online' && (
           <View style={[styles.section, styles.storeSectionOnlineSpacing]}>
-            <Text style={styles.sectionTitle}>STORE</Text>
+            <Text style={styles.sectionTitle}>STORES</Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.storesCarouselContent}>
+              {shopifyLogo && (
+                <View style={styles.storeLogoCard}>
+                  <Image source={shopifyLogo} style={styles.storeLogoImage} resizeMode="contain" />
+                  <Text style={styles.storeLogoLabel}>Shopify</Text>
+                </View>
+              )}
+              {woocommerceLogo && (
+                <View style={styles.storeLogoCard}>
+                  <Image source={woocommerceLogo} style={styles.storeLogoImage} resizeMode="contain" />
+                  <Text style={styles.storeLogoLabel}>WooCommerce</Text>
+                </View>
+              )}
+              {ebayLogo && (
+                <View style={styles.storeLogoCard}>
+                  <Image source={ebayLogo} style={styles.storeLogoImage} resizeMode="contain" />
+                  <Text style={styles.storeLogoLabel}>eBay</Text>
+                </View>
+              )}
+              {amazonLogo && (
+                <View style={styles.storeLogoCard}>
+                  <Image source={amazonLogo} style={styles.storeLogoImage} resizeMode="contain" />
+                  <Text style={styles.storeLogoLabel}>Amazon</Text>
+                </View>
+              )}
+            </ScrollView>
             <View style={styles.storeButtonsRow}>
               <TouchableOpacity style={styles.storeButton} onPress={() => { /* TODO: Install plugin flow */ }}>
                 <Text style={styles.storeButtonText}>Install</Text>
@@ -1507,11 +1550,36 @@ const styles = StyleSheet.create({
   storeSectionOnlineSpacing: {
     marginTop: 10,
   },
+  storesCarouselContent: {
+    paddingVertical: 12,
+    paddingRight: 16,
+  },
+  storeLogoCard: {
+    width: 88,
+    marginRight: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.neutral[50],
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: Colors.neutral[200],
+  },
+  storeLogoImage: {
+    width: 56,
+    height: 56,
+    marginBottom: 6,
+  },
+  storeLogoLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: Colors.text.primary,
+  },
   storeButtonsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 12,
-    marginTop: 8,
+    marginTop: 12,
   },
   storeButton: {
     backgroundColor: Colors.primary,
