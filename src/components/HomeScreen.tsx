@@ -73,16 +73,18 @@ try {
   console.log('[HomeScreen] Social icons not found:', e);
 }
 
-// Store platform logos (Shopify, WooCommerce, eBay, Amazon) for Online STORES carousel
+// Store platform logos (Shopify, WooCommerce, eBay, Amazon, Etsy) for Online STORES carousel
 let shopifyLogo: any = null;
 let woocommerceLogo: any = null;
 let ebayLogo: any = null;
 let amazonLogo: any = null;
+let etsyLogo: any = null;
 try {
   shopifyLogo = require('../../assets/stores/shopify-logo.png');
   woocommerceLogo = require('../../assets/stores/woocommerce-logo.png');
   ebayLogo = require('../../assets/stores/ebay-logo.png');
   amazonLogo = require('../../assets/stores/amazon-logo.png');
+  etsyLogo = require('../../assets/stores/etsy-logo.png');
 } catch (e) {
   console.log('[HomeScreen] Store logos not found:', e);
 }
@@ -780,7 +782,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
         </View>
         )}
 
-        {/* Stores section - Online only: carousel of store logos, then Install, Manage, Analytics */}
+        {/* Stores section - Online only: carousel with logo + footer (Install under all except WooCommerce; Manage under WooCommerce) */}
         {mode === 'online' && (
           <View style={[styles.section, styles.storeSectionOnlineSpacing]}>
             <Text style={styles.sectionTitle}>STORES</Text>
@@ -792,34 +794,49 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                 <View style={styles.storeLogoCard}>
                   <Image source={shopifyLogo} style={styles.storeLogoImage} resizeMode="contain" />
                   <Text style={styles.storeLogoLabel}>Shopify</Text>
+                  <TouchableOpacity style={styles.storeCardFooter} onPress={() => { /* TODO: Install */ }}>
+                    <Text style={styles.storeCardFooterText}>Install</Text>
+                  </TouchableOpacity>
                 </View>
               )}
               {woocommerceLogo && (
                 <View style={styles.storeLogoCard}>
                   <Image source={woocommerceLogo} style={styles.storeLogoImage} resizeMode="contain" />
                   <Text style={styles.storeLogoLabel}>WooCommerce</Text>
+                  <TouchableOpacity style={styles.storeCardFooter} onPress={() => onNavigate('OnlineAdmin')}>
+                    <Text style={styles.storeCardFooterText}>Manage</Text>
+                  </TouchableOpacity>
                 </View>
               )}
               {ebayLogo && (
                 <View style={styles.storeLogoCard}>
                   <Image source={ebayLogo} style={styles.storeLogoImage} resizeMode="contain" />
                   <Text style={styles.storeLogoLabel}>eBay</Text>
+                  <TouchableOpacity style={styles.storeCardFooter} onPress={() => { /* TODO: Install */ }}>
+                    <Text style={styles.storeCardFooterText}>Install</Text>
+                  </TouchableOpacity>
                 </View>
               )}
               {amazonLogo && (
                 <View style={styles.storeLogoCard}>
                   <Image source={amazonLogo} style={styles.storeLogoImage} resizeMode="contain" />
                   <Text style={styles.storeLogoLabel}>Amazon</Text>
+                  <TouchableOpacity style={styles.storeCardFooter} onPress={() => { /* TODO: Install */ }}>
+                    <Text style={styles.storeCardFooterText}>Install</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+              {etsyLogo && (
+                <View style={styles.storeLogoCard}>
+                  <Image source={etsyLogo} style={styles.storeLogoImage} resizeMode="contain" />
+                  <Text style={styles.storeLogoLabel}>Etsy</Text>
+                  <TouchableOpacity style={styles.storeCardFooter} onPress={() => { /* TODO: Install */ }}>
+                    <Text style={styles.storeCardFooterText}>Install</Text>
+                  </TouchableOpacity>
                 </View>
               )}
             </ScrollView>
             <View style={styles.storeButtonsRow}>
-              <TouchableOpacity style={styles.storeButton} onPress={() => { /* TODO: Install plugin flow */ }}>
-                <Text style={styles.storeButtonText}>Install</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.storeButton} onPress={() => onNavigate('OnlineAdmin')}>
-                <Text style={styles.storeButtonText}>Manage</Text>
-              </TouchableOpacity>
               <TouchableOpacity style={styles.storeButton} onPress={() => { /* TODO: Analytics */ }}>
                 <Text style={styles.storeButtonText}>Analytics</Text>
               </TouchableOpacity>
@@ -1574,6 +1591,18 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     color: Colors.text.primary,
+    marginBottom: 8,
+  },
+  storeCardFooter: {
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    backgroundColor: Colors.primary,
+  },
+  storeCardFooterText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: Colors.background,
   },
   storeButtonsRow: {
     flexDirection: 'row',
