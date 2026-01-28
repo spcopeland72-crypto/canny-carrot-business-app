@@ -793,7 +793,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
               {shopifyLogo && (
                 <View style={styles.storeLogoCard}>
                   <Image source={shopifyLogo} style={styles.storeLogoImage} resizeMode="contain" />
-                  <Text style={styles.storeLogoLabel}>Shopify</Text>
                   <TouchableOpacity style={styles.storeCardFooter} onPress={() => { /* TODO: Install */ }}>
                     <Text style={styles.storeCardFooterText}>Install</Text>
                   </TouchableOpacity>
@@ -802,7 +801,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
               {woocommerceLogo && (
                 <View style={styles.storeLogoCard}>
                   <Image source={woocommerceLogo} style={styles.storeLogoImage} resizeMode="contain" />
-                  <Text style={styles.storeLogoLabel}>WooCommerce</Text>
                   <TouchableOpacity style={styles.storeCardFooter} onPress={() => onNavigate('OnlineAdmin')}>
                     <Text style={styles.storeCardFooterText}>Manage</Text>
                   </TouchableOpacity>
@@ -811,7 +809,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
               {ebayLogo && (
                 <View style={styles.storeLogoCard}>
                   <Image source={ebayLogo} style={styles.storeLogoImage} resizeMode="contain" />
-                  <Text style={styles.storeLogoLabel}>eBay</Text>
                   <TouchableOpacity style={styles.storeCardFooter} onPress={() => { /* TODO: Install */ }}>
                     <Text style={styles.storeCardFooterText}>Install</Text>
                   </TouchableOpacity>
@@ -820,7 +817,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
               {amazonLogo && (
                 <View style={styles.storeLogoCard}>
                   <Image source={amazonLogo} style={styles.storeLogoImage} resizeMode="contain" />
-                  <Text style={styles.storeLogoLabel}>Amazon</Text>
                   <TouchableOpacity style={styles.storeCardFooter} onPress={() => { /* TODO: Install */ }}>
                     <Text style={styles.storeCardFooterText}>Install</Text>
                   </TouchableOpacity>
@@ -829,18 +825,12 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
               {etsyLogo && (
                 <View style={styles.storeLogoCard}>
                   <Image source={etsyLogo} style={styles.storeLogoImage} resizeMode="contain" />
-                  <Text style={styles.storeLogoLabel}>Etsy</Text>
                   <TouchableOpacity style={styles.storeCardFooter} onPress={() => { /* TODO: Install */ }}>
                     <Text style={styles.storeCardFooterText}>Install</Text>
                   </TouchableOpacity>
                 </View>
               )}
             </ScrollView>
-            <View style={styles.storeButtonsRow}>
-              <TouchableOpacity style={styles.storeButton} onPress={() => { /* TODO: Analytics */ }}>
-                <Text style={styles.storeButtonText}>Analytics</Text>
-              </TouchableOpacity>
-            </View>
           </View>
         )}
         
@@ -1572,7 +1562,7 @@ const styles = StyleSheet.create({
     paddingRight: 16,
   },
   storeLogoCard: {
-    width: 88,
+    width: 114,
     marginRight: 16,
     alignItems: 'center',
     justifyContent: 'center',
@@ -1585,12 +1575,6 @@ const styles = StyleSheet.create({
   storeLogoImage: {
     width: 56,
     height: 56,
-    marginBottom: 6,
-  },
-  storeLogoLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: Colors.text.primary,
     marginBottom: 8,
   },
   storeCardFooter: {
