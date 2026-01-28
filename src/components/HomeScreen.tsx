@@ -440,6 +440,160 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
     {id: '10', from: 'James Taylor', subject: 'Compliment', preview: 'Great job on the new update!', timestamp: '2 days ago', unread: false},
   ];
 
+  const renderBannerContent = () => {
+    if (mode === 'online') {
+      return (
+        <View style={styles.bannerOnline}>
+          <View style={styles.bannerContent}>
+            <View style={styles.bannerTextContainer}>
+              <Text style={styles.bannerTitleOnline}>Canny Carrot</Text>
+              <Text style={styles.bannerSubtitleOnline}>Online</Text>
+              <View style={styles.socialIconsContainer}>
+                {socialIcons.facebook && (
+                  <TouchableOpacity
+                    style={[styles.socialIcon, {marginRight: 7}]}
+                    onPress={() => Linking.openURL('https://www.facebook.com/CannyCarrotRewards')}>
+                    <Image source={socialIcons.facebook} style={styles.socialIconImage} resizeMode="contain" />
+                  </TouchableOpacity>
+                )}
+                {socialIcons.instagram && (
+                  <TouchableOpacity
+                    style={[styles.socialIcon, {marginRight: 7}]}
+                    onPress={() => Linking.openURL('https://www.instagram.com/cannycarrotrewards')}>
+                    <Image source={socialIcons.instagram} style={styles.socialIconImage} resizeMode="contain" />
+                  </TouchableOpacity>
+                )}
+                {socialIcons.tiktok && (
+                  <TouchableOpacity
+                    style={[styles.socialIcon, {marginRight: 7}]}
+                    onPress={() => Linking.openURL('https://www.tiktok.com/@cannycarrotrewards')}>
+                    <Image source={socialIcons.tiktok} style={styles.socialIconImage} resizeMode="contain" />
+                  </TouchableOpacity>
+                )}
+                {socialIcons.x && (
+                  <TouchableOpacity
+                    style={[styles.socialIcon, {marginRight: 7}]}
+                    onPress={() => Linking.openURL('https://twitter.com/CannyCarrotRew')}>
+                    <Image source={socialIcons.x} style={styles.socialIconImage} resizeMode="contain" />
+                  </TouchableOpacity>
+                )}
+                {socialIcons.linkedin && (
+                  <TouchableOpacity
+                    style={styles.socialIcon}
+                    onPress={() => Linking.openURL('https://www.linkedin.com/company/canny-carrot-rewards')}>
+                    <Image source={socialIcons.linkedin} style={styles.socialIconImage} resizeMode="contain" />
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+            <View style={styles.bannerLogoContainer}>
+              {ccIconImage ? (
+                <Image source={ccIconImage} style={styles.bannerLogoImage} resizeMode="contain" />
+              ) : (
+                <View style={styles.bannerLogoPlaceholder}>
+                  <Text style={styles.bannerLogoText}>Logo</Text>
+                </View>
+              )}
+            </View>
+          </View>
+        </View>
+      );
+    }
+    if (bannerImage && !bannerError) {
+      return (
+        <Image
+          source={bannerImage}
+          style={styles.bannerImage}
+          resizeMode="cover"
+          onError={() => {
+            console.log('Banner image failed to load');
+            setBannerError(true);
+          }}
+        />
+      );
+    }
+    return (
+      <View style={styles.banner}>
+        <View style={styles.bannerContent}>
+          <View style={styles.bannerTextContainer}>
+            <Text style={styles.bannerTitle}>Canny Carrot</Text>
+            <Text style={styles.bannerSubtitle}>Rewards</Text>
+            <View style={styles.socialIconsContainer}>
+              {socialIcons.facebook && (
+                <TouchableOpacity
+                  style={[styles.socialIcon, {marginRight: 7}]}
+                  onPress={() => Linking.openURL('https://www.facebook.com/CannyCarrotRewards')}>
+                  <Image
+                    source={socialIcons.facebook}
+                    style={styles.socialIconImage}
+                    resizeMode="contain"
+                  />
+                </TouchableOpacity>
+              )}
+              {socialIcons.instagram && (
+                <TouchableOpacity
+                  style={[styles.socialIcon, {marginRight: 7}]}
+                  onPress={() => Linking.openURL('https://www.instagram.com/cannycarrotrewards')}>
+                  <Image
+                    source={socialIcons.instagram}
+                    style={styles.socialIconImage}
+                    resizeMode="contain"
+                  />
+                </TouchableOpacity>
+              )}
+              {socialIcons.tiktok && (
+                <TouchableOpacity
+                  style={[styles.socialIcon, {marginRight: 7}]}
+                  onPress={() => Linking.openURL('https://www.tiktok.com/@cannycarrotrewards')}>
+                  <Image
+                    source={socialIcons.tiktok}
+                    style={styles.socialIconImage}
+                    resizeMode="contain"
+                  />
+                </TouchableOpacity>
+              )}
+              {socialIcons.x && (
+                <TouchableOpacity
+                  style={[styles.socialIcon, {marginRight: 7}]}
+                  onPress={() => Linking.openURL('https://twitter.com/CannyCarrotRew')}>
+                  <Image
+                    source={socialIcons.x}
+                    style={styles.socialIconImage}
+                    resizeMode="contain"
+                  />
+                </TouchableOpacity>
+              )}
+              {socialIcons.linkedin && (
+                <TouchableOpacity
+                  style={styles.socialIcon}
+                  onPress={() => Linking.openURL('https://www.linkedin.com/company/canny-carrot-rewards')}>
+                  <Image
+                    source={socialIcons.linkedin}
+                    style={styles.socialIconImage}
+                    resizeMode="contain"
+                  />
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+          <View style={styles.bannerLogoContainer}>
+            {ccIconImage ? (
+              <Image
+                source={ccIconImage}
+                style={styles.bannerLogoImage}
+                resizeMode="contain"
+              />
+            ) : (
+              <View style={styles.bannerLogoPlaceholder}>
+                <Text style={styles.bannerLogoText}>Logo</Text>
+              </View>
+            )}
+          </View>
+        </View>
+      </View>
+    );
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={Colors.background} />
@@ -537,153 +691,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
         {/* Marketing Banner Section - 90% width; Online template when mode === 'online' */}
         <View style={styles.bannerSectionWrapper}>
           <View style={styles.bannerSection}>
-            {mode === 'online' ? (
-              /* Canny Carrot Online: grey ticker-style banner, white text */
-              <View style={styles.bannerOnline}>
-                <View style={styles.bannerContent}>
-                  <View style={styles.bannerTextContainer}>
-                    <Text style={styles.bannerTitleOnline}>Canny Carrot</Text>
-                    <Text style={styles.bannerSubtitleOnline}>Online</Text>
-                    <View style={styles.socialIconsContainer}>
-                      {socialIcons.facebook && (
-                        <TouchableOpacity
-                          style={[styles.socialIcon, {marginRight: 7}]}
-                          onPress={() => Linking.openURL('https://www.facebook.com/CannyCarrotRewards')}>
-                          <Image source={socialIcons.facebook} style={styles.socialIconImage} resizeMode="contain" />
-                        </TouchableOpacity>
-                      )}
-                      {socialIcons.instagram && (
-                        <TouchableOpacity
-                          style={[styles.socialIcon, {marginRight: 7}]}
-                          onPress={() => Linking.openURL('https://www.instagram.com/cannycarrotrewards')}>
-                          <Image source={socialIcons.instagram} style={styles.socialIconImage} resizeMode="contain" />
-                        </TouchableOpacity>
-                      )}
-                      {socialIcons.tiktok && (
-                        <TouchableOpacity
-                          style={[styles.socialIcon, {marginRight: 7}]}
-                          onPress={() => Linking.openURL('https://www.tiktok.com/@cannycarrotrewards')}>
-                          <Image source={socialIcons.tiktok} style={styles.socialIconImage} resizeMode="contain" />
-                        </TouchableOpacity>
-                      )}
-                      {socialIcons.x && (
-                        <TouchableOpacity
-                          style={[styles.socialIcon, {marginRight: 7}]}
-                          onPress={() => Linking.openURL('https://twitter.com/CannyCarrotRew')}>
-                          <Image source={socialIcons.x} style={styles.socialIconImage} resizeMode="contain" />
-                        </TouchableOpacity>
-                      )}
-                      {socialIcons.linkedin && (
-                        <TouchableOpacity
-                          style={styles.socialIcon}
-                          onPress={() => Linking.openURL('https://www.linkedin.com/company/canny-carrot-rewards')}>
-                          <Image source={socialIcons.linkedin} style={styles.socialIconImage} resizeMode="contain" />
-                        </TouchableOpacity>
-                      )}
-                    </View>
-                  </View>
-                  <View style={styles.bannerLogoContainer}>
-                    {ccIconImage ? (
-                      <Image source={ccIconImage} style={styles.bannerLogoImage} resizeMode="contain" />
-                    ) : (
-                      <View style={styles.bannerLogoPlaceholder}>
-                        <Text style={styles.bannerLogoText}>Logo</Text>
-                      </View>
-                    )}
-                  </View>
-                </View>
-              </View>
-            ) : bannerImage && !bannerError ? (
-              <Image
-                source={bannerImage}
-                style={styles.bannerImage}
-                resizeMode="cover"
-                onError={() => {
-                  console.log('Banner image failed to load');
-                  setBannerError(true);
-                }}
-              />
-            ) : (
-              <View style={styles.banner}>
-                <View style={styles.bannerContent}>
-                  <View style={styles.bannerTextContainer}>
-                    <Text style={styles.bannerTitle}>Canny Carrot</Text>
-                    <Text style={styles.bannerSubtitle}>Rewards</Text>
-                  {/* Social Media Icons */}
-                  <View style={styles.socialIconsContainer}>
-                    {socialIcons.facebook && (
-                      <TouchableOpacity
-                        style={[styles.socialIcon, {marginRight: 7}]}
-                        onPress={() => Linking.openURL('https://www.facebook.com/CannyCarrotRewards')}>
-                        <Image
-                          source={socialIcons.facebook}
-                          style={styles.socialIconImage}
-                          resizeMode="contain"
-                        />
-                      </TouchableOpacity>
-                    )}
-                    {socialIcons.instagram && (
-                      <TouchableOpacity
-                        style={[styles.socialIcon, {marginRight: 7}]}
-                        onPress={() => Linking.openURL('https://www.instagram.com/cannycarrotrewards')}>
-                        <Image
-                          source={socialIcons.instagram}
-                          style={styles.socialIconImage}
-                          resizeMode="contain"
-                        />
-                      </TouchableOpacity>
-                    )}
-                    {socialIcons.tiktok && (
-                      <TouchableOpacity
-                        style={[styles.socialIcon, {marginRight: 7}]}
-                        onPress={() => Linking.openURL('https://www.tiktok.com/@cannycarrotrewards')}>
-                        <Image
-                          source={socialIcons.tiktok}
-                          style={styles.socialIconImage}
-                          resizeMode="contain"
-                        />
-                      </TouchableOpacity>
-                    )}
-                    {socialIcons.x && (
-                      <TouchableOpacity
-                        style={[styles.socialIcon, {marginRight: 7}]}
-                        onPress={() => Linking.openURL('https://twitter.com/CannyCarrotRew')}>
-                        <Image
-                          source={socialIcons.x}
-                          style={styles.socialIconImage}
-                          resizeMode="contain"
-                        />
-                      </TouchableOpacity>
-                    )}
-                    {socialIcons.linkedin && (
-                      <TouchableOpacity
-                        style={styles.socialIcon}
-                        onPress={() => Linking.openURL('https://www.linkedin.com/company/canny-carrot-rewards')}>
-                        <Image
-                          source={socialIcons.linkedin}
-                          style={styles.socialIconImage}
-                          resizeMode="contain"
-                        />
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                </View>
-                <View style={styles.bannerLogoContainer}>
-                  {ccIconImage ? (
-                    <Image
-                      source={ccIconImage}
-                      style={styles.bannerLogoImage}
-                      resizeMode="contain"
-                    />
-                  ) : (
-                    <View style={styles.bannerLogoPlaceholder}>
-                      <Text style={styles.bannerLogoText}>Logo</Text>
-                    </View>
-                  )}
-                </View>
-              </View>
-            </View>
-            )))}
+            {renderBannerContent()}
           {/* Social Media Icons for banner with image (in-store only) */}
           {mode !== 'online' && bannerImage && !bannerError && (
             <View style={styles.bannerSocialIconsOverlay}>
