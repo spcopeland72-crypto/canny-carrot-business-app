@@ -675,16 +675,15 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
             </TouchableOpacity>
           </View>
         </View>
-        {/* In-store / Online toggle - Uiverse-style custom switch */}
+        {/* In-store / Online toggle - right-aligned under i and bell; label shows the other mode */}
         <View style={styles.modeToggleRow}>
-          <Text style={[styles.modeToggleLabel, mode === 'online' && styles.modeToggleLabelMuted]}>In-store</Text>
+          <Text style={styles.modeToggleLabel}>{mode === 'instore' ? 'Online' : 'In-store'}</Text>
           <TouchableOpacity
             activeOpacity={1}
             onPress={() => setMode(mode === 'online' ? 'instore' : 'online')}
             style={[styles.switchTrack, mode === 'online' && styles.switchTrackChecked]}>
             <Animated.View style={[styles.switchThumb, {transform: [{translateX: modeToggleAnim}]}]} />
           </TouchableOpacity>
-          <Text style={[styles.modeToggleLabel, mode === 'instore' && styles.modeToggleLabelMuted]}>Online</Text>
         </View>
       </View>
 
@@ -818,7 +817,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
         {/* Rewards Carousel - "REWARDS" in-store, "ONLINE" when online */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>{mode === 'online' ? 'ONLINE' : 'REWARDS'}</Text>
+            <Text style={styles.sectionTitle}>REWARDS</Text>
             <View style={styles.sectionActions}>
               <TouchableOpacity 
                 onPress={() => onNavigate('CreateReward')}
@@ -1519,7 +1518,7 @@ const styles = StyleSheet.create({
   modeToggleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'flex-end',
     paddingVertical: 4,
     paddingHorizontal: 12,
     gap: 10,
@@ -1528,9 +1527,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: Colors.text.primary,
-  },
-  modeToggleLabelMuted: {
-    color: Colors.neutral[500],
   },
   switchTrack: {
     width: 56,
