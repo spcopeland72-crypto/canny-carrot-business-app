@@ -131,6 +131,15 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
     linkedin?: any;
   }>({});
   const [mode, setMode] = useState<'instore' | 'online'>('instore');
+  const modeToggleAnim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.timing(modeToggleAnim, {
+      toValue: mode === 'online' ? 26 : 0,
+      duration: 300,
+      useNativeDriver: true,
+      easing: Easing.bezier(0.23, 1, 0.32, 1),
+    }).start();
+  }, [mode, modeToggleAnim]);
 
   // Local state for rewards as fallback if props are empty
   const [localRewards, setLocalRewards] = useState<Reward[]>([]);
@@ -666,20 +675,16 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
             </TouchableOpacity>
           </View>
         </View>
-        {/* In-store / Online toggle - below i and bell row */}
+        {/* In-store / Online toggle - Uiverse-style custom switch */}
         <View style={styles.modeToggleRow}>
+          <Text style={[styles.modeToggleLabel, mode === 'online' && styles.modeToggleLabelMuted]}>In-store</Text>
           <TouchableOpacity
-            style={[styles.modeToggleButton, mode === 'instore' && styles.modeToggleButtonActive]}
-            onPress={() => setMode('instore')}
-            activeOpacity={0.7}>
-            <Text style={[styles.modeToggleText, mode === 'instore' && styles.modeToggleTextActive]}>In-store</Text>
+            activeOpacity={1}
+            onPress={() => setMode(mode === 'online' ? 'instore' : 'online')}
+            style={[styles.switchTrack, mode === 'online' && styles.switchTrackChecked]}>
+            <Animated.View style={[styles.switchThumb, {transform: [{translateX: modeToggleAnim}]}]} />
           </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.modeToggleButton, mode === 'online' && styles.modeToggleButtonActive]}
-            onPress={() => setMode('online')}
-            activeOpacity={0.7}>
-            <Text style={[styles.modeToggleText, mode === 'online' && styles.modeToggleTextActive]}>Online</Text>
-          </TouchableOpacity>
+          <Text style={[styles.modeToggleLabel, mode === 'instore' && styles.modeToggleLabelMuted]}>Online</Text>
         </View>
       </View>
 
@@ -688,7 +693,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}>
         
-        {/* Marketing Banner Section - 90% width; Online template when mode === 'online' */}
+        {/* Marketing Banner Section - full width to screen edge; Online template when mode === 'online' */}
         <View style={styles.bannerSectionWrapper}>
           <View style={styles.bannerSection}>
             {renderBannerContent()}
@@ -1483,8 +1488,7 @@ const styles = StyleSheet.create({
     paddingBottom: 100,
   },
   bannerSectionWrapper: {
-    width: '90%',
-    alignSelf: 'center',
+    width: '100%',
     marginBottom: 0,
   },
   bannerSection: {
@@ -1516,26 +1520,42 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    gap: 12,
+    paddingVertical: 4,
+    paddingHorizontal: 12,
+    gap: 10,
   },
-  modeToggleButton: {
-    paddingHorizontal: 20,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: Colors.neutral[200],
-  },
-  modeToggleButtonActive: {
-    backgroundColor: Colors.primary,
-  },
-  modeToggleText: {
-    fontSize: 15,
+  modeToggleLabel: {
+    fontSize: 14,
     fontWeight: '600',
     color: Colors.text.primary,
   },
-  modeToggleTextActive: {
-    color: Colors.background,
+  modeToggleLabelMuted: {
+    color: Colors.neutral[500],
+  },
+  switchTrack: {
+    width: 56,
+    height: 32,
+    borderRadius: 50,
+    borderWidth: 2,
+    borderColor: '#414141',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  switchTrackChecked: {
+    borderColor: '#0974f1',
+    ...Platform.select({
+      ios: {shadowColor: '#0974f1', shadowOffset: {width: 0, height: 0}, shadowOpacity: 0.8, shadowRadius: 10},
+      android: {elevation: 8},
+    }),
+  },
+  switchThumb: {
+    width: 22,
+    height: 22,
+    borderRadius: 50,
+    backgroundColor: '#FFFFFF',
+    position: 'absolute',
+    left: 4,
+    top: 4,
   },
   storeButtonsRow: {
     flexDirection: 'row',
