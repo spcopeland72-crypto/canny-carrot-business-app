@@ -35,26 +35,26 @@ interface ManageCustomersListPageProps {
   onLogout?: () => void;
 }
 
-function formatLastPurchase(iso: string | null): string {
-  if (!iso || !iso.trim()) return 'Never';
-  try {
-    const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) return 'Never';
-    const day = String(d.getDate()).padStart(2, '0');
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const year = d.getFullYear();
-    return `${day}/${month}/${year}`;
-  } catch {
-    return 'Never';
-  }
-}
-
 const ManageCustomersListPage: React.FC<ManageCustomersListPageProps> = ({
   currentScreen,
   onNavigate,
   onBack,
   onLogout,
 }) => {
+  const formatLastPurchase = (iso: string | null): string => {
+    if (!iso || !iso.trim()) return 'Never';
+    try {
+      const d = new Date(iso);
+      if (Number.isNaN(d.getTime())) return 'Never';
+      const day = String(d.getDate()).padStart(2, '0');
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const year = d.getFullYear();
+      return `${day}/${month}/${year}`;
+    } catch {
+      return 'Never';
+    }
+  };
+
   const [tokens, setTokens] = useState<TokenWithCustomers[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
