@@ -95,11 +95,11 @@ export const generateCampaignQRCode = (
 
 /**
  * Generate QR code for a campaign product or action.
- * Each QR embeds ALL campaign data (all products + all actions) so the customer app
- * can store it locally on first scan. Delimiter || for lists; names must not contain ||.
- * Format: CAMPAIGN_ITEM:{businessId}:{businessName}:{campaignName}:{itemType}:{itemName}:{startDate}:{endDate}:{productsPart}:{actionsPart}
+ * Each QR embeds campaign document id so the customer app stores the same id (no prefix); index and API stay aligned.
+ * Format: CAMPAIGN_ITEM:{campaignId}:{businessId}:{businessName}:{campaignName}:{itemType}:{itemName}:{startDate}:{endDate}:{productsPart}:{actionsPart}
  */
 export const generateCampaignItemQRCode = (
+  campaignId: string,
   businessId: string,
   businessName: string,
   campaignName: string,
@@ -111,12 +111,13 @@ export const generateCampaignItemQRCode = (
   allActions?: string[]
 ): string => {
   const safe = (s: string) => (s ?? '').replace(/:/g, '-').trim();
+  const safeCampaignId = (campaignId ?? '').trim().replace(/:/g, '-');
   const safeBusinessName = safe(businessName ?? '');
   const safeCampaignName = safe(campaignName);
   const safeItemName = safe(itemName);
   const productsPart = (allProducts && allProducts.length > 0) ? allProducts.join('||') : '';
   const actionsPart = (allActions && allActions.length > 0) ? allActions.join('||') : '';
-  return `CAMPAIGN_ITEM:${businessId}:${safeBusinessName}:${safeCampaignName}:${itemType}:${safeItemName}:${startDate}:${endDate}:${productsPart}:${actionsPart}`;
+  return `CAMPAIGN_ITEM:${safeCampaignId}:${businessId}:${safeBusinessName}:${safeCampaignName}:${itemType}:${safeItemName}:${startDate}:${endDate}:${productsPart}:${actionsPart}`;
 };
 
 /**

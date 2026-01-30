@@ -976,6 +976,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                       if (prods.length > 0 && auth?.businessId) {
                         prods.forEach((product: string) => {
                           const qrCode = generateCampaignItemQRCode(
+                            fullCampaign.id,
                             auth.businessId,
                             businessName,
                             fullCampaign.name,
@@ -992,6 +993,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                       if (acts.length > 0 && auth?.businessId) {
                         acts.forEach((action: string) => {
                           const qrCode = generateCampaignItemQRCode(
+                            fullCampaign.id,
                             auth.businessId,
                             businessName,
                             fullCampaign.name,

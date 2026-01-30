@@ -25,6 +25,7 @@ interface CreateEditRewardPageProps {
   rewardId?: string;
   reward?: Reward;
   onBack?: () => void;
+  onLogout?: () => void;
   onSave?: (data: {
     name: string;
     type: 'product' | 'action';
@@ -44,6 +45,7 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
   rewardId,
   reward,
   onBack,
+  onLogout,
   onSave,
 }) => {
   console.log('[CreateEditReward] ===== COMPONENT RENDERING =====', { currentScreen, rewardId, reward: !!reward, onBack: !!onBack, onSave: !!onSave });
@@ -156,6 +158,7 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
               if (prods.length > 0) {
                 prods.forEach((product: string) => {
                   const qrCode = generateCampaignItemQRCode(
+                    loadedCampaign.id ?? '',
                     loadedCampaign.businessId ?? '',
                     businessName,
                     loadedCampaign.name,
@@ -172,6 +175,7 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
               if (acts.length > 0) {
                 acts.forEach((action: string) => {
                   const qrCode = generateCampaignItemQRCode(
+                    loadedCampaign.id ?? '',
                     loadedCampaign.businessId ?? '',
                     businessName,
                     loadedCampaign.name,
@@ -638,6 +642,7 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
         if (prods.length > 0) {
           prods.forEach((product) => {
             const qrCode = generateCampaignItemQRCode(
+              rewardIdToSave,
               auth.businessId,
               businessName,
               name,
@@ -654,6 +659,7 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
         if (acts.length > 0) {
           acts.forEach((action) => {
             const qrCode = generateCampaignItemQRCode(
+              rewardIdToSave,
               auth.businessId,
               businessName,
               name,
@@ -891,9 +897,8 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
 
   const confirmDeleteReward = async () => {
     if (!isEdit || !rewardId) return;
-    
+
     try {
-      // Simple delete: just delete from local storage
       if (isCampaign) {
         await campaignsRepository.delete(rewardId);
         console.log(`✅ [CreateEditReward] Campaign ${rewardId} deleted from local storage`);
@@ -901,8 +906,7 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
         await rewardsRepository.delete(rewardId);
         console.log(`✅ [CreateEditReward] Reward ${rewardId} deleted from local storage`);
       }
-      
-      // Close modal and navigate to Home to refresh
+
       setDeleteConfirmVisible(false);
       onNavigate('Home');
     } catch (error) {
@@ -983,6 +987,7 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
       currentScreen={currentScreen}
       onNavigate={onNavigate}
       onBack={onBack}
+      onLogout={onLogout}
       headerRight={headerButtons}>
       <ScrollView style={styles.content}>
         <View style={styles.form}>
