@@ -28,6 +28,7 @@ interface CampaignsPageProps {
   currentScreen: string;
   onNavigate: (screen: string) => void;
   onBack?: () => void;
+  onLogout?: () => void;
   campaigns?: Campaign[];
   onDeleteCampaign?: (id: string) => void;
 }
@@ -70,7 +71,8 @@ const CampaignsPage: React.FC<CampaignsPageProps> = ({
       title="Campaigns"
       currentScreen={currentScreen}
       onNavigate={onNavigate}
-      onBack={onBack}>
+      onBack={onBack}
+      onLogout={onLogout}>
       <View style={styles.content}>
         <TouchableOpacity
           style={styles.addButton}
@@ -293,6 +295,10 @@ const styles = StyleSheet.create({
 export default CampaignsPage;
 
 
+
+
+
+sPage;
 
 
 

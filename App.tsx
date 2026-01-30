@@ -537,6 +537,7 @@ function App(): React.JSX.Element {
             currentScreen={currentScreen}
             onNavigate={handleNavigate}
             onBack={handleBack}
+            onLogout={handleLogout}
           />
         );
       case 'AddCustomer':
@@ -686,6 +687,7 @@ function App(): React.JSX.Element {
             currentScreen={currentScreen}
             onNavigate={handleNavigate}
             onScanPress={handleScanPress}
+            onLogout={handleLogout}
             rewards={rewards}
             campaigns={campaigns}
           />

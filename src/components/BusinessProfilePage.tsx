@@ -24,12 +24,14 @@ interface BusinessProfilePageProps {
   currentScreen: string;
   onNavigate: (screen: string) => void;
   onBack?: () => void;
+  onLogout?: () => void;
 }
 
 const BusinessProfilePage: React.FC<BusinessProfilePageProps> = ({
   currentScreen,
   onNavigate,
   onBack,
+  onLogout,
 }) => {
   const [businessName, setBusinessName] = useState('Blackwells Butchers');
   const [email, setEmail] = useState('info@blackwells.com');
@@ -275,7 +277,8 @@ const BusinessProfilePage: React.FC<BusinessProfilePageProps> = ({
       title="Business Profile"
       currentScreen={currentScreen}
       onNavigate={onNavigate}
-      onBack={onBack}>
+      onBack={onBack}
+      onLogout={onLogout}>
       <ScrollView style={styles.content}>
         <View style={styles.form}>
           <Text style={styles.label}>Business Name *</Text>

@@ -18,6 +18,7 @@ interface AddEditCustomerPageProps {
   onNavigate: (screen: string) => void;
   customerId?: string;
   onBack?: () => void;
+  onLogout?: () => void;
 }
 
 const AddEditCustomerPage: React.FC<AddEditCustomerPageProps> = ({
@@ -25,6 +26,7 @@ const AddEditCustomerPage: React.FC<AddEditCustomerPageProps> = ({
   onNavigate,
   customerId,
   onBack,
+  onLogout,
 }) => {
   const isEdit = !!customerId;
   const [name, setName] = useState(isEdit ? 'John Smith' : '');
@@ -79,7 +81,8 @@ const AddEditCustomerPage: React.FC<AddEditCustomerPageProps> = ({
       title={isEdit ? 'Edit Customer' : 'Add Customer'}
       currentScreen={currentScreen}
       onNavigate={onNavigate}
-      onBack={onBack}>
+      onBack={onBack}
+      onLogout={onLogout}>
       <ScrollView style={styles.content}>
         <View style={styles.form}>
           <Text style={styles.label}>Name *</Text>

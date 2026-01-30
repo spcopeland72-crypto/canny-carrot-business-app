@@ -13,6 +13,7 @@ import { redis } from './redis';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import * as repoModule from './localRepository';
+import { fetchManageCustomersData } from './manageCustomersService';
 
 // Get API base URL (same logic as redis.ts)
 const getApiBaseUrl = (): string => {
@@ -496,7 +497,10 @@ export const loginBusiness = async (email: string, password: string): Promise<Bu
       console.error('⚠️ Error loading repository from local storage (will retry later):', repoError);
       // Don't fail login if repo load fails - user can still use app offline
     }
-    
+
+    // Manage Customers: download latest from index at login (no timestamps, no cache)
+    fetchManageCustomersData(auth.businessId).catch(() => {});
+
     return auth;
   } catch (error: any) {
     console.error('Error logging in:', error);

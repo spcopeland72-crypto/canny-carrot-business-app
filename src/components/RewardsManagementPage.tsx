@@ -93,7 +93,8 @@ const RewardsManagementPage: React.FC<RewardsManagementPageProps> = ({
       title="Rewards Management"
       currentScreen={currentScreen}
       onNavigate={onNavigate}
-      onBack={onBack}>
+      onBack={onBack}
+      onLogout={onLogout}>
       <View style={styles.content}>
         <TouchableOpacity
           style={styles.addButton}
