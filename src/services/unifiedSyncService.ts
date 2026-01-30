@@ -404,7 +404,7 @@ export const performUnifiedSync = async (businessId: string): Promise<{
 
     // ⚠️ DEBUG: Send local storage dump to API for debugging
     try {
-      const [businessProfile, allRewards, allCampaigns, allCustomers, syncStatus] = await Promise.all([
+      const [businessProfile, debugRewards, debugCampaigns, debugCustomers, syncStatus] = await Promise.all([
         businessRepository.get(),
         rewardsRepository.getAll(),
         campaignsRepository.getAll(),
@@ -417,10 +417,10 @@ export const performUnifiedSync = async (businessId: string): Promise<{
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           businessId,
-          campaigns: allCampaigns,
-          rewards: allRewards,
+          campaigns: debugCampaigns,
+          rewards: debugRewards,
           businessProfile,
-          customers: allCustomers,
+          customers: debugCustomers,
           syncMetadata: syncStatus,
         }),
       }).catch(err => {
