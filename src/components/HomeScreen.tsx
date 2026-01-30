@@ -837,7 +837,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
         {/* Rewards Carousel - "REWARDS" in-store, "ONLINE" when online */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>REWARDS</Text>
+            <Text style={[styles.sectionTitle, styles.sectionTitleRewardsCampaigns]}>REWARDS</Text>
             <View style={styles.sectionActions}>
               <TouchableOpacity 
                 onPress={() => onNavigate('CreateReward')}
@@ -1797,7 +1797,7 @@ const styles = StyleSheet.create({
     width: 68,
     height: 68,
     borderRadius: 34,
-    backgroundColor: '#4AE261',
+    backgroundColor: '#74A71C', // same green as banner
     justifyContent: 'center',
     alignItems: 'center',
   },

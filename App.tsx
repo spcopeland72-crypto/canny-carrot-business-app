@@ -26,6 +26,7 @@ if (Platform.OS === 'web' && typeof console !== 'undefined') {
 }
 import HomeScreen from './src/components/HomeScreen';
 import CustomersPage from './src/components/CustomersPage';
+import ManageCustomersListPage from './src/components/ManageCustomersListPage';
 import AddEditCustomerPage from './src/components/AddEditCustomerPage';
 import RewardsManagementPage from './src/components/RewardsManagementPage';
 import CreateEditRewardPage from './src/components/CreateEditRewardPage';
@@ -532,7 +533,7 @@ function App(): React.JSX.Element {
         );
       case 'Customers':
         return (
-          <CustomersPage
+          <ManageCustomersListPage
             currentScreen={currentScreen}
             onNavigate={handleNavigate}
             onBack={handleBack}
