@@ -8,7 +8,7 @@
  * - Reward: REWARD:{businessId}:{businessName}:{id}:{name}:{requirement}:{rewardType}:{products}:{pinCode}
  * - Company: COMPANY:{number}:{name}
  * - Campaign: CAMPAIGN:{id}:{name}:{description}
- * - Campaign item: CAMPAIGN_ITEM:{businessId}:{businessName}:{campaignName}:{itemType}:{itemName}:{startDate}:{endDate}
+ * - Campaign item: CAMPAIGN_ITEM:{campaignId}:{businessId}:{businessName}:{campaignName}:{itemType}:{itemName}:{startDate}:{endDate}:{productsPart}:{actionsPart}
  */
 
 export interface ParsedRewardQR {
@@ -98,6 +98,9 @@ export const generateCampaignQRCode = (
  * Each QR embeds campaign document id so the customer app stores the same id (no prefix); index and API stay aligned.
  * Format: CAMPAIGN_ITEM:{campaignId}:{businessId}:{businessName}:{campaignName}:{itemType}:{itemName}:{startDate}:{endDate}:{productsPart}:{actionsPart}
  */
+/** Sanitize for colon-delimited QR segments: no colons, trimmed. */
+const safeSegment = (s: string) => (s ?? '').replace(/:/g, '-').trim();
+
 export const generateCampaignItemQRCode = (
   campaignId: string,
   businessId: string,
@@ -110,13 +113,19 @@ export const generateCampaignItemQRCode = (
   allProducts?: string[],
   allActions?: string[]
 ): string => {
-  const safe = (s: string) => (s ?? '').replace(/:/g, '-').trim();
   const safeCampaignId = (campaignId ?? '').trim().replace(/:/g, '-');
-  const safeBusinessName = safe(businessName ?? '');
-  const safeCampaignName = safe(campaignName);
-  const safeItemName = safe(itemName);
-  const productsPart = (allProducts && allProducts.length > 0) ? allProducts.join('||') : '';
-  const actionsPart = (allActions && allActions.length > 0) ? allActions.join('||') : '';
+  const safeBusinessName = safeSegment(businessName ?? '');
+  const safeCampaignName = safeSegment(campaignName);
+  const safeItemName = safeSegment(itemName);
+  // Sanitize each product/action so colons in names don't break QR parsing
+  const productsPart =
+    allProducts && allProducts.length > 0
+      ? allProducts.map((p) => safeSegment(p)).filter(Boolean).join('||')
+      : '';
+  const actionsPart =
+    allActions && allActions.length > 0
+      ? allActions.map((a) => safeSegment(a)).filter(Boolean).join('||')
+      : '';
   return `CAMPAIGN_ITEM:${safeCampaignId}:${businessId}:${safeBusinessName}:${safeCampaignName}:${itemType}:${safeItemName}:${startDate}:${endDate}:${productsPart}:${actionsPart}`;
 };
 

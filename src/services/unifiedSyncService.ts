@@ -70,8 +70,11 @@ const downloadAllData = async (businessId: string): Promise<{
     if (profileResponse.ok) {
       const profileResult = await profileResponse.json();
       if (profileResult.success && profileResult.data) {
-        result.profile = profileResult.data.profile || profileResult.data;
-        result.timestamp = profileResult.data.updatedAt || null;
+        const data = profileResult.data;
+        result.timestamp = data.updatedAt || null;
+        // Save only profile fields to business repo; rewards/campaigns come from separate GET and are saved to their repos
+        const { rewards: _r, campaigns: _c, ...profileOnly } = data;
+        result.profile = data.profile || profileOnly;
         console.log('  ✅ Downloaded business profile');
       }
     }
@@ -212,8 +215,8 @@ const uploadAllData = async (businessId: string): Promise<{
         return result; // Fail early - all or nothing
       }
     }
-    const activeCount = allRewards.filter((r) => r.isActive !== false).length;
-    console.log(`  ✅ Uploaded ${result.rewards}/${allRewards.length} rewards (${activeCount} active, ${allRewards.length - activeCount} inactive)`);
+    const activeCount = activeRewards.filter((r) => r.isActive !== false).length;
+    console.log(`  ✅ Uploaded ${result.rewards}/${activeRewards.length} rewards (${activeCount} active, ${activeRewards.length - activeCount} inactive)`);
 
     // Get existing campaigns from Redis to determine which to update vs create
     const existingCampaignsResponse = await fetch(`${API_BASE_URL}/api/v1/campaigns?businessId=${businessId}`);
@@ -307,7 +310,7 @@ const uploadAllData = async (businessId: string): Promise<{
     
     console.log(`  ✅ Uploaded ${result.campaigns}/${allCampaigns.length} campaigns`);
 
-    // Upload all local customers
+    // Upload all local customers (non-fatal: endpoint may be removed; don't fail sync)
     const allCustomers = await customersRepository.getAll();
     for (const customer of allCustomers) {
       try {
@@ -316,17 +319,10 @@ const uploadAllData = async (businessId: string): Promise<{
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(customer),
         });
-        
-        if (customerResponse.ok) {
-          result.customers++;
-        } else {
-          const errorText = await customerResponse.text();
-          console.error(`  ❌ Failed to upload customer ${customer.id}: ${customerResponse.status} ${errorText.substring(0, 200)}`);
-          return result; // Fail early - all or nothing
-        }
+        if (customerResponse.ok) result.customers++;
+        else console.warn(`  ⚠️ Customer upload skipped (${customerResponse.status}) for ${customer.id}`);
       } catch (error: any) {
-        console.error(`  ❌ Error uploading customer ${customer.id}:`, error.message || error);
-        return result; // Fail early - all or nothing
+        console.warn(`  ⚠️ Customer upload skipped:`, error.message || error);
       }
     }
     console.log(`  ✅ Uploaded ${result.customers}/${allCustomers.length} customers`);
