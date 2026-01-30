@@ -1025,7 +1025,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                       backgroundColor={Colors.neutral[200]}
                     />
                     <View style={styles.rewardIconOverlayCampaign}>
-                      <Text style={styles.rewardIcon}>{displayFields.icon}</Text>
+                      <Text style={[styles.rewardIcon, styles.rewardIconCampaign]}>{displayFields.icon}</Text>
                     </View>
                   </View>
                   <Text style={styles.rewardSubtitle} numberOfLines={1}>
@@ -1790,7 +1790,7 @@ const styles = StyleSheet.create({
     width: 68,
     height: 68,
     borderRadius: 34,
-    backgroundColor: '#737373',
+    backgroundColor: '#9E8F85',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1799,12 +1799,15 @@ const styles = StyleSheet.create({
     width: 68,
     height: 68,
     borderRadius: 34,
-    backgroundColor: '#74A71C', // same green as banner
+    backgroundColor: '#74A71C',
     justifyContent: 'center',
     alignItems: 'center',
   },
   rewardIcon: {
     fontSize: 32,
+  },
+  rewardIconCampaign: {
+    color: Colors.primary,
   },
   rewardIconImage: {
     width: 68,

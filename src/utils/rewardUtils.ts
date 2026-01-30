@@ -52,9 +52,9 @@ export const mapDbRewardToFormFields = (reward: Reward) => {
 };
 
 /**
- * Campaign icon: always star (no demo/random icons)
+ * Campaign icon: star that inherits text color (blue, same as present)
  */
-const CAMPAIGN_ICON = '⭐';
+const CAMPAIGN_ICON = '★';
 
 /**
  * Compute UI display fields from DB format campaign
