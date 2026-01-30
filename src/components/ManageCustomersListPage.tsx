@@ -25,6 +25,7 @@ interface TokenWithCustomers {
     lastScanAt: string | null;
     scansLast30: number;
     scansLast90: number;
+    totalScans: number;
   }>;
 }
 
@@ -107,23 +108,31 @@ const ManageCustomersListPage: React.FC<ManageCustomersListPageProps> = ({
       {list.length === 0 ? (
         <Text style={styles.emptySection}>None yet</Text>
       ) : (
-        list.map((token) => (
-          <View key={token.tokenId} style={styles.tokenCard}>
-            <Text style={styles.tokenName}>{token.name}</Text>
-            {token.customers.length === 0 ? (
+        list.map((token) =>
+          token.customers.length === 0 ? (
+            <View key={token.tokenId} style={styles.tokenLine}>
+              <Text style={styles.tokenNameInline}>{token.name}:</Text>
               <Text style={styles.noCustomers}>No customers active</Text>
-            ) : (
-              token.customers.map((c) => (
-                <View key={c.customerId} style={styles.customerRow}>
-                  <Text style={styles.customerName}>{c.customerName}</Text>
-                  <Text style={styles.lastCollected}>
-                    Last collected: {formatLastCollected(c.lastScanAt)}
-                  </Text>
-                </View>
-              ))
-            )}
-          </View>
-        ))
+            </View>
+          ) : (
+            token.customers.map((c) => (
+              <View key={`${token.tokenId}-${c.customerId}`} style={styles.tokenLine}>
+                <Text style={styles.customerName}>{c.customerName}</Text>
+                <Text style={styles.lineSeparator}>—</Text>
+                <Text style={styles.tokenNameInline}>{token.name}:</Text>
+                <Text style={styles.pointsText}>
+                  {c.pointsEarned}/{c.pointsRequired}
+                </Text>
+                <Text style={styles.metaLabel}>Last purchase</Text>
+                <Text style={styles.metaValue}>{formatLastPurchase(c.lastScanAt)}</Text>
+                <Text style={styles.metaLabel}>No. of visits in last 30 days</Text>
+                <Text style={styles.metaValue}>{c.scansLast30}</Text>
+                <Text style={styles.metaLabel}>Total visits</Text>
+                <Text style={styles.metaValue}>{c.totalScans}</Text>
+              </View>
+            ))
+          )
+        )
       )}
     </View>
   );
@@ -200,41 +209,59 @@ const styles = StyleSheet.create({
     color: Colors.text.light,
     fontStyle: 'italic',
   },
-  tokenCard: {
+  tokenLine: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginBottom: 8,
     backgroundColor: Colors.neutral[50],
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: Colors.neutral[200],
+    gap: 4,
   },
-  tokenName: {
-    fontSize: 16,
+  tokenNameInline: {
+    fontSize: 15,
     fontWeight: '600',
     color: Colors.text.primary,
-    marginBottom: 10,
+    marginRight: 4,
+  },
+  pointsText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: Colors.primary,
+    marginRight: 12,
+  },
+  metaLabel: {
+    fontSize: 13,
+    color: Colors.text.secondary,
+    marginLeft: 4,
+    marginRight: 2,
+  },
+  metaValue: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: Colors.text.primary,
+    marginRight: 8,
+  },
+  customerName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.text.primary,
+    marginRight: 4,
+  },
+  lineSeparator: {
+    fontSize: 13,
+    color: Colors.text.secondary,
+    marginRight: 4,
   },
   noCustomers: {
     fontSize: 14,
     color: Colors.text.light,
     fontStyle: 'italic',
-  },
-  customerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 6,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: Colors.neutral[200],
-  },
-  customerName: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: Colors.text.primary,
-  },
-  lastCollected: {
-    fontSize: 13,
-    color: Colors.text.secondary,
+    marginLeft: 4,
   },
 });
 
