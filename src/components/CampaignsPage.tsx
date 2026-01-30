@@ -294,11 +294,3 @@ const styles = StyleSheet.create({
 
 export default CampaignsPage;
 
-
-
-
-
-sPage;
-
-
-
