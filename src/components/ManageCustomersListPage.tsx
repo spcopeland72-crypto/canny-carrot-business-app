@@ -9,8 +9,7 @@ import {
 import {Colors} from '../constants/Colors';
 import PageTemplate from './PageTemplate';
 import {getStoredAuth} from '../services/authService';
-
-const API_BASE_URL = 'https://api.cannycarrot.com';
+import {fetchManageCustomersData} from '../services/manageCustomersService';
 
 /** Token (reward or campaign) with customers and analytics from API */
 interface TokenWithCustomers {
@@ -33,18 +32,18 @@ interface ManageCustomersListPageProps {
   currentScreen: string;
   onNavigate: (screen: string) => void;
   onBack?: () => void;
+  onLogout?: () => void;
 }
 
-function formatLastCollected(iso: string | null): string {
+function formatLastPurchase(iso: string | null): string {
   if (!iso || !iso.trim()) return 'Never';
   try {
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return 'Never';
-    return d.toLocaleDateString(undefined, {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-    });
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    return `${day}/${month}/${year}`;
   } catch {
     return 'Never';
   }
@@ -54,36 +53,36 @@ const ManageCustomersListPage: React.FC<ManageCustomersListPageProps> = ({
   currentScreen,
   onNavigate,
   onBack,
+  onLogout,
 }) => {
   const [tokens, setTokens] = useState<TokenWithCustomers[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Always fetch latest from index when this screen is shown (no cache, no timestamps)
   useEffect(() => {
     let cancelled = false;
     const load = async () => {
+      setLoading(true);
       try {
         const auth = await getStoredAuth();
         const businessId = auth?.businessId;
         if (!businessId) {
-          setError('Not logged in');
+          if (!cancelled) {
+            setError('Not logged in');
+            setTokens([]);
+          }
+          return;
+        }
+        const list = await fetchManageCustomersData(businessId);
+        if (cancelled) return;
+        if (list === null) {
+          setError('Failed to load');
           setTokens([]);
           return;
         }
-        const res = await fetch(
-          `${API_BASE_URL}/api/v1/businesses/${businessId}/tokens/with-customers`
-        );
-        if (!res.ok) {
-          setError(`Failed to load (${res.status})`);
-          setTokens([]);
-          return;
-        }
-        const json = await res.json();
-        const list: TokenWithCustomers[] = json.data?.tokens ?? [];
-        if (!cancelled) {
-          setTokens(list);
-          setError(null);
-        }
+        setTokens(list);
+        setError(null);
       } catch (e) {
         if (!cancelled) {
           setError(e instanceof Error ? e.message : 'Failed to load');
@@ -97,52 +96,57 @@ const ManageCustomersListPage: React.FC<ManageCustomersListPageProps> = ({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [currentScreen]);
 
-  const rewards = tokens.filter((t) => t.type === 'reward');
-  const campaigns = tokens.filter((t) => t.type === 'campaign');
+  // Customer-centric: one entry per customer with only their active rewards and campaigns + metadata
+  type TokenEntry = {
+    tokenId: string;
+    name: string;
+    pointsEarned: number;
+    pointsRequired: number;
+    lastScanAt: string | null;
+    scansLast30: number;
+    totalScans: number;
+  };
+  type CustomerWithTokens = {
+    customerId: string;
+    customerName: string;
+    rewards: TokenEntry[];
+    campaigns: TokenEntry[];
+  };
 
-  const renderTokenSection = (title: string, list: TokenWithCustomers[]) => (
-    <View style={styles.section}>
-      <Text style={styles.sectionTitle}>{title}</Text>
-      {list.length === 0 ? (
-        <Text style={styles.emptySection}>None yet</Text>
-      ) : (
-        list.map((token) =>
-          token.customers.length === 0 ? (
-            <View key={token.tokenId} style={styles.tokenLine}>
-              <Text style={styles.tokenNameInline}>{token.name}:</Text>
-              <Text style={styles.noCustomers}>No customers active</Text>
-            </View>
-          ) : (
-            token.customers.map((c) => (
-              <View key={`${token.tokenId}-${c.customerId}`} style={styles.tokenLine}>
-                <Text style={styles.customerName}>{c.customerName}</Text>
-                <Text style={styles.lineSeparator}>—</Text>
-                <Text style={styles.tokenNameInline}>{token.name}:</Text>
-                <Text style={styles.pointsText}>
-                  {c.pointsEarned}/{c.pointsRequired}
-                </Text>
-                <Text style={styles.metaLabel}>Last purchase</Text>
-                <Text style={styles.metaValue}>{formatLastPurchase(c.lastScanAt)}</Text>
-                <Text style={styles.metaLabel}>No. of visits in last 30 days</Text>
-                <Text style={styles.metaValue}>{c.scansLast30}</Text>
-                <Text style={styles.metaLabel}>Total visits</Text>
-                <Text style={styles.metaValue}>{c.totalScans}</Text>
-              </View>
-            ))
-          )
-        )
-      )}
-    </View>
-  );
+  const customersWithTokens: CustomerWithTokens[] = (() => {
+    const byCustomer = new Map<string, CustomerWithTokens>();
+    for (const token of tokens) {
+      for (const c of token.customers) {
+        let row = byCustomer.get(c.customerId);
+        if (!row) {
+          row = { customerId: c.customerId, customerName: c.customerName, rewards: [], campaigns: [] };
+          byCustomer.set(c.customerId, row);
+        }
+        const entry: TokenEntry = {
+          tokenId: token.tokenId,
+          name: token.name,
+          pointsEarned: c.pointsEarned,
+          pointsRequired: c.pointsRequired,
+          lastScanAt: c.lastScanAt,
+          scansLast30: c.scansLast30,
+          totalScans: c.totalScans,
+        };
+        if (token.type === 'reward') row.rewards.push(entry);
+        else row.campaigns.push(entry);
+      }
+    }
+    return Array.from(byCustomer.values());
+  })();
 
   return (
     <PageTemplate
       title="Manage Customers"
       currentScreen={currentScreen}
       onNavigate={onNavigate}
-      onBack={onBack}>
+      onBack={onBack}
+      onLogout={onLogout}>
       <View style={styles.content}>
         {loading ? (
           <View style={styles.centered}>
@@ -153,14 +157,58 @@ const ManageCustomersListPage: React.FC<ManageCustomersListPageProps> = ({
           <View style={styles.centered}>
             <Text style={styles.errorText}>{error}</Text>
           </View>
+        ) : customersWithTokens.length === 0 ? (
+          <View style={styles.centered}>
+            <Text style={styles.emptySection}>No customers yet</Text>
+          </View>
         ) : (
           <ScrollView
             style={styles.scroll}
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={true}>
-            {renderTokenSection('Rewards', rewards)}
-            {renderTokenSection('Campaigns', campaigns)}
-            {/* Actions: add section when actions are first-class tokens */}
+            {customersWithTokens.map((cust) => (
+              <View key={cust.customerId} style={styles.customerSection}>
+                <Text style={styles.customerNameHeading}>{cust.customerName}</Text>
+                {cust.rewards.length > 0 && (
+                  <>
+                    <Text style={styles.subsectionTitle}>Rewards</Text>
+                    {cust.rewards.map((r) => (
+                      <View key={r.tokenId} style={styles.tokenLine}>
+                        <Text style={styles.tokenNameInline}>{r.name}:</Text>
+                        <Text style={styles.pointsText}>
+                          {r.pointsEarned}/{r.pointsRequired}
+                        </Text>
+                        <Text style={styles.metaLabel}>Last purchase</Text>
+                        <Text style={styles.metaValue}>{formatLastPurchase(r.lastScanAt)}</Text>
+                        <Text style={styles.metaLabel}>No. of visits in last 30 days</Text>
+                        <Text style={styles.metaValue}>{r.scansLast30}</Text>
+                        <Text style={styles.metaLabel}>Total visits</Text>
+                        <Text style={styles.metaValue}>{r.totalScans}</Text>
+                      </View>
+                    ))}
+                  </>
+                )}
+                {cust.campaigns.length > 0 && (
+                  <>
+                    <Text style={styles.subsectionTitle}>Campaigns</Text>
+                    {cust.campaigns.map((r) => (
+                      <View key={r.tokenId} style={styles.tokenLine}>
+                        <Text style={styles.tokenNameInline}>{r.name}:</Text>
+                        <Text style={styles.pointsText}>
+                          {r.pointsEarned}/{r.pointsRequired}
+                        </Text>
+                        <Text style={styles.metaLabel}>Last purchase</Text>
+                        <Text style={styles.metaValue}>{formatLastPurchase(r.lastScanAt)}</Text>
+                        <Text style={styles.metaLabel}>No. of visits in last 30 days</Text>
+                        <Text style={styles.metaValue}>{r.scansLast30}</Text>
+                        <Text style={styles.metaLabel}>Total visits</Text>
+                        <Text style={styles.metaValue}>{r.totalScans}</Text>
+                      </View>
+                    ))}
+                  </>
+                )}
+              </View>
+            ))}
           </ScrollView>
         )}
       </View>
@@ -208,6 +256,22 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: Colors.text.light,
     fontStyle: 'italic',
+  },
+  customerSection: {
+    marginBottom: 24,
+  },
+  customerNameHeading: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: Colors.primary,
+    marginBottom: 8,
+  },
+  subsectionTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: Colors.text.secondary,
+    marginTop: 4,
+    marginBottom: 6,
   },
   tokenLine: {
     flexDirection: 'row',
