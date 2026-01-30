@@ -83,6 +83,10 @@ const ManageCustomersListPage: React.FC<ManageCustomersListPageProps> = ({
         }
         setTokens(list);
         setError(null);
+        const rewardCount = list.filter((t) => t.type === 'reward').length;
+        const campaignCount = list.filter((t) => t.type === 'campaign').length;
+        const campaignWithCustomers = list.filter((t) => t.type === 'campaign' && (t.customers?.length ?? 0) > 0).length;
+        console.log('[ManageCustomers] Loaded tokens:', list.length, 'rewards:', rewardCount, 'campaigns:', campaignCount, 'campaigns-with-customers:', campaignWithCustomers);
       } catch (e) {
         if (!cancelled) {
           setError(e instanceof Error ? e.message : 'Failed to load');
@@ -140,6 +144,22 @@ const ManageCustomersListPage: React.FC<ManageCustomersListPageProps> = ({
     return Array.from(byCustomer.values());
   })();
 
+  const renderTokenLines = (items: TokenEntry[]) =>
+    items.map((item) => (
+      <View key={item.tokenId} style={styles.tokenLine}>
+        <Text style={styles.tokenNameInline}>{item.name}:</Text>
+        <Text style={styles.pointsText}>
+          {item.pointsEarned}/{item.pointsRequired}
+        </Text>
+        <Text style={styles.metaLabel}>Last purchase</Text>
+        <Text style={styles.metaValue}>{formatLastPurchase(item.lastScanAt)}</Text>
+        <Text style={styles.metaLabel}>No. of visits in last 30 days</Text>
+        <Text style={styles.metaValue}>{item.scansLast30}</Text>
+        <Text style={styles.metaLabel}>Total visits</Text>
+        <Text style={styles.metaValue}>{item.totalScans}</Text>
+      </View>
+    ));
+
   return (
     <PageTemplate
       title="Manage Customers"
@@ -170,42 +190,16 @@ const ManageCustomersListPage: React.FC<ManageCustomersListPageProps> = ({
               <View key={cust.customerId} style={styles.customerSection}>
                 <Text style={styles.customerNameHeading}>{cust.customerName}</Text>
                 {cust.rewards.length > 0 && (
-                  <>
+                  <View style={styles.subsection}>
                     <Text style={styles.subsectionTitle}>Rewards</Text>
-                    {cust.rewards.map((r) => (
-                      <View key={r.tokenId} style={styles.tokenLine}>
-                        <Text style={styles.tokenNameInline}>{r.name}:</Text>
-                        <Text style={styles.pointsText}>
-                          {r.pointsEarned}/{r.pointsRequired}
-                        </Text>
-                        <Text style={styles.metaLabel}>Last purchase</Text>
-                        <Text style={styles.metaValue}>{formatLastPurchase(r.lastScanAt)}</Text>
-                        <Text style={styles.metaLabel}>No. of visits in last 30 days</Text>
-                        <Text style={styles.metaValue}>{r.scansLast30}</Text>
-                        <Text style={styles.metaLabel}>Total visits</Text>
-                        <Text style={styles.metaValue}>{r.totalScans}</Text>
-                      </View>
-                    ))}
-                  </>
+                    {renderTokenLines(cust.rewards)}
+                  </View>
                 )}
                 {cust.campaigns.length > 0 && (
-                  <>
+                  <View style={styles.subsection}>
                     <Text style={styles.subsectionTitle}>Campaigns</Text>
-                    {cust.campaigns.map((r) => (
-                      <View key={r.tokenId} style={styles.tokenLine}>
-                        <Text style={styles.tokenNameInline}>{r.name}:</Text>
-                        <Text style={styles.pointsText}>
-                          {r.pointsEarned}/{r.pointsRequired}
-                        </Text>
-                        <Text style={styles.metaLabel}>Last purchase</Text>
-                        <Text style={styles.metaValue}>{formatLastPurchase(r.lastScanAt)}</Text>
-                        <Text style={styles.metaLabel}>No. of visits in last 30 days</Text>
-                        <Text style={styles.metaValue}>{r.scansLast30}</Text>
-                        <Text style={styles.metaLabel}>Total visits</Text>
-                        <Text style={styles.metaValue}>{r.totalScans}</Text>
-                      </View>
-                    ))}
-                  </>
+                    {renderTokenLines(cust.campaigns)}
+                  </View>
                 )}
               </View>
             ))}
@@ -265,6 +259,9 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: Colors.primary,
     marginBottom: 8,
+  },
+  subsection: {
+    marginBottom: 12,
   },
   subsectionTitle: {
     fontSize: 15,

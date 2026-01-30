@@ -40,8 +40,22 @@ export const fetchManageCustomersData = async (
   const base = getApiBaseUrl();
   const url = `${base}/api/v1/businesses/${businessId}/tokens/with-customers`;
   const res = await fetch(url, { cache: 'no-store' });
-  if (!res.ok) return null;
+  if (!res.ok) {
+    console.warn('[ManageCustomers] API not ok:', res.status, url);
+    return null;
+  }
   const json = await res.json();
   const list = json.data?.tokens ?? [];
-  return Array.isArray(list) ? list : null;
+  const tokens = Array.isArray(list) ? list : [];
+  const rewards = tokens.filter((t) => t.type === 'reward');
+  const campaigns = tokens.filter((t) => t.type === 'campaign');
+  console.log('[ManageCustomers] API response:', {
+    url,
+    tokenCount: tokens.length,
+    rewardTokens: rewards.length,
+    campaignTokens: campaigns.length,
+    rewardCustomers: rewards.map((t) => ({ name: t.name, customers: (t.customers ?? []).length })),
+    campaignCustomers: campaigns.map((t) => ({ name: t.name, customers: (t.customers ?? []).length })),
+  });
+  return tokens;
 };
