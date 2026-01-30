@@ -15,6 +15,13 @@ import BottomNavigation from './BottomNavigation';
 import CompanyMenuModal from './CompanyMenuModal';
 import {businessRepository} from '../services/localRepository';
 
+let ccIconImage: number | null = null;
+try {
+  ccIconImage = require('../../assets/cc-icon-no-background.png');
+} catch {
+  ccIconImage = null;
+}
+
 interface PageTemplateProps {
   title: string;
   currentScreen: string;
@@ -84,6 +91,12 @@ const PageTemplate: React.FC<PageTemplateProps> = ({
               source={{uri: businessLogo}}
               style={styles.accountLogo}
               resizeMode="cover"
+            />
+          ) : ccIconImage ? (
+            <Image
+              source={ccIconImage}
+              style={styles.accountLogo}
+              resizeMode="contain"
             />
           ) : (
             <View style={styles.accountLogoPlaceholder}>

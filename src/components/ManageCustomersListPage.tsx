@@ -12,21 +12,20 @@ import {getStoredAuth} from '../services/authService';
 
 const API_BASE_URL = 'https://api.cannycarrot.com';
 
-/** Customer record from API (Redis): has rewards[] with businessId per item */
-interface ApiCustomer {
-  id: string;
-  email?: string;
-  firstName?: string;
-  lastName?: string;
-  name?: string;
-  rewards?: Array<{ id: string; name?: string; businessId?: string }>;
-}
-
-interface CustomerEntry {
-  id: string;
+/** Token (reward or campaign) with customers and analytics from API */
+interface TokenWithCustomers {
+  tokenId: string;
+  type: 'reward' | 'campaign';
   name: string;
-  rewardNames: string[];
-  campaignNames: string[];
+  customers: Array<{
+    customerId: string;
+    customerName: string;
+    pointsEarned: number;
+    pointsRequired: number;
+    lastScanAt: string | null;
+    scansLast30: number;
+    scansLast90: number;
+  }>;
 }
 
 interface ManageCustomersListPageProps {
@@ -35,12 +34,27 @@ interface ManageCustomersListPageProps {
   onBack?: () => void;
 }
 
+function formatLastCollected(iso: string | null): string {
+  if (!iso || !iso.trim()) return 'Never';
+  try {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return 'Never';
+    return d.toLocaleDateString(undefined, {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    });
+  } catch {
+    return 'Never';
+  }
+}
+
 const ManageCustomersListPage: React.FC<ManageCustomersListPageProps> = ({
   currentScreen,
   onNavigate,
   onBack,
 }) => {
-  const [list, setList] = useState<CustomerEntry[]>([]);
+  const [tokens, setTokens] = useState<TokenWithCustomers[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -52,57 +66,27 @@ const ManageCustomersListPage: React.FC<ManageCustomersListPageProps> = ({
         const businessId = auth?.businessId;
         if (!businessId) {
           setError('Not logged in');
-          setList([]);
+          setTokens([]);
           return;
         }
         const res = await fetch(
-          `${API_BASE_URL}/api/v1/businesses/${businessId}/customers?limit=200`
+          `${API_BASE_URL}/api/v1/businesses/${businessId}/tokens/with-customers`
         );
         if (!res.ok) {
-          setError(`Failed to load customers (${res.status})`);
-          setList([]);
+          setError(`Failed to load (${res.status})`);
+          setTokens([]);
           return;
         }
         const json = await res.json();
-        const customers: ApiCustomer[] = json.data ?? [];
-        const businessIdNorm = businessId.trim();
-        const entries: CustomerEntry[] = customers
-          .filter((c): c is ApiCustomer => c != null && c.id)
-          .map((c) => {
-            const name =
-              [c.firstName, c.lastName].filter(Boolean).join(' ') ||
-              (c.name && c.name.trim()) ||
-              c.email ||
-              'Customer';
-            const rewards = c.rewards ?? [];
-            const forBusiness = rewards.filter(
-              (r) => (r.businessId ?? '').trim() === businessIdNorm
-            );
-            const rewardNames: string[] = [];
-            const campaignNames: string[] = [];
-            for (const r of forBusiness) {
-              const displayName = (r.name ?? '').trim() || r.id;
-              if ((r.id ?? '').startsWith('campaign-')) {
-                campaignNames.push(displayName);
-              } else {
-                rewardNames.push(displayName);
-              }
-            }
-            return {
-              id: c.id,
-              name: name.trim() || 'Customer',
-              rewardNames,
-              campaignNames,
-            };
-          });
+        const list: TokenWithCustomers[] = json.data?.tokens ?? [];
         if (!cancelled) {
-          setList(entries);
+          setTokens(list);
           setError(null);
         }
       } catch (e) {
         if (!cancelled) {
           setError(e instanceof Error ? e.message : 'Failed to load');
-          setList([]);
+          setTokens([]);
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -114,6 +98,36 @@ const ManageCustomersListPage: React.FC<ManageCustomersListPageProps> = ({
     };
   }, []);
 
+  const rewards = tokens.filter((t) => t.type === 'reward');
+  const campaigns = tokens.filter((t) => t.type === 'campaign');
+
+  const renderTokenSection = (title: string, list: TokenWithCustomers[]) => (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>{title}</Text>
+      {list.length === 0 ? (
+        <Text style={styles.emptySection}>None yet</Text>
+      ) : (
+        list.map((token) => (
+          <View key={token.tokenId} style={styles.tokenCard}>
+            <Text style={styles.tokenName}>{token.name}</Text>
+            {token.customers.length === 0 ? (
+              <Text style={styles.noCustomers}>No customers active</Text>
+            ) : (
+              token.customers.map((c) => (
+                <View key={c.customerId} style={styles.customerRow}>
+                  <Text style={styles.customerName}>{c.customerName}</Text>
+                  <Text style={styles.lastCollected}>
+                    Last collected: {formatLastCollected(c.lastScanAt)}
+                  </Text>
+                </View>
+              ))
+            )}
+          </View>
+        ))
+      )}
+    </View>
+  );
+
   return (
     <PageTemplate
       title="Manage Customers"
@@ -124,7 +138,7 @@ const ManageCustomersListPage: React.FC<ManageCustomersListPageProps> = ({
         {loading ? (
           <View style={styles.centered}>
             <ActivityIndicator size="large" color={Colors.primary} />
-            <Text style={styles.loadingText}>Loading customers…</Text>
+            <Text style={styles.loadingText}>Loading…</Text>
           </View>
         ) : error ? (
           <View style={styles.centered}>
@@ -135,37 +149,9 @@ const ManageCustomersListPage: React.FC<ManageCustomersListPageProps> = ({
             style={styles.scroll}
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={true}>
-            {list.length === 0 ? (
-              <Text style={styles.emptyText}>No customers yet</Text>
-            ) : (
-              list.map((entry) => (
-                <View key={entry.id} style={styles.card}>
-                  <Text style={styles.customerName}>{entry.name}</Text>
-                  {entry.rewardNames.length > 0 && (
-                    <View style={styles.row}>
-                      <Text style={styles.label}>Rewards: </Text>
-                      <Text style={styles.value}>
-                        {entry.rewardNames.join(', ')}
-                      </Text>
-                    </View>
-                  )}
-                  {entry.campaignNames.length > 0 && (
-                    <View style={styles.row}>
-                      <Text style={styles.label}>Campaigns: </Text>
-                      <Text style={styles.value}>
-                        {entry.campaignNames.join(', ')}
-                      </Text>
-                    </View>
-                  )}
-                  {entry.rewardNames.length === 0 &&
-                    entry.campaignNames.length === 0 && (
-                      <Text style={styles.noData}>
-                        No rewards or campaigns for this business
-                      </Text>
-                    )}
-                </View>
-              ))
-            )}
+            {renderTokenSection('Rewards', rewards)}
+            {renderTokenSection('Campaigns', campaigns)}
+            {/* Actions: add section when actions are first-class tokens */}
           </ScrollView>
         )}
       </View>
@@ -194,19 +180,27 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#b91c1c',
   },
-  emptyText: {
-    fontSize: 16,
-    color: Colors.text.secondary,
-    textAlign: 'center',
-    paddingVertical: 24,
-  },
   scroll: {
     flex: 1,
   },
   scrollContent: {
     paddingBottom: 24,
   },
-  card: {
+  section: {
+    marginBottom: 24,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: Colors.primary,
+    marginBottom: 12,
+  },
+  emptySection: {
+    fontSize: 14,
+    color: Colors.text.light,
+    fontStyle: 'italic',
+  },
+  tokenCard: {
     backgroundColor: Colors.neutral[50],
     borderRadius: 12,
     padding: 16,
@@ -214,32 +208,33 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.neutral[200],
   },
-  customerName: {
-    fontSize: 18,
+  tokenName: {
+    fontSize: 16,
     fontWeight: '600',
     color: Colors.text.primary,
-    marginBottom: 8,
+    marginBottom: 10,
   },
-  row: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginTop: 4,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: Colors.text.secondary,
-  },
-  value: {
-    fontSize: 14,
-    color: Colors.text.primary,
-    flex: 1,
-  },
-  noData: {
+  noCustomers: {
     fontSize: 14,
     color: Colors.text.light,
     fontStyle: 'italic',
-    marginTop: 4,
+  },
+  customerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 6,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: Colors.neutral[200],
+  },
+  customerName: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: Colors.text.primary,
+  },
+  lastCollected: {
+    fontSize: 13,
+    color: Colors.text.secondary,
   },
 });
 
