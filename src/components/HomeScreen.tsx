@@ -1808,6 +1808,7 @@ const styles = StyleSheet.create({
   },
   rewardIconCampaign: {
     color: Colors.primary,
+    fontSize: 64,
   },
   rewardIconImage: {
     width: 68,
