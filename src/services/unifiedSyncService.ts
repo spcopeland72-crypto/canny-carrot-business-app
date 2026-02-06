@@ -15,6 +15,43 @@ import type { BusinessProfile, Reward, Campaign, Customer } from '../types';
 
 const API_BASE_URL = 'https://api.cannycarrot.com';
 
+const SYNC_HEADERS = {
+  'Content-Type': 'application/json',
+  'X-Sync-Context': 'manual-sync' as const,
+};
+const UPLOAD_HEADERS = { ...SYNC_HEADERS, 'X-Sync-Direction': 'upload' as const };
+
+const MAX_RETRIES = 2;
+const RETRY_DELAY_MS = 800;
+
+/**
+ * Fetch with retries. Returns response or null if all retries failed.
+ */
+const fetchWithRetry = async (url: string, options: RequestInit, retries = MAX_RETRIES): Promise<Response | null> => {
+  let lastResponse: Response | null = null;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const res = await fetch(url, options);
+      lastResponse = res;
+      if (res.ok) return res;
+      if (res.status >= 400 && res.status < 500 && res.status !== 408) {
+        // Don't retry client errors (except Request Timeout)
+        return res;
+      }
+      if (attempt < retries) {
+        console.warn(`  ⚠️ [UNIFIED SYNC] Retry ${attempt + 1}/${retries} after ${res.status}...`);
+        await new Promise(r => setTimeout(r, RETRY_DELAY_MS));
+      }
+    } catch (err: any) {
+      if (attempt < retries) {
+        console.warn(`  ⚠️ [UNIFIED SYNC] Retry ${attempt + 1}/${retries} after error: ${err?.message || err}`);
+        await new Promise(r => setTimeout(r, RETRY_DELAY_MS));
+      }
+    }
+  }
+  return lastResponse;
+};
+
 /**
  * Get the remote repository timestamp from Redis
  */
@@ -24,7 +61,8 @@ const getRemoteRepositoryTimestamp = async (businessId: string): Promise<string 
       method: 'GET',
       headers: { 'Content-Type': 'application/json' },
     });
-    
+    console.log('[SYNC] Command GET business (timestamp) id=%s → status=%s', businessId, response.status);
+
     if (response.ok) {
       const result = await response.json();
       if (result.success && result.data) {
@@ -81,6 +119,7 @@ const downloadAllData = async (businessId: string): Promise<{
 
     // Download all rewards
     const rewardsResponse = await fetch(`${API_BASE_URL}/api/v1/rewards?businessId=${businessId}`);
+    console.log('[SYNC] Command GET rewards?businessId=%s → status=%s', businessId, rewardsResponse.status);
     if (rewardsResponse.ok) {
       const rewardsResult = await rewardsResponse.json();
       if (rewardsResult.success && Array.isArray(rewardsResult.data)) {
@@ -104,6 +143,7 @@ const downloadAllData = async (businessId: string): Promise<{
 
     // Download all customers
     const customersResponse = await fetch(`${API_BASE_URL}/api/v1/businesses/${businessId}/customers`);
+    console.log('[SYNC] Command GET customers businessId=%s → status=%s', businessId, customersResponse.status);
     if (customersResponse.ok) {
       const customersResult = await customersResponse.json();
       if (customersResult.success && Array.isArray(customersResult.data)) {
@@ -122,7 +162,9 @@ const downloadAllData = async (businessId: string): Promise<{
 };
 
 /**
- * Upload all data to Redis (account, rewards, products, campaigns)
+ * Upload all data to Redis (account, rewards, products, campaigns).
+ * Last-known-good: we only update timestamp and delete obsolete items after all reward/campaign uploads succeed.
+ * On any upload failure we abort, do not PUT business, and return errors so the user gets a clear failure and state stays consistent.
  */
 const uploadAllData = async (businessId: string): Promise<{
   success: boolean;
@@ -130,187 +172,157 @@ const uploadAllData = async (businessId: string): Promise<{
   rewards: number;
   campaigns: number;
   customers: number;
+  errors: string[];
 }> => {
-  console.log('📤 [UNIFIED SYNC] Uploading all data to Redis...');
-  
+  console.log('[SYNC WRITE] uploadAllData entered businessId=%s', businessId);
+  const uploadErrors: string[] = [];
   const result = {
     success: false,
     profile: false,
     rewards: 0,
     campaigns: 0,
     customers: 0,
+    errors: [] as string[],
   };
 
   try {
-    // Timestamp only changes on create/edit in app or admin server-side. Use local lastModified, never "now".
     const localTs = await getLocalRepositoryTimestamp();
     if (!localTs) {
-      console.error('❌ [UNIFIED SYNC] Cannot upload: no local lastModified (timestamp only set on create/edit).');
+      console.log('[SYNC WRITE] upload aborted: no local timestamp');
+      result.errors.push('No local timestamp (save your changes first).');
       return result;
     }
-    const profile = await businessRepository.get();
-    if (profile) {
-      const profileResponse = await fetch(`${API_BASE_URL}/api/v1/businesses/${businessId}`, {
-        method: 'PUT',
-        headers: { 
-          'Content-Type': 'application/json',
-          'X-Sync-Context': 'manual-sync', // Required by Redis write monitor
-        },
-        body: JSON.stringify({
-          ...profile,
-          updatedAt: localTs,
-        }),
-      });
-      
-      if (profileResponse.ok) {
-        result.profile = true;
-        console.log('  ✅ Uploaded business profile');
-      } else {
-        const errorText = await profileResponse.text();
-        console.error(`  ❌ Failed to upload profile: ${profileResponse.status} ${errorText.substring(0, 200)}`);
-        return result; // Fail early - all or nothing
-      }
-    }
 
-    // Delete all existing rewards in Redis first (full replacement)
-    const existingRewardsResponse = await fetch(`${API_BASE_URL}/api/v1/rewards?businessId=${businessId}`);
+    const traceId = `sync-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+    const headers = { ...UPLOAD_HEADERS, 'X-Sync-Trace': traceId };
+    console.log('[SYNC TRACE] hop=app upload start traceId=%s businessId=%s', traceId, businessId);
+
+    // 1. Get existing state from API (do not delete or update timestamp yet — last-known-good)
+    const existingRewardsResponse = await fetch(`${API_BASE_URL}/api/v1/rewards?businessId=${businessId}`, { headers });
+    console.log('[SYNC] Command GET rewards?businessId=%s → status=%s', businessId, existingRewardsResponse.status);
+    const existingRewardIds = new Set<string>();
     if (existingRewardsResponse.ok) {
-      const existingRewardsResult = await existingRewardsResponse.json();
-      if (existingRewardsResult.success && Array.isArray(existingRewardsResult.data)) {
-        for (const reward of existingRewardsResult.data) {
-          try {
-            await fetch(`${API_BASE_URL}/api/v1/rewards/${reward.id}`, { method: 'DELETE' });
-          } catch (error) {
-            // Continue even if delete fails
-          }
-        }
+      const rewardsResult = await existingRewardsResponse.json();
+      if (rewardsResult.success && Array.isArray(rewardsResult.data)) {
+        for (const r of rewardsResult.data) if (r?.id) existingRewardIds.add(r.id);
       }
     }
 
-    // Upload all local rewards
-    const activeRewards = await rewardsRepository.getActive();
-    for (const reward of activeRewards) {
-      try {
-        const rewardResponse = await fetch(`${API_BASE_URL}/api/v1/rewards`, {
-          method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json',
-            'X-Sync-Context': 'manual-sync', // Required by Redis write monitor
-          },
-          body: JSON.stringify({
-            ...reward,
-            businessId: reward.businessId || businessId,
-          }),
-        });
-        
-        if (rewardResponse.ok) {
-          result.rewards++;
-        } else {
-          const errorText = await rewardResponse.text();
-          console.error(`  ❌ Failed to upload reward "${reward.name}": ${rewardResponse.status} ${errorText.substring(0, 200)}`);
-          return result; // Fail early - all or nothing
-        }
-      } catch (error: any) {
-        console.error(`  ❌ Error uploading reward ${reward.id}:`, error.message || error);
-        return result; // Fail early - all or nothing
-      }
-    }
-    const activeCount = activeRewards.filter((r) => r.isActive !== false).length;
-    console.log(`  ✅ Uploaded ${result.rewards}/${activeRewards.length} rewards (${activeCount} active, ${activeRewards.length - activeCount} inactive)`);
-
-    // Get existing campaigns from Redis to determine which to update vs create
-    const existingCampaignsResponse = await fetch(`${API_BASE_URL}/api/v1/campaigns?businessId=${businessId}`);
+    const existingCampaignsResponse = await fetch(`${API_BASE_URL}/api/v1/campaigns?businessId=${businessId}`, { headers });
+    console.log('[SYNC] Command GET campaigns?businessId=%s → status=%s', businessId, existingCampaignsResponse.status);
     const existingCampaignIds = new Set<string>();
     if (existingCampaignsResponse.ok) {
-      const existingCampaignsResult = await existingCampaignsResponse.json();
-      if (existingCampaignsResult.success && Array.isArray(existingCampaignsResult.data)) {
-        for (const campaign of existingCampaignsResult.data) {
-          existingCampaignIds.add(campaign.id);
-        }
+      const campaignsResult = await existingCampaignsResponse.json();
+      if (campaignsResult.success && Array.isArray(campaignsResult.data)) {
+        for (const c of campaignsResult.data) if (c?.id) existingCampaignIds.add(c.id);
       }
     }
 
-    // Get local campaigns
+    // 2. Upload all rewards (PUT existing, POST new) with retry — abort on first failure
+    const activeRewards = await rewardsRepository.getActive();
+    for (const reward of activeRewards) {
+      const body = JSON.stringify({ ...reward, businessId: reward.businessId || businessId });
+      const exists = reward.id && existingRewardIds.has(reward.id);
+      const url = exists
+        ? `${API_BASE_URL}/api/v1/rewards/${reward.id}`
+        : `${API_BASE_URL}/api/v1/rewards`;
+      const method = exists ? 'PUT' : 'POST';
+      const res = await fetchWithRetry(url, { method, headers, body });
+      const status = res?.status ?? 'network error';
+      console.log('[SYNC TRACE] hop=app send %s reward id=%s traceId=%s → status=%s', method, reward.id ?? 'new', traceId, status);
+      if (res?.ok) {
+        result.rewards++;
+      } else {
+        const msg = `Reward "${reward.name}": ${status}`;
+        uploadErrors.push(msg);
+        console.error(`  ❌ ${msg}`);
+        result.errors = uploadErrors;
+        return result; // Abort — do not delete, do not PUT business
+      }
+    }
+    console.log(`  ✅ Uploaded ${result.rewards}/${activeRewards.length} rewards`);
+
+    // 3. Upload all campaigns (PUT existing, POST new) with retry — abort on first failure
     const allCampaigns = await campaignsRepository.getAll();
-    console.log(`📤 [UNIFIED SYNC] Uploading ${allCampaigns.length} campaigns (${existingCampaignIds.size} existing in Redis)`);
-    
-    // Track which campaigns we've uploaded
-    const uploadedCampaignIds = new Set<string>();
-    
+    const localCampaignIds = new Set<string>();
     for (const campaign of allCampaigns) {
-      try {
-        if (!campaign.id) {
-          console.error(`  ❌ Campaign "${campaign.name}" has no ID - skipping`);
-          continue;
-        }
-
-        // Create campaign object to send
-        const campaignToSend = {
-          ...campaign,
-          businessId: campaign.businessId || businessId,
-        };
-        
-        // Use PUT if campaign exists in Redis, POST if new (POST now preserves ID if provided)
-        let campaignResponse: Response;
-        const campaignExists = campaign.id && existingCampaignIds.has(campaign.id);
-        
-        if (campaignExists) {
-          // Campaign exists in Redis - use PUT to update
-          console.log(`📤 [UNIFIED SYNC] PUT campaign "${campaign.name}" (ID: ${campaign.id}) - updating existing`);
-          campaignResponse = await fetch(`${API_BASE_URL}/api/v1/campaigns/${campaign.id}`, {
-            method: 'PUT',
-            headers: { 
-              'Content-Type': 'application/json',
-              'X-Sync-Context': 'manual-sync',
-            },
-            body: JSON.stringify(campaignToSend),
-          });
-        } else {
-          // Campaign doesn't exist - use POST (will preserve ID if provided in body)
-          console.log(`📤 [UNIFIED SYNC] POST campaign "${campaign.name}" (ID: ${campaign.id || 'new'}) - creating`);
-          campaignResponse = await fetch(`${API_BASE_URL}/api/v1/campaigns`, {
-            method: 'POST',
-            headers: { 
-              'Content-Type': 'application/json',
-              'X-Sync-Context': 'manual-sync',
-            },
-            body: JSON.stringify(campaignToSend), // Includes id field if present
-          });
-        }
-        
-        if (campaignResponse.ok) {
-          result.campaigns++;
-          uploadedCampaignIds.add(campaign.id);
-        } else {
-          const errorText = await campaignResponse.text();
-          console.error(`  ❌ Failed to sync campaign "${campaign.name}": ${campaignResponse.status} ${errorText.substring(0, 200)}`);
-          return result; // Fail early - all or nothing
-        }
-      } catch (error: any) {
-        console.error(`  ❌ Error uploading campaign ${campaign.id}:`, error.message || error);
-        return result; // Fail early - all or nothing
+      if (!campaign.id) {
+        uploadErrors.push(`Campaign "${campaign.name}" has no ID`);
+        result.errors = uploadErrors;
+        return result;
+      }
+      localCampaignIds.add(campaign.id);
+      const campaignToSend = { ...campaign, businessId: campaign.businessId || businessId };
+      const campaignExists = existingCampaignIds.has(campaign.id);
+      const url = campaignExists
+        ? `${API_BASE_URL}/api/v1/campaigns/${campaign.id}`
+        : `${API_BASE_URL}/api/v1/campaigns`;
+      const method = campaignExists ? 'PUT' : 'POST';
+      const res = await fetchWithRetry(url, {
+        method,
+        headers: UPLOAD_HEADERS,
+        body: JSON.stringify(campaignToSend),
+      });
+      const status = res?.status ?? 'network error';
+      console.log('[SYNC] Write %s campaign id=%s name=%s → status=%s', method, campaign.id, campaign.name ?? 'unnamed', status);
+      if (res?.ok) {
+        result.campaigns++;
+      } else {
+        const msg = `Campaign "${campaign.name}": ${status}`;
+        uploadErrors.push(msg);
+        console.error(`  ❌ ${msg}`);
+        result.errors = uploadErrors;
+        return result;
       }
     }
-
-    // Delete campaigns from Redis that no longer exist locally
-    for (const existingId of existingCampaignIds) {
-      if (!uploadedCampaignIds.has(existingId)) {
-        try {
-          console.log(`🗑️ [UNIFIED SYNC] Deleting campaign ${existingId} (no longer in local repository)`);
-          await fetch(`${API_BASE_URL}/api/v1/campaigns/${existingId}`, { 
-            method: 'DELETE',
-            headers: { 'X-Sync-Context': 'manual-sync' },
-          });
-        } catch (error) {
-          console.error(`  ❌ Failed to delete campaign ${existingId}:`, error);
-          // Continue - don't fail sync if delete fails
-        }
-      }
-    }
-    
     console.log(`  ✅ Uploaded ${result.campaigns}/${allCampaigns.length} campaigns`);
 
-    // Upload all local customers (non-fatal: endpoint may be removed; don't fail sync)
+    // 4. Delete rewards no longer in local list
+    for (const existingId of existingRewardIds) {
+      const stillLocal = activeRewards.some(r => r.id === existingId);
+      if (!stillLocal) {
+        try {
+          const delRes = await fetch(`${API_BASE_URL}/api/v1/rewards/${existingId}`, { method: 'DELETE', headers });
+          console.log('[SYNC] Write DELETE reward id=%s → status=%s', existingId, delRes.status);
+        } catch (e: any) {
+          console.log('[SYNC] Write DELETE reward id=%s → error=%s', existingId, e?.message ?? e);
+        }
+      }
+    }
+
+    // 5. Delete campaigns no longer in local list
+    for (const existingId of existingCampaignIds) {
+      if (!localCampaignIds.has(existingId)) {
+        try {
+          const delRes = await fetch(`${API_BASE_URL}/api/v1/campaigns/${existingId}`, { method: 'DELETE', headers });
+          console.log('[SYNC] Write DELETE campaign id=%s → status=%s', existingId, delRes.status);
+        } catch (e: any) {
+          console.log('[SYNC] Write DELETE campaign id=%s → error=%s', existingId, e?.message ?? e);
+        }
+      }
+    }
+
+    // 6. Only now update business (timestamp) — last-known-good preserved until here
+    const profile = await businessRepository.get();
+    if (profile) {
+      const profileResponse = await fetchWithRetry(`${API_BASE_URL}/api/v1/businesses/${businessId}`, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify({ ...profile, updatedAt: localTs }),
+      });
+      const putStatus = profileResponse?.status ?? 'network error';
+      console.log('[SYNC] Write PUT business id=%s updatedAt=%s → status=%s', businessId, localTs, putStatus);
+      if (profileResponse?.ok) {
+        result.profile = true;
+        console.log('  ✅ Uploaded business profile (timestamp updated)');
+      } else {
+        uploadErrors.push(`Business profile: ${putStatus}`);
+        result.errors = uploadErrors;
+        return result;
+      }
+    }
+
+    // 7. Customers (non-fatal)
     const allCustomers = await customersRepository.getAll();
     for (const customer of allCustomers) {
       try {
@@ -320,56 +332,16 @@ const uploadAllData = async (businessId: string): Promise<{
           body: JSON.stringify(customer),
         });
         if (customerResponse.ok) result.customers++;
-        else console.warn(`  ⚠️ Customer upload skipped (${customerResponse.status}) for ${customer.id}`);
-      } catch (error: any) {
-        console.warn(`  ⚠️ Customer upload skipped:`, error.message || error);
-      }
+      } catch (_) { /* skip */ }
     }
     console.log(`  ✅ Uploaded ${result.customers}/${allCustomers.length} customers`);
 
-    // Ensure business.updatedAt in Redis matches local lastModified (from create/edit). Never use "now".
-    try {
-      const businessResponse = await fetch(`${API_BASE_URL}/api/v1/businesses/${businessId}`, {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
-      });
-      
-      if (businessResponse.ok) {
-        const businessResult = await businessResponse.json();
-        if (businessResult.success && businessResult.data) {
-          const updatedBusiness = {
-            ...businessResult.data,
-            updatedAt: localTs,
-          };
-          
-          const updateResponse = await fetch(`${API_BASE_URL}/api/v1/businesses/${businessId}`, {
-            method: 'PUT',
-            headers: { 
-              'Content-Type': 'application/json',
-              'X-Sync-Context': 'manual-sync', // Required by Redis write monitor
-            },
-            body: JSON.stringify(updatedBusiness),
-          });
-          
-          if (updateResponse.ok) {
-            console.log(`✅ [UNIFIED SYNC] Business timestamp set to local lastModified: ${localTs}`);
-          } else {
-            const errorText = await updateResponse.text();
-            console.error(`❌ [UNIFIED SYNC] Failed to update business timestamp: ${updateResponse.status} ${errorText.substring(0, 200)}`);
-          }
-        }
-      } else {
-        console.error(`❌ [UNIFIED SYNC] Failed to fetch business for timestamp update: ${businessResponse.status}`);
-      }
-    } catch (error: any) {
-      console.error(`❌ [UNIFIED SYNC] Error updating business timestamp: ${error.message || error}`);
-    }
-
-    // All data uploaded successfully
     result.success = true;
-    console.log('✅ [UNIFIED SYNC] All data uploaded successfully');
+    result.errors = [];
+    console.log('✅ [UNIFIED SYNC] All data uploaded successfully (last-known-good maintained)');
   } catch (error: any) {
-    console.error('❌ [UNIFIED SYNC] Error uploading data:', error.message || error);
+    console.log('[SYNC WRITE] upload failed with exception: %s', error?.message || error);
+    result.errors = uploadErrors.length ? uploadErrors : [error?.message || 'Upload failed'];
   }
 
   return result;
@@ -487,16 +459,25 @@ export const performUnifiedSync = async (businessId: string): Promise<{
       }
     }
 
+    console.log('[SYNC TIMESTAMP] decision=%s local=%s remote=%s', direction, localTimestamp ?? 'null', remoteTimestamp ?? 'null');
+
     // Perform sync based on direction
     if (direction === 'upload') {
+      console.log('[SYNC WRITE] firing upload path');
       const uploadResult = await uploadAllData(businessId);
+      if (!uploadResult.success) {
+        console.log('[SYNC WRITE] upload failed success=%s errors=%s', uploadResult.success, uploadResult.errors?.length ? uploadResult.errors.join('; ') : 'none');
+      } else {
+        console.log('[SYNC WRITE] upload completed success=true rewards=%s campaigns=%s', uploadResult.rewards, uploadResult.campaigns);
+      }
       result.profile = uploadResult.profile;
       result.rewards = uploadResult.rewards;
       result.campaigns = uploadResult.campaigns;
       result.customers = uploadResult.customers;
       
       if (!uploadResult.success) {
-        errors.push('Failed to upload all data');
+        errors.push('Upload failed (last known good state preserved).');
+        if (uploadResult.errors?.length) errors.push(...uploadResult.errors);
       } else {
         // DO NOT update timestamp on sync - timestamp only changes on user create/edit/submit
         // Just record that we synced, but preserve existing timestamp
@@ -539,6 +520,7 @@ export const performUnifiedSync = async (businessId: string): Promise<{
       }
     }
 
+    console.log('[SYNC] Sync completed: direction=%s profile=%s rewards=%s campaigns=%s customers=%s errors=%s', direction, result.profile, result.rewards, result.campaigns, result.customers, errors.length ? errors.join('; ') : 'none');
     console.log('\n✅ [UNIFIED SYNC] Unified sync completed');
     console.log(`   Direction: ${direction}`);
     console.log(`   Profile: ${result.profile ? '✅' : '❌'}`);
