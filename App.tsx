@@ -205,7 +205,8 @@ function App(): React.JSX.Element {
   //   // Function archived - login functionality disabled
   // };
 
-  const handleAddReward = async (rewardData: {
+  // Reward already saved by CreateEditRewardPage; just reload from repository (same as handleAddCampaign).
+  const handleAddReward = async (_rewardData: {
     name: string;
     type: 'product' | 'action';
     requirement: number;
@@ -215,56 +216,11 @@ function App(): React.JSX.Element {
     pinCode?: string;
     qrCode?: string;
   }) => {
-    const icons = ['🎁', '⭐', '📱', '👥', '💎', '🎂', '🎉', '🏆', '🎯', '🎊'];
-    const rewardId = Date.now().toString();
-    // Use QR code from rewardData if provided, otherwise generate one with the actual reward ID
-    let qrCode = rewardData.qrCode;
-    if (!qrCode) {
-      // Generate QR code using shared utility
-      qrCode = generateRewardQRCode(
-        rewardId,
-        rewardData.name,
-        rewardData.requirement,
-        rewardData.rewardType,
-        rewardData.selectedProducts
-      );
-    } else {
-      // Update ID in existing QR code if needed
-      const parts = qrCode.split(':');
-      if (parts.length >= 2 && parts[0] === 'REWARD') {
-        parts[1] = rewardId; // Update ID
-        qrCode = parts.join(':');
-      }
-    }
-    
-    const newReward: Reward = {
-      id: rewardId,
-      name: rewardData.name,
-      count: 0,
-      total: rewardData.requirement,
-      icon: icons[Math.floor(Math.random() * icons.length)],
-      type: rewardData.type,
-      requirement: rewardData.requirement,
-      rewardType: rewardData.rewardType,
-      selectedProducts: rewardData.selectedProducts,
-      selectedActions: rewardData.selectedActions,
-      pinCode: rewardData.pinCode, // Save PIN code in reward record
-      qrCode: qrCode, // Save QR code in reward record
-    };
-    const updatedRewards = [...rewards, newReward];
-    setRewards(updatedRewards);
-    
-    // Save to local repository (source of truth) - this marks as dirty
-    console.log(`💾 [App] Saving new reward "${newReward.name}" to local repository...`);
-    await rewardsRepository.save(newReward);
-    
-    // Mark repository as having unsynced changes (sync only on Sync click, login, logout)
+    await reloadRewards();
     const { updateSyncMetadata } = await import('./src/services/localRepository');
     await updateSyncMetadata({ hasUnsyncedChanges: true });
-    console.log(`✅ [App] Reward saved to local repository and marked as dirty`);
-    
-    // Also save to legacy storage for backward compatibility
-    saveRewards(updatedRewards);
+    const loaded = await rewardsRepository.getActive();
+    if (loaded?.length) saveRewards(loaded);
   };
 
   const handleUpdateReward = async (rewardId: string, rewardData: {

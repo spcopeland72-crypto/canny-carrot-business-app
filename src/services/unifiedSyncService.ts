@@ -447,45 +447,28 @@ export const performUnifiedSync = async (businessId: string): Promise<{
 
     console.log('[SYNC TIMESTAMP] decision=%s local=%s remote=%s', direction, localTimestamp ?? 'null', remoteTimestamp ?? 'null');
 
-    // Perform sync based on direction (upload/download use the timestamp decision only).
+    // Perform sync based on direction. Upload = commit only (dump → Redis on API); no app GET/PUT/DELETE.
     if (direction === 'upload') {
-      // Commit: tell API to write its in-memory dump (from POST /local-storage at sync start) to Redis. No second copy from app.
-      try {
-        const commitRes = await fetch(`${API_BASE_URL}/api/v1/debug/commit`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: '{}',
-        });
-        if (commitRes.ok) {
-          console.log('[SYNC] Commit: API wrote its local dump to Redis');
-        } else {
-          console.log('[SYNC] Commit: failed', commitRes.status, await commitRes.text().catch(() => ''));
-        }
-      } catch (commitErr: any) {
-        console.log('[SYNC] Commit: error', commitErr?.message ?? commitErr);
-      }
-      console.log('[SYNC WRITE] firing upload path');
-      const uploadResult = await uploadAllData(businessId);
-      if (!uploadResult.success) {
-        console.log('[SYNC WRITE] upload failed success=%s errors=%s', uploadResult.success, uploadResult.errors?.length ? uploadResult.errors.join('; ') : 'none');
+      const commitRes = await fetch(`${API_BASE_URL}/api/v1/debug/commit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{}',
+      });
+      if (!commitRes.ok) {
+        const msg = await commitRes.text().catch(() => '');
+        console.log('[SYNC] Commit failed', commitRes.status, msg);
+        errors.push(`Commit failed: ${commitRes.status}`);
       } else {
-        console.log('[SYNC WRITE] upload completed success=true rewards=%s campaigns=%s', uploadResult.rewards, uploadResult.campaigns);
-      }
-      result.profile = uploadResult.profile;
-      result.rewards = uploadResult.rewards;
-      result.campaigns = uploadResult.campaigns;
-      result.customers = uploadResult.customers;
-      
-      if (!uploadResult.success) {
-        errors.push('Upload failed (last known good state preserved).');
-        if (uploadResult.errors?.length) errors.push(...uploadResult.errors);
-      } else {
-        // DO NOT update timestamp on sync - timestamp only changes on user create/edit/submit
-        // Just record that we synced, but preserve existing timestamp
+        const commitJson = await commitRes.json().catch(() => ({}));
+        const committed = commitJson.committed || {};
+        result.profile = true;
+        result.rewards = committed.rewards ?? 0;
+        result.campaigns = committed.campaigns ?? 0;
+        result.customers = committed.customers ?? 0;
+        console.log('[SYNC WRITE] commit completed rewards=%s campaigns=%s', result.rewards, result.campaigns);
         await updateSyncMetadata({
           lastSyncedAt: new Date().toISOString(),
           hasUnsyncedChanges: false,
-          // DO NOT update lastModified - it only changes when user creates/edits/submits
         });
       }
     } else if (direction === 'download') {
