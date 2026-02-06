@@ -19,7 +19,6 @@ const SYNC_HEADERS = {
   'Content-Type': 'application/json',
   'X-Sync-Context': 'manual-sync' as const,
 };
-const UPLOAD_HEADERS = { ...SYNC_HEADERS, 'X-Sync-Direction': 'upload' as const };
 
 const MAX_RETRIES = 2;
 const RETRY_DELAY_MS = 800;
@@ -193,12 +192,8 @@ const uploadAllData = async (businessId: string): Promise<{
       return result;
     }
 
-    const traceId = `sync-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-    const headers = { ...UPLOAD_HEADERS, 'X-Sync-Trace': traceId };
-    console.log('[SYNC TRACE] hop=app upload start traceId=%s businessId=%s', traceId, businessId);
-
     // 1. Get existing state from API (do not delete or update timestamp yet — last-known-good)
-    const existingRewardsResponse = await fetch(`${API_BASE_URL}/api/v1/rewards?businessId=${businessId}`, { headers });
+    const existingRewardsResponse = await fetch(`${API_BASE_URL}/api/v1/rewards?businessId=${businessId}`, { headers: SYNC_HEADERS });
     console.log('[SYNC] Command GET rewards?businessId=%s → status=%s', businessId, existingRewardsResponse.status);
     const existingRewardIds = new Set<string>();
     if (existingRewardsResponse.ok) {
@@ -208,7 +203,7 @@ const uploadAllData = async (businessId: string): Promise<{
       }
     }
 
-    const existingCampaignsResponse = await fetch(`${API_BASE_URL}/api/v1/campaigns?businessId=${businessId}`, { headers });
+    const existingCampaignsResponse = await fetch(`${API_BASE_URL}/api/v1/campaigns?businessId=${businessId}`, { headers: SYNC_HEADERS });
     console.log('[SYNC] Command GET campaigns?businessId=%s → status=%s', businessId, existingCampaignsResponse.status);
     const existingCampaignIds = new Set<string>();
     if (existingCampaignsResponse.ok) {
@@ -227,9 +222,9 @@ const uploadAllData = async (businessId: string): Promise<{
         ? `${API_BASE_URL}/api/v1/rewards/${reward.id}`
         : `${API_BASE_URL}/api/v1/rewards`;
       const method = exists ? 'PUT' : 'POST';
-      const res = await fetchWithRetry(url, { method, headers, body });
+      const res = await fetchWithRetry(url, { method, headers: SYNC_HEADERS, body });
       const status = res?.status ?? 'network error';
-      console.log('[SYNC TRACE] hop=app send %s reward id=%s traceId=%s → status=%s', method, reward.id ?? 'new', traceId, status);
+      console.log('[SYNC] Write %s reward id=%s name=%s → status=%s', method, reward.id ?? 'new', reward.name ?? 'unnamed', status);
       if (res?.ok) {
         result.rewards++;
       } else {
@@ -260,7 +255,7 @@ const uploadAllData = async (businessId: string): Promise<{
       const method = campaignExists ? 'PUT' : 'POST';
       const res = await fetchWithRetry(url, {
         method,
-        headers: UPLOAD_HEADERS,
+        headers: SYNC_HEADERS,
         body: JSON.stringify(campaignToSend),
       });
       const status = res?.status ?? 'network error';
@@ -282,7 +277,7 @@ const uploadAllData = async (businessId: string): Promise<{
       const stillLocal = activeRewards.some(r => r.id === existingId);
       if (!stillLocal) {
         try {
-          const delRes = await fetch(`${API_BASE_URL}/api/v1/rewards/${existingId}`, { method: 'DELETE', headers });
+          const delRes = await fetch(`${API_BASE_URL}/api/v1/rewards/${existingId}`, { method: 'DELETE', headers: SYNC_HEADERS });
           console.log('[SYNC] Write DELETE reward id=%s → status=%s', existingId, delRes.status);
         } catch (e: any) {
           console.log('[SYNC] Write DELETE reward id=%s → error=%s', existingId, e?.message ?? e);
@@ -294,7 +289,7 @@ const uploadAllData = async (businessId: string): Promise<{
     for (const existingId of existingCampaignIds) {
       if (!localCampaignIds.has(existingId)) {
         try {
-          const delRes = await fetch(`${API_BASE_URL}/api/v1/campaigns/${existingId}`, { method: 'DELETE', headers });
+          const delRes = await fetch(`${API_BASE_URL}/api/v1/campaigns/${existingId}`, { method: 'DELETE', headers: SYNC_HEADERS });
           console.log('[SYNC] Write DELETE campaign id=%s → status=%s', existingId, delRes.status);
         } catch (e: any) {
           console.log('[SYNC] Write DELETE campaign id=%s → error=%s', existingId, e?.message ?? e);
@@ -307,7 +302,7 @@ const uploadAllData = async (businessId: string): Promise<{
     if (profile) {
       const profileResponse = await fetchWithRetry(`${API_BASE_URL}/api/v1/businesses/${businessId}`, {
         method: 'PUT',
-        headers,
+        headers: SYNC_HEADERS,
         body: JSON.stringify({ ...profile, updatedAt: localTs }),
       });
       const putStatus = profileResponse?.status ?? 'network error';
