@@ -52,27 +52,20 @@ const fetchWithRetry = async (url: string, options: RequestInit, retries = MAX_R
 };
 
 /**
- * Get the remote repository timestamp from Redis
+ * Request only the remote timestamp for sync decision. No full business fetch.
  */
 const getRemoteRepositoryTimestamp = async (businessId: string): Promise<string | null> => {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/v1/businesses/${businessId}`, {
+    const res = await fetch(`${API_BASE_URL}/api/v1/businesses/${businessId}/timestamp`, {
       method: 'GET',
       headers: { 'Content-Type': 'application/json' },
     });
-    console.log('[SYNC] Command GET business (timestamp) id=%s → status=%s', businessId, response.status);
-
-    if (response.ok) {
-      const result = await response.json();
-      if (result.success && result.data) {
-        // Use business.updatedAt as the repository timestamp (check both top-level and profile)
-        return result.data.updatedAt || result.data.profile?.updatedAt || null;
-      }
-    }
-  } catch (error: any) {
-    console.error('[UNIFIED SYNC] Error fetching remote timestamp:', error.message || error);
+    if (!res.ok) return null;
+    const json = await res.json();
+    return typeof json.updatedAt === 'string' ? json.updatedAt : null;
+  } catch (_) {
+    return null;
   }
-  return null;
 };
 
 /**
@@ -399,28 +392,18 @@ export const performUnifiedSync = async (businessId: string): Promise<{
       console.log('⚠️ [DEBUG] Error collecting local storage dump:', debugError.message);
     }
 
-    // Get timestamps. Retry remote only (transient API issues). Local is never fabricated.
+    // Decision: request remote timestamp only, compare with local, set direction.
     let localTimestamp = await getLocalRepositoryTimestamp();
     let remoteTimestamp = await getRemoteRepositoryTimestamp(businessId);
     let retryCount = 0;
     const maxRetries = 2;
-    while (!remoteTimestamp && retryCount < maxRetries) {
+    while (remoteTimestamp == null && retryCount < maxRetries) {
       retryCount++;
-      console.warn(`⚠️ [UNIFIED SYNC] Remote timestamp missing (attempt ${retryCount}/${maxRetries}) - retrying...`);
       await new Promise(resolve => setTimeout(resolve, 1000));
       remoteTimestamp = await getRemoteRepositoryTimestamp(businessId);
     }
 
-    console.log(`📊 [UNIFIED SYNC] Timestamp comparison:`);
-    console.log(`   Local:  ${localTimestamp ?? 'null'}`);
-    console.log(`   Remote: ${remoteTimestamp ?? 'null'}`);
-    if (localTimestamp && remoteTimestamp) {
-      const localMs = new Date(localTimestamp).getTime();
-      const remoteMs = new Date(remoteTimestamp).getTime();
-      console.log(`   Local (ms): ${localMs}, Remote (ms): ${remoteMs}, diff: ${Math.abs(localMs - remoteMs) / 1000 / 60} min`);
-    }
-
-    // Decide direction. Timestamp only changes on create/edit (or admin). Never upload when local is null.
+    // Decide direction. Newest overwrites oldest. Never upload when local is null.
     let direction: 'upload' | 'download' | 'none' = 'none';
     if (!localTimestamp && remoteTimestamp) {
       // No valid local timestamp (e.g. stale device, fresh restore) → take Redis as truth. Never overwrite.
@@ -456,7 +439,7 @@ export const performUnifiedSync = async (businessId: string): Promise<{
 
     console.log('[SYNC TIMESTAMP] decision=%s local=%s remote=%s', direction, localTimestamp ?? 'null', remoteTimestamp ?? 'null');
 
-    // Perform sync based on direction
+    // Perform sync based on direction (upload/download use the timestamp decision only).
     if (direction === 'upload') {
       console.log('[SYNC WRITE] firing upload path');
       const uploadResult = await uploadAllData(businessId);
