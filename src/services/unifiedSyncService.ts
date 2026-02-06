@@ -362,33 +362,41 @@ export const performUnifiedSync = async (businessId: string): Promise<{
     console.log('🔄 [UNIFIED SYNC] Starting unified sync for business:', businessId);
     console.log('🔄 [UNIFIED SYNC] All data (account, rewards, products, campaigns) syncs as one unit');
 
-    // ⚠️ DEBUG: Send local storage dump to API for debugging
+    // ⚠️ DEBUG: Send local storage dump to API (API stores in memory; commit later writes that to Redis)
     try {
-      const [businessProfile, debugRewards, debugCampaigns, debugCustomers, syncStatus] = await Promise.all([
+      const [businessProfile, activeRewards, debugCampaigns, debugCustomers, syncStatus, localTs] = await Promise.all([
         businessRepository.get(),
-        rewardsRepository.getAll(),
+        rewardsRepository.getActive(),
         campaignsRepository.getAll(),
         customersRepository.getAll(),
         getSyncStatus(),
+        getLocalRepositoryTimestamp(),
       ]);
-      
+      const verify = {
+        copy: {
+          rewardIds: activeRewards.map(r => r.id).filter((id): id is string => !!id).sort(),
+          campaignIds: debugCampaigns.map(c => c.id).filter((id): id is string => !!id).sort(),
+          rewardCount: activeRewards.length,
+          campaignCount: debugCampaigns.length,
+          businessUpdatedAt: localTs ?? null,
+        },
+      };
       await fetch(`${API_BASE_URL}/api/v1/debug/local-storage`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           businessId,
           campaigns: debugCampaigns,
-          rewards: debugRewards,
+          rewards: activeRewards,
           businessProfile,
           customers: debugCustomers,
           syncMetadata: syncStatus,
+          verify,
         }),
       }).catch(err => {
-        // Silently fail - debug endpoint is optional
         console.log('⚠️ [DEBUG] Could not send local storage dump to API:', err.message);
       });
     } catch (debugError: any) {
-      // Silently fail - debug endpoint is optional
       console.log('⚠️ [DEBUG] Error collecting local storage dump:', debugError.message);
     }
 
@@ -441,6 +449,21 @@ export const performUnifiedSync = async (businessId: string): Promise<{
 
     // Perform sync based on direction (upload/download use the timestamp decision only).
     if (direction === 'upload') {
+      // Commit: tell API to write its in-memory dump (from POST /local-storage at sync start) to Redis. No second copy from app.
+      try {
+        const commitRes = await fetch(`${API_BASE_URL}/api/v1/debug/commit`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: '{}',
+        });
+        if (commitRes.ok) {
+          console.log('[SYNC] Commit: API wrote its local dump to Redis');
+        } else {
+          console.log('[SYNC] Commit: failed', commitRes.status, await commitRes.text().catch(() => ''));
+        }
+      } catch (commitErr: any) {
+        console.log('[SYNC] Commit: error', commitErr?.message ?? commitErr);
+      }
       console.log('[SYNC WRITE] firing upload path');
       const uploadResult = await uploadAllData(businessId);
       if (!uploadResult.success) {
