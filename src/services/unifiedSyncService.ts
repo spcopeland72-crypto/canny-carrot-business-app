@@ -362,7 +362,7 @@ export const performUnifiedSync = async (businessId: string): Promise<{
     console.log('🔄 [UNIFIED SYNC] Starting unified sync for business:', businessId);
     console.log('🔄 [UNIFIED SYNC] All data (account, rewards, products, campaigns) syncs as one unit');
 
-    // ⚠️ DEBUG: Send local storage dump to API (API stores in memory; commit later writes that to Redis)
+    // Full copy: whole record from app → API (every field and object defined in the app; no stripping).
     try {
       const [businessProfile, activeRewards, debugCampaigns, debugCustomers, syncStatus, localTs] = await Promise.all([
         businessRepository.get(),
@@ -381,6 +381,23 @@ export const performUnifiedSync = async (businessId: string): Promise<{
           businessUpdatedAt: localTs ?? null,
         },
       };
+      // Proof (dev console): what is sent to dump on sync/logout (initial POST)
+      const profileProof = businessProfile ? {
+        keys: Object.keys(businessProfile),
+        addressLine1: (businessProfile as Record<string, unknown>).addressLine1,
+        addressLine2: (businessProfile as Record<string, unknown>).addressLine2,
+        city: (businessProfile as Record<string, unknown>).city,
+        postcode: (businessProfile as Record<string, unknown>).postcode,
+        region: (businessProfile as Record<string, unknown>).region,
+        country: (businessProfile as Record<string, unknown>).country,
+        hasLogo: !!(businessProfile as Record<string, unknown>).logo,
+        hasLogoIcon: !!(businessProfile as Record<string, unknown>).logoIcon,
+        hasBanner: !!(businessProfile as Record<string, unknown>).banner,
+        logoLen: ((businessProfile as Record<string, unknown>).logo as string)?.length ?? 0,
+        logoIconLen: ((businessProfile as Record<string, unknown>).logoIcon as string)?.length ?? 0,
+        bannerLen: ((businessProfile as Record<string, unknown>).banner as string)?.length ?? 0,
+      } : null;
+      console.log('[SYNC DUMP SENT] Proof of what is sent to dump (POST local-storage):', { businessProfileProof: profileProof, rewardCount: activeRewards.length, campaignCount: debugCampaigns.length });
       await fetch(`${API_BASE_URL}/api/v1/debug/local-storage`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -394,7 +411,7 @@ export const performUnifiedSync = async (businessId: string): Promise<{
           verify,
         }),
       }).catch(err => {
-        console.log('⚠️ [DEBUG] Could not send local storage dump to API:', err.message);
+        console.log('[SYNC] Could not send full dump to API:', err.message);
       });
     } catch (debugError: any) {
       console.log('⚠️ [DEBUG] Error collecting local storage dump:', debugError.message);
@@ -447,12 +464,55 @@ export const performUnifiedSync = async (businessId: string): Promise<{
 
     console.log('[SYNC TIMESTAMP] decision=%s local=%s remote=%s', direction, localTimestamp ?? 'null', remoteTimestamp ?? 'null');
 
-    // Perform sync based on direction. Upload = commit only (dump → Redis on API); no app GET/PUT/DELETE.
+    // Perform sync based on direction. Upload = commit: dump already sent to API; pass dump again in commit body so the request that handles commit has the data.
     if (direction === 'upload') {
+      const [businessProfile, activeRewards, allCampaigns, debugCustomers, syncStatus, localTs] = await Promise.all([
+        businessRepository.get(),
+        rewardsRepository.getActive(),
+        campaignsRepository.getAll(),
+        customersRepository.getAll(),
+        getSyncStatus(),
+        getLocalRepositoryTimestamp(),
+      ]);
+      const verify = {
+        copy: {
+          rewardIds: activeRewards.map(r => r.id).filter((id): id is string => !!id).sort(),
+          campaignIds: allCampaigns.map(c => c.id).filter((id): id is string => !!id).sort(),
+          rewardCount: activeRewards.length,
+          campaignCount: allCampaigns.length,
+          businessUpdatedAt: localTs ?? null,
+        },
+      };
+      const commitBody = {
+        businessId,
+        campaigns: allCampaigns,
+        rewards: activeRewards,
+        businessProfile: businessProfile || {},
+        customers: debugCustomers,
+        syncMetadata: syncStatus,
+        verify,
+      };
+      // Proof (dev console): what is sent to dump on commit (upload path)
+      const commitProfileProof = businessProfile ? {
+        keys: Object.keys(businessProfile),
+        addressLine1: (businessProfile as Record<string, unknown>).addressLine1,
+        addressLine2: (businessProfile as Record<string, unknown>).addressLine2,
+        city: (businessProfile as Record<string, unknown>).city,
+        postcode: (businessProfile as Record<string, unknown>).postcode,
+        region: (businessProfile as Record<string, unknown>).region,
+        country: (businessProfile as Record<string, unknown>).country,
+        hasLogo: !!(businessProfile as Record<string, unknown>).logo,
+        hasLogoIcon: !!(businessProfile as Record<string, unknown>).logoIcon,
+        hasBanner: !!(businessProfile as Record<string, unknown>).banner,
+        logoLen: ((businessProfile as Record<string, unknown>).logo as string)?.length ?? 0,
+        logoIconLen: ((businessProfile as Record<string, unknown>).logoIcon as string)?.length ?? 0,
+        bannerLen: ((businessProfile as Record<string, unknown>).banner as string)?.length ?? 0,
+      } : null;
+      console.log('[SYNC DUMP SENT] Proof of what is sent to commit (body = full dump):', { businessProfileProof: commitProfileProof, rewardCount: activeRewards.length, campaignCount: allCampaigns.length });
       const commitRes = await fetch(`${API_BASE_URL}/api/v1/debug/commit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: '{}',
+        body: JSON.stringify(commitBody),
       });
       if (!commitRes.ok) {
         const msg = await commitRes.text().catch(() => '');
@@ -465,7 +525,7 @@ export const performUnifiedSync = async (businessId: string): Promise<{
         result.rewards = committed.rewards ?? 0;
         result.campaigns = committed.campaigns ?? 0;
         result.customers = committed.customers ?? 0;
-        console.log('[SYNC WRITE] commit completed rewards=%s campaigns=%s', result.rewards, result.campaigns);
+        console.log('[SYNC WRITE] commit completed profile=1 rewards=%s campaigns=%s', result.rewards, result.campaigns);
         await updateSyncMetadata({
           lastSyncedAt: new Date().toISOString(),
           hasUnsyncedChanges: false,

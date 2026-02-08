@@ -425,6 +425,23 @@ const BusinessProfilePage: React.FC<BusinessProfilePageProps> = ({
         createdAt: existingProfile?.createdAt || new Date().toISOString(),
       };
 
+      // Proof (dev console): what is saved from Business Profile page
+      console.log('[PROFILE SAVE PROOF] Saved to local repo:', {
+        keys: Object.keys(updatedProfile),
+        addressLine1: updatedProfile.addressLine1,
+        addressLine2: updatedProfile.addressLine2,
+        city: updatedProfile.city,
+        postcode: updatedProfile.postcode,
+        region: updatedProfile.region,
+        country: updatedProfile.country,
+        hasLogo: !!updatedProfile.logo,
+        hasLogoIcon: !!updatedProfile.logoIcon,
+        hasBanner: !!updatedProfile.banner,
+        logoLen: updatedProfile.logo?.length ?? 0,
+        logoIconLen: updatedProfile.logoIcon?.length ?? 0,
+        bannerLen: updatedProfile.banner?.length ?? 0,
+      });
+
       // Save to local repository
       await businessRepository.save(updatedProfile);
       await appendEditEvent('business_profile', businessId, businessName).catch(() => {});
