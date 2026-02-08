@@ -1,6 +1,7 @@
 /**
  * Business app event log — same behaviour as customer app transaction log.
  * Stored in AsyncStorage under local_repo:event_log; client cap 300.
+ * Synced to Redis as business.transactionLog (merge on commit, returned on GET). Cap 300.
  * Sync manifest: inbound counts at login/download + create/delete tally for 100% accurate dump at sync/logout.
  */
 
@@ -31,13 +32,30 @@ export async function getEventLog(): Promise<TransactionLogEntry[]> {
   }
 }
 
-export async function appendEventLog(entry: TransactionLogEntry): Promise<void> {
-  const log = await getEventLog();
-  log.push(entry);
-  if (log.length > TRANSACTION_LOG_MAX) {
-    log.splice(0, log.length - TRANSACTION_LOG_MAX);
+/** Replace local event log with server log (e.g. after download). Same cap as append. */
+export async function setEventLog(entries: TransactionLogEntry[]): Promise<void> {
+  try {
+    const log = Array.isArray(entries) ? entries : [];
+    const capped = log.length > TRANSACTION_LOG_MAX ? log.slice(-TRANSACTION_LOG_MAX) : log;
+    await AsyncStorage.setItem(EVENT_LOG_KEY, JSON.stringify(capped));
+  } catch (err: unknown) {
+    console.error('[EVENT LOG] Failed to set event log:', err);
+    throw err;
   }
-  await AsyncStorage.setItem(EVENT_LOG_KEY, JSON.stringify(log));
+}
+
+export async function appendEventLog(entry: TransactionLogEntry): Promise<void> {
+  try {
+    const log = await getEventLog();
+    log.push(entry);
+    if (log.length > TRANSACTION_LOG_MAX) {
+      log.splice(0, log.length - TRANSACTION_LOG_MAX);
+    }
+    await AsyncStorage.setItem(EVENT_LOG_KEY, JSON.stringify(log));
+  } catch (err: unknown) {
+    console.error('[EVENT LOG] Failed to append entry:', err);
+    throw err;
+  }
 }
 
 /** Log login with inbound reward/campaign counts (from download or local state after login). */

@@ -646,18 +646,22 @@ export const getLocalRepositoryTimestamp = async (): Promise<string | null> => {
  * of the repository was updated in Redis (this is the top-level repository timestamp)
  */
 export const getDatabaseRecordTimestamp = async (businessId: string, apiBaseUrl: string = 'https://api.cannycarrot.com'): Promise<string | null> => {
-  try {
+  const tryFetch = async (): Promise<string | null> => {
     const response = await fetch(`${apiBaseUrl}/api/v1/businesses/${businessId}`);
     if (response.ok) {
       const result = await response.json();
       if (result.success && result.data) {
         const businessData = result.data;
-        // Business.updatedAt is the top-level repository timestamp in Redis
-        // It should be updated whenever any entity (rewards, campaigns, customers) is modified
         return businessData.updatedAt || businessData.profile?.updatedAt || null;
       }
     }
     return null;
+  };
+  try {
+    const ts = await tryFetch();
+    if (ts != null) return ts;
+    await new Promise((r) => setTimeout(r, 800));
+    return await tryFetch();
   } catch (error) {
     console.error('Error getting database repository timestamp:', error);
     return null;
@@ -729,6 +733,11 @@ export const downloadAllData = async (businessId: string, apiBaseUrl: string = '
         // Save profile without marking as dirty (we're downloading, not modifying)
         await AsyncStorage.setItem(REPOSITORY_KEYS.BUSINESS_PROFILE, JSON.stringify(profile));
         console.log('✅ Business profile downloaded');
+        // Restore event log from Redis (same as unifiedSyncService download path)
+        if (Array.isArray(businessData.transactionLog)) {
+          const { setEventLog } = await import('./eventLogService');
+          await setEventLog(businessData.transactionLog);
+        }
       }
     }
 
@@ -837,6 +846,11 @@ export const downloadAllData = async (businessId: string, apiBaseUrl: string = '
       hasUnsyncedChanges: false,
       lastModified: lastModifiedValue,
     });
+
+    // Set manifest baseline so next sync tally matches downloaded counts (same as unifiedSyncService)
+    const { setSyncManifestBaseline } = await import('./eventLogService');
+    const [activeRewards, allCampaigns] = await Promise.all([rewardsRepository.getActive(), campaignsRepository.getAll()]);
+    await setSyncManifestBaseline({ rewardsAtLogin: activeRewards.length, campaignsAtLogin: allCampaigns.length });
 
     // Set current business ID for this repository
     await setCurrentRepositoryBusinessId(businessId);

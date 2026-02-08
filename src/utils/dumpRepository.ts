@@ -67,13 +67,13 @@ export const dumpRepository = async (): Promise<void> => {
       console.error('Error reading auth:', e);
     }
     
-    // Check current business ID
+    // Check current business ID (same key as localRepository)
     console.log('\n=== CURRENT BUSINESS ID ===');
     try {
-      const businessId = await AsyncStorage.getItem('CURRENT_BUSINESS_ID');
-      console.log('CURRENT_BUSINESS_ID:', businessId || 'NULL');
+      const businessId = await AsyncStorage.getItem(REPOSITORY_KEYS.CURRENT_BUSINESS_ID);
+      console.log('local_repo:current_business_id:', businessId || 'NULL');
     } catch (e) {
-      console.error('Error reading CURRENT_BUSINESS_ID:', e);
+      console.error('Error reading current business id:', e);
     }
     
     console.log('\n=== END DUMP ===');

@@ -11,7 +11,7 @@
  */
 
 import { businessRepository, rewardsRepository, campaignsRepository, customersRepository, getSyncStatus, getLocalRepositoryTimestamp, updateSyncMetadata as updateLocalSyncMetadata } from './localRepository';
-import { validateDumpCounts, setSyncManifestBaseline, appendSyncErrorEvent } from './eventLogService';
+import { validateDumpCounts, setSyncManifestBaseline, appendSyncErrorEvent, getEventLog, setEventLog } from './eventLogService';
 import type { BusinessProfile, Reward, Campaign, Customer } from '../types';
 
 const API_BASE_URL = 'https://api.cannycarrot.com';
@@ -78,6 +78,7 @@ const downloadAllData = async (businessId: string): Promise<{
   rewards: Reward[];
   campaigns: Campaign[];
   customers: Customer[];
+  transactionLog: { timestamp: string; action: string; data: Record<string, unknown> }[];
   timestamp: string | null;
 }> => {
   console.log('📥 [UNIFIED SYNC] Downloading all data from Redis...');
@@ -88,6 +89,7 @@ const downloadAllData = async (businessId: string): Promise<{
     rewards: [] as Reward[],
     campaigns: [] as Campaign[],
     customers: [] as Customer[],
+    transactionLog: [] as { timestamp: string; action: string; data: Record<string, unknown> }[],
     timestamp: null as string | null,
   };
 
@@ -103,8 +105,11 @@ const downloadAllData = async (businessId: string): Promise<{
       if (profileResult.success && profileResult.data) {
         const data = profileResult.data;
         result.timestamp = data.updatedAt || null;
+        if (Array.isArray(data.transactionLog)) {
+          result.transactionLog = data.transactionLog;
+        }
         // Save only profile fields to business repo; rewards/campaigns come from separate GET and are saved to their repos
-        const { rewards: _r, campaigns: _c, ...profileOnly } = data;
+        const { rewards: _r, campaigns: _c, transactionLog: _t, ...profileOnly } = data;
         result.profile = data.profile || profileOnly;
         console.log('  ✅ Downloaded business profile');
       }
@@ -437,6 +442,7 @@ export const performUnifiedSync = async (businessId: string): Promise<{
           customers: debugCustomers,
           syncMetadata: syncStatus,
           verify,
+          eventLog: await getEventLog(),
         }),
       }).catch(err => {
         console.log('[SYNC] Could not send full dump to API:', err.message);
@@ -519,6 +525,7 @@ export const performUnifiedSync = async (businessId: string): Promise<{
         customers: debugCustomers,
         syncMetadata: syncStatus,
         verify,
+        eventLog: await getEventLog(),
       };
       // Proof (dev console): what is sent to dump on commit (upload path)
       const commitProfileProof = businessProfile ? {
@@ -578,6 +585,10 @@ export const performUnifiedSync = async (businessId: string): Promise<{
         
         await customersRepository.saveAll(downloadResult.customers, true); // skipMarkDirty
         result.customers = downloadResult.customers.length;
+        
+        if (Array.isArray(downloadResult.transactionLog)) {
+          await setEventLog(downloadResult.transactionLog);
+        }
         
         // Set manifest baseline so tally matches inbound counts for next sync
         await setSyncManifestBaseline({ rewardsAtLogin: downloadResult.rewards.length, campaignsAtLogin: downloadResult.campaigns.length });
