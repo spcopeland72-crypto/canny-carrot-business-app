@@ -48,11 +48,8 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
   onLogout,
   onSave,
 }) => {
-  console.log('[CreateEditReward] ===== COMPONENT RENDERING =====', { currentScreen, rewardId, reward: !!reward, onBack: !!onBack, onSave: !!onSave });
   const isEdit = !!rewardId;
   const isCampaign = currentScreen.startsWith('CreateCampaign') || currentScreen.startsWith('EditCampaign');
-  console.log('[CreateEditReward] Component initialized:', { currentScreen, isCampaign, isEdit, rewardId });
-  console.log('[CreateEditReward] Date picker will render:', isCampaign);
   const [name, setName] = useState('');
   const [type, setType] = useState<'product' | 'action'>('product');
   const [requirement, setRequirement] = useState('');

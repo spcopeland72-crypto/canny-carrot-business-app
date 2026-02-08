@@ -37,6 +37,7 @@ import RewardsPage from './src/components/RewardsPage';
 import ScanPage from './src/components/ScanPage';
 import HelpPage from './src/components/HelpPage';
 import MorePage from './src/components/MorePage';
+import EventLogPage from './src/components/EventLogPage';
 import ChatPage from './src/components/ChatPage';
 import OnlineAdminPage from './src/components/OnlineAdminPage';
 import ScanModal from './src/components/ScanModal';
@@ -465,6 +466,14 @@ function App(): React.JSX.Element {
       case 'More':
         return (
           <MorePage
+            currentScreen={currentScreen}
+            onNavigate={handleNavigate}
+            onBack={handleBack}
+          />
+        );
+      case 'EventLog':
+        return (
+          <EventLogPage
             currentScreen={currentScreen}
             onNavigate={handleNavigate}
             onBack={handleBack}

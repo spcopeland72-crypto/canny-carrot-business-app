@@ -369,7 +369,10 @@ export const loginBusiness = async (email: string, password: string): Promise<Bu
         console.error('⚠️ Error loading repository (will retry later):', repoError);
         // Don't fail login if repo load fails - user can still use app offline
       }
-      
+
+      const { appendLoginEvent } = await import('./eventLogService');
+      await appendLoginEvent().catch(() => {});
+
       return existingAuth;
     }
 
@@ -501,6 +504,9 @@ export const loginBusiness = async (email: string, password: string): Promise<Bu
     // Manage Customers: download latest from index at login (no timestamps, no cache)
     fetchManageCustomersData(auth.businessId).catch(() => {});
 
+    const { appendLoginEvent } = await import('./eventLogService');
+    await appendLoginEvent().catch(() => {});
+
     return auth;
   } catch (error: any) {
     console.error('Error logging in:', error);
@@ -550,10 +556,13 @@ export const getStoredInvitation = async (): Promise<InvitationData | null> => {
  */
 export const logoutBusiness = async (): Promise<void> => {
   try {
+    const { appendLogoutEvent } = await import('./eventLogService');
+    await appendLogoutEvent().catch(() => {});
+
     // Get current business ID for sync
     const auth = await getStoredAuth();
     const businessId = auth?.businessId;
-    
+
     if (businessId) {
       // Use case 3 of 3: Sync only on Sync click, login, logout. 1 rule: newest overwrites oldest.
       // MUST use performUnifiedSync only. Never full-replacement. If you see "full replacement" on logout, rebuild the app.

@@ -7,6 +7,7 @@ import {
   StyleSheet,
   ScrollView,
   Image,
+  Alert,
 } from 'react-native';
 import {Colors} from '../constants/Colors';
 import {businessRepository} from '../services/localRepository';
@@ -81,6 +82,10 @@ const CompanyMenuModal: React.FC<CompanyMenuModalProps> = ({
           await refreshAfterSync();
         } else {
           console.warn('⚠️ [SYNC] Sync failed:', syncResult.errors);
+          const message = syncResult.errors?.length
+            ? syncResult.errors.join('\n')
+            : 'Sync failed. Last known good state preserved. Try again.';
+          Alert.alert('Sync failed', message, [{ text: 'OK' }]);
         }
       } else {
         console.error('No business ID found for sync');

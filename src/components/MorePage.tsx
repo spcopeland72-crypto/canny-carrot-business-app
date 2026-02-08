@@ -6,9 +6,14 @@ import {
   StyleSheet,
   ScrollView,
   Dimensions,
+  Linking,
 } from 'react-native';
 import {Colors} from '../constants/Colors';
 import PageTemplate from './PageTemplate';
+
+const DITTOFEED_DASHBOARD_URL =
+  (typeof process !== 'undefined' && (process as any).env?.EXPO_PUBLIC_DITTOFEED_DASHBOARD_URL) ||
+  'https://messaging.cannycarrot.com';
 
 interface MorePageProps {
   currentScreen: string;
@@ -31,7 +36,12 @@ const MorePage: React.FC<MorePageProps> = ({
     {id: '4', title: 'Products', screen: 'Products', icon: '📦'},
     {id: '5', title: 'Reports', screen: 'Reports', icon: '📄'},
     {id: '6', title: 'About', screen: 'About', icon: 'ℹ️'},
+    {id: '7', title: 'Event Log', screen: 'EventLog', icon: '📋'},
   ];
+
+  const openMessagingDashboard = () => {
+    Linking.openURL(DITTOFEED_DASHBOARD_URL).catch(() => {});
+  };
 
   return (
     <PageTemplate
@@ -57,6 +67,13 @@ const MorePage: React.FC<MorePageProps> = ({
               <Text style={styles.buttonText}>Settings →</Text>
             </TouchableOpacity>
           </View>
+
+          {/* Messaging (Dittofeed) - opens dashboard in browser */}
+          <TouchableOpacity style={styles.menuItem} onPress={openMessagingDashboard}>
+            <Text style={styles.menuIcon}>📬</Text>
+            <Text style={styles.menuTitle}>Messaging & campaigns</Text>
+            <Text style={styles.menuArrow}>↗</Text>
+          </TouchableOpacity>
 
           {/* Menu Items */}
           {menuItems.map((item) => (
