@@ -17,7 +17,7 @@ import QRCodeModal from './QRCodeModal';
 import {generateRewardQRCode, generateCampaignItemQRCode} from '../utils/qrCodeUtils';
 import {businessRepository, rewardsRepository, campaignsRepository} from '../services/localRepository';
 import {getStoredAuth} from '../services/authService';
-import {appendCreateEvent, appendEditEvent} from '../services/eventLogService';
+import {appendCreateEvent, appendEditEvent, appendDeleteEvent, updateSyncManifestTally} from '../services/eventLogService';
 import type {BusinessProfile, Reward, Campaign, CampaignType} from '../types';
 
 interface CreateEditRewardPageProps {
@@ -657,6 +657,7 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
           await appendEditEvent('campaign', rewardIdToSave, name).catch(() => {});
         } else {
           await appendCreateEvent('campaign', rewardIdToSave, name).catch(() => {});
+          await updateSyncManifestTally({ campaignCreate: 1 }).catch(() => {});
         }
 
         // Generate QR codes for each selected product and action
@@ -744,6 +745,7 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
           await appendEditEvent('reward', rewardIdToSave, name).catch(() => {});
         } else {
           await appendCreateEvent('reward', rewardIdToSave, name).catch(() => {});
+          await updateSyncManifestTally({ rewardCreate: 1 }).catch(() => {});
         }
       }
 
@@ -931,13 +933,18 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
 
   const confirmDeleteReward = async () => {
     if (!isEdit || !rewardId) return;
+    const name = reward?.name ?? '';
 
     try {
       if (isCampaign) {
         await campaignsRepository.delete(rewardId);
+        await appendDeleteEvent('campaign', rewardId, name).catch(() => {});
+        await updateSyncManifestTally({ campaignDelete: 1 }).catch(() => {});
         console.log(`✅ [CreateEditReward] Campaign ${rewardId} deleted from local storage`);
       } else {
         await rewardsRepository.delete(rewardId);
+        await appendDeleteEvent('reward', rewardId, name).catch(() => {});
+        await updateSyncManifestTally({ rewardDelete: 1 }).catch(() => {});
         console.log(`✅ [CreateEditReward] Reward ${rewardId} deleted from local storage`);
       }
 

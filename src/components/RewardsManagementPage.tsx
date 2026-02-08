@@ -11,6 +11,7 @@ import {
 import {Colors} from '../constants/Colors';
 import PageTemplate from './PageTemplate';
 import {rewardsRepository} from '../services/localRepository';
+import {appendDeleteEvent, updateSyncManifestTally} from '../services/eventLogService';
 import type {Reward} from '../types';
 
 interface RewardsManagementPageProps {
@@ -72,7 +73,9 @@ const RewardsManagementPage: React.FC<RewardsManagementPageProps> = ({
     try {
       console.log(`[RewardsManagement] Confirming deletion of reward: ${rewardToDelete.id}`);
       await rewardsRepository.delete(rewardToDelete.id);
-      
+      await appendDeleteEvent('reward', rewardToDelete.id, rewardToDelete.name).catch(() => {});
+      await updateSyncManifestTally({ rewardDelete: 1 }).catch(() => {});
+
       // Reload active rewards from repository to update UI
       const loadedRewards = await rewardsRepository.getActive();
       setRewards(loadedRewards);

@@ -370,8 +370,15 @@ export const loginBusiness = async (email: string, password: string): Promise<Bu
         // Don't fail login if repo load fails - user can still use app offline
       }
 
-      const { appendLoginEvent } = await import('./eventLogService');
-      await appendLoginEvent().catch(() => {});
+      const { appendLoginEvent, setSyncManifestBaseline } = await import('./eventLogService');
+      const [activeRewards, allCampaigns] = await Promise.all([
+        repoModule.rewardsRepository.getActive(),
+        repoModule.campaignsRepository.getAll(),
+      ]);
+      const rewardCount = activeRewards.length;
+      const campaignCount = allCampaigns.length;
+      await appendLoginEvent({ rewardCount, campaignCount }).catch(() => {});
+      await setSyncManifestBaseline({ rewardsAtLogin: rewardCount, campaignsAtLogin: campaignCount }).catch(() => {});
 
       return existingAuth;
     }
@@ -504,8 +511,15 @@ export const loginBusiness = async (email: string, password: string): Promise<Bu
     // Manage Customers: download latest from index at login (no timestamps, no cache)
     fetchManageCustomersData(auth.businessId).catch(() => {});
 
-    const { appendLoginEvent } = await import('./eventLogService');
-    await appendLoginEvent().catch(() => {});
+    const { appendLoginEvent, setSyncManifestBaseline } = await import('./eventLogService');
+    const [activeRewards, allCampaigns] = await Promise.all([
+      repoModule.rewardsRepository.getActive(),
+      repoModule.campaignsRepository.getAll(),
+    ]);
+    const rewardCount = activeRewards.length;
+    const campaignCount = allCampaigns.length;
+    await appendLoginEvent({ rewardCount, campaignCount }).catch(() => {});
+    await setSyncManifestBaseline({ rewardsAtLogin: rewardCount, campaignsAtLogin: campaignCount }).catch(() => {});
 
     return auth;
   } catch (error: any) {

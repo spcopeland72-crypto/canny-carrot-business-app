@@ -11,6 +11,7 @@
  */
 
 import { businessRepository, rewardsRepository, campaignsRepository, customersRepository, getSyncStatus, getLocalRepositoryTimestamp, updateSyncMetadata as updateLocalSyncMetadata } from './localRepository';
+import { validateDumpCounts, setSyncManifestBaseline, appendSyncErrorEvent } from './eventLogService';
 import type { BusinessProfile, Reward, Campaign, Customer } from '../types';
 
 const API_BASE_URL = 'https://api.cannycarrot.com';
@@ -362,12 +363,39 @@ export const performUnifiedSync = async (businessId: string): Promise<{
     console.log('🔄 [UNIFIED SYNC] Starting unified sync for business:', businessId);
     console.log('🔄 [UNIFIED SYNC] All data (account, rewards, products, campaigns) syncs as one unit');
 
+    // Manifest tally check: ensure dump is 100% accurate before sync/logout.
+    let activeRewards = await rewardsRepository.getActive();
+    let debugCampaigns = await campaignsRepository.getAll();
+    let validation = await validateDumpCounts(activeRewards.length, debugCampaigns.length);
+    if (!validation.ok) {
+      console.warn('[UNIFIED SYNC] Dump tally mismatch (first check):', validation.message);
+      activeRewards = await rewardsRepository.getActive();
+      debugCampaigns = await campaignsRepository.getAll();
+      validation = await validateDumpCounts(activeRewards.length, debugCampaigns.length);
+    }
+    if (!validation.ok) {
+      console.warn('[UNIFIED SYNC] Dump tally mismatch — doing nothing, logging error, waiting for user instruction');
+      await appendSyncErrorEvent(validation.message ?? 'Dump tally mismatch', {
+        expectedRewards: validation.expectedRewards,
+        expectedCampaigns: validation.expectedCampaigns,
+        actualRewards: activeRewards.length,
+        actualCampaigns: debugCampaigns.length,
+      }).catch(() => {});
+      const userMessage = validation.message
+        ? `Sync stopped: ${validation.message} No data was sent or changed. Check Event Log for details, then try again or contact support.`
+        : 'Sync stopped: dump tally could not be reconciled. No data was sent or changed. Check Event Log, then try again or contact support.';
+      return {
+        success: false,
+        direction: 'none',
+        synced: { profile: false, rewards: 0, campaigns: 0, customers: 0 },
+        errors: [userMessage],
+      };
+    }
+
     // Full copy: whole record from app → API (every field and object defined in the app; no stripping).
     try {
-      const [businessProfile, activeRewards, debugCampaigns, debugCustomers, syncStatus, localTs] = await Promise.all([
+      const [businessProfile, debugCustomers, syncStatus, localTs] = await Promise.all([
         businessRepository.get(),
-        rewardsRepository.getActive(),
-        campaignsRepository.getAll(),
         customersRepository.getAll(),
         getSyncStatus(),
         getLocalRepositoryTimestamp(),
@@ -550,6 +578,9 @@ export const performUnifiedSync = async (businessId: string): Promise<{
         
         await customersRepository.saveAll(downloadResult.customers, true); // skipMarkDirty
         result.customers = downloadResult.customers.length;
+        
+        // Set manifest baseline so tally matches inbound counts for next sync
+        await setSyncManifestBaseline({ rewardsAtLogin: downloadResult.rewards.length, campaignsAtLogin: downloadResult.campaigns.length });
         
         // Update sync metadata with remote timestamp
         if (downloadResult.timestamp) {

@@ -11,6 +11,7 @@ import {
 import {Colors} from '../constants/Colors';
 import PageTemplate from './PageTemplate';
 import { campaignsRepository } from '../services/localRepository';
+import { appendDeleteEvent, updateSyncManifestTally } from '../services/eventLogService';
 
 interface Campaign {
   id: string;
@@ -54,6 +55,8 @@ const CampaignsPage: React.FC<CampaignsPageProps> = ({
     if (!campaignToDelete) return;
     try {
       await campaignsRepository.delete(campaignToDelete.id);
+      await appendDeleteEvent('campaign', campaignToDelete.id, campaignToDelete.name).catch(() => {});
+      await updateSyncManifestTally({ campaignDelete: 1 }).catch(() => {});
       console.log(`✅ [CampaignsPage] Campaign ${campaignToDelete.id} deleted from local storage`);
       setDeleteConfirmVisible(false);
       setCampaignToDelete(null);
