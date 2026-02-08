@@ -3,7 +3,19 @@
  * Connects Business App to Redis-backed API
  */
 
-const API_BASE_URL = 'http://localhost:3001/api/v1';
+import { Platform } from 'react-native';
+import Constants from 'expo-constants';
+
+function getApiBaseUrl(): string {
+  const apiUrl = Constants.expoConfig?.extra?.apiUrl;
+  if (apiUrl) return String(apiUrl).replace(/\/api\/v1\/?$/, '').replace(/\/$/, '');
+  if (Platform.OS === 'web') {
+    return process.env.API_BASE_URL || process.env.EXPO_PUBLIC_API_URL?.replace(/\/api\/v1\/?$/, '').replace(/\/$/, '') || 'https://api.cannycarrot.com';
+  }
+  return process.env.EXPO_PUBLIC_API_URL?.replace(/\/api\/v1\/?$/, '').replace(/\/$/, '') || 'https://api.cannycarrot.com';
+}
+
+const API_BASE_URL = `${getApiBaseUrl()}/api/v1`;
 
 // Types
 export interface Business {
