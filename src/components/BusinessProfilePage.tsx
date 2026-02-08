@@ -1,4 +1,4 @@
-import React, {useState, useEffect} from 'react';
+import React, {useState, useEffect, useRef} from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,8 @@ import {
   Alert,
   Platform,
   ActivityIndicator,
+  Modal,
+  PanResponder,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import {Colors} from '../constants/Colors';
@@ -18,7 +20,7 @@ import QRCodeModal from './QRCodeModal';
 import {generateCompanyQRCode} from '../utils/qrCodeUtils';
 import {businessRepository} from '../services/localRepository';
 import {appendEditEvent} from '../services/eventLogService';
-import {generateCircularIcon, resizeToBanner, BANNER_HEIGHT, BANNER_WIDTH} from '../utils/logoUtils';
+import {generateCircularIcon, resizeToBanner, cropBannerRegion, BANNER_HEIGHT, BANNER_WIDTH} from '../utils/logoUtils';
 import type {BusinessProfile} from '../types';
 
 const AVATAR_SIZE = 128; // Optimal for customer and business apps
@@ -54,6 +56,16 @@ const BusinessProfilePage: React.FC<BusinessProfilePageProps> = ({
   const [file2, setFile2] = useState<any>(null);
   const [qrCodeModalVisible, setQrCodeModalVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  // Remove confirmation (works on web where Alert.alert has only one button)
+  const [confirmRemove, setConfirmRemove] = useState<'logo' | 'banner' | null>(null);
+  // Banner crop modal: user moves selection vertically/horizontally then confirms
+  const [bannerCropUri, setBannerCropUri] = useState<string | null>(null);
+  const [bannerCropOffsetX, setBannerCropOffsetX] = useState(0.5);
+  const [bannerCropOffsetY, setBannerCropOffsetY] = useState(0.5);
+  const [bannerImageSize, setBannerImageSize] = useState<{ width: number; height: number } | null>(null);
+  const [bannerLayoutSize, setBannerLayoutSize] = useState<{ width: number; height: number } | null>(null);
+  const bannerCropBoxSize = useRef<{ width: number; height: number } | null>(null);
+  const bannerCropDispSize = useRef<{ width: number; height: number } | null>(null);
 
   // Load business profile on mount
   useEffect(() => {
@@ -217,22 +229,11 @@ const BusinessProfilePage: React.FC<BusinessProfilePageProps> = ({
     }
   };
 
-  const removeLogo = () => {
-    Alert.alert(
-      'Remove Logo/Avatar',
-      'Are you sure you want to remove the logo and avatar?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Remove',
-          style: 'destructive',
-          onPress: () => {
-            setLogo(null);
-            setLogoIcon(null);
-          },
-        },
-      ]
-    );
+  const removeLogo = () => setConfirmRemove('logo');
+  const doRemoveLogo = () => {
+    setLogo(null);
+    setLogoIcon(null);
+    setConfirmRemove(null);
   };
 
   const pickBanner = async () => {
@@ -248,9 +249,8 @@ const BusinessProfilePage: React.FC<BusinessProfilePageProps> = ({
       }
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [BANNER_WIDTH / BANNER_HEIGHT, 1],
-        quality: 0.8,
+        allowsEditing: false,
+        quality: 0.9,
         base64: true,
         allowsMultipleSelection: false,
       });
@@ -266,28 +266,115 @@ const BusinessProfilePage: React.FC<BusinessProfilePageProps> = ({
         setBannerLoading(false);
         return;
       }
-      const resized = await resizeToBanner(uriOrBase64);
-      if (resized) {
-        setBanner(resized);
-        console.log(`[BusinessProfile] Banner saved: ${BANNER_WIDTH}x${BANNER_HEIGHT}px`);
-      }
+      setBannerCropUri(uriOrBase64);
+      setBannerCropOffsetX(0.5);
+      setBannerCropOffsetY(0.5);
+      setBannerImageSize(asset.width && asset.height ? { width: asset.width, height: asset.height } : null);
+      setBannerLayoutSize(null);
+      bannerCropBoxSize.current = null;
     } catch (error) {
       console.error('Error picking banner:', error);
-      Alert.alert('Error', 'Failed to pick or resize banner. Please try again.');
+      Alert.alert('Error', 'Failed to pick image. Please try again.');
     } finally {
       setBannerLoading(false);
     }
   };
 
-  const removeBanner = () => {
-    Alert.alert(
-      'Remove Banner',
-      'Are you sure you want to remove the banner image?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Remove', style: 'destructive', onPress: () => setBanner(null) },
-      ]
-    );
+  const onBannerImageLayout = (e: { nativeEvent: { layout: { width: number; height: number } } }) => {
+    const { width, height } = e.nativeEvent.layout;
+    setBannerLayoutSize({ width, height });
+  };
+
+  const onBannerImageLoad = (e: { nativeEvent?: { source?: { width?: number; height?: number } } }) => {
+    const source = e?.nativeEvent?.source;
+    if (source?.width != null && source?.height != null) {
+      setBannerImageSize({ width: source.width, height: source.height });
+      return;
+    }
+    if (bannerCropUri && !bannerImageSize) {
+      Image.getSize(
+        bannerCropUri,
+        (width, height) => setBannerImageSize({ width, height }),
+        () => {}
+      );
+    }
+  };
+
+  const getBannerCropBox = () => {
+    const img = bannerImageSize;
+    const layout = bannerLayoutSize;
+    if (!img || !layout) return null;
+    const scale = Math.min(layout.width / img.width, layout.height / img.height);
+    const dispW = img.width * scale;
+    const dispH = img.height * scale;
+    const offsetX = (layout.width - dispW) / 2;
+    const offsetY = (layout.height - dispH) / 2;
+    const aspect = BANNER_WIDTH / BANNER_HEIGHT;
+    const cropW = Math.min(img.width, img.height * aspect);
+    const cropH = cropW / aspect;
+    const boxW = cropW * scale;
+    const boxH = cropH * scale;
+    const maxX = Math.max(0, dispW - boxW);
+    const maxY = Math.max(0, dispH - boxH);
+    const left = offsetX + bannerCropOffsetX * maxX;
+    const top = offsetY + bannerCropOffsetY * maxY;
+    bannerCropBoxSize.current = { width: boxW, height: boxH };
+    bannerCropDispSize.current = { width: dispW, height: dispH };
+    return { left, top, width: boxW, height: boxH, originX: bannerCropOffsetX * (img.width - cropW), originY: bannerCropOffsetY * (img.height - cropH), cropW, cropH };
+  };
+
+  const bannerCropOffsetsRef = useRef({ x: 0.5, y: 0.5 });
+  const bannerCropStartOffsets = useRef({ x: 0.5, y: 0.5 });
+  bannerCropOffsetsRef.current = { x: bannerCropOffsetX, y: bannerCropOffsetY };
+  const bannerCropPan = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: () => {
+        bannerCropStartOffsets.current = { ...bannerCropOffsetsRef.current };
+      },
+      onPanResponderMove: (_, g) => {
+        const disp = bannerCropDispSize.current;
+        const box = bannerCropBoxSize.current;
+        if (!disp || !box) return;
+        const maxX = Math.max(0, disp.width - box.width);
+        const maxY = Math.max(0, disp.height - box.height);
+        const start = bannerCropStartOffsets.current;
+        if (maxY > 0) setBannerCropOffsetY(Math.max(0, Math.min(1, start.y + g.dy / maxY)));
+        if (maxX > 0) setBannerCropOffsetX(Math.max(0, Math.min(1, start.x + g.dx / maxX)));
+      },
+    })
+  ).current;
+
+  const confirmBannerCrop = async () => {
+    if (!bannerCropUri || !bannerImageSize) return;
+    const box = getBannerCropBox();
+    if (!box) return;
+    setBannerLoading(true);
+    try {
+      const out = await cropBannerRegion(bannerCropUri, box.originX, box.originY, box.cropW, box.cropH);
+      if (out) {
+        setBanner(out);
+        console.log(`[BusinessProfile] Banner saved: ${BANNER_WIDTH}x${BANNER_HEIGHT}px`);
+      }
+    } finally {
+      setBannerCropUri(null);
+      setBannerImageSize(null);
+      setBannerLayoutSize(null);
+      setBannerLoading(false);
+    }
+  };
+
+  const cancelBannerCrop = () => {
+    setBannerCropUri(null);
+    setBannerImageSize(null);
+    setBannerLayoutSize(null);
+  };
+
+  const removeBanner = () => setConfirmRemove('banner');
+  const doRemoveBanner = () => {
+    setBanner(null);
+    setConfirmRemove(null);
   };
 
   const pickDocument = async (setter: (doc: any) => void) => {
@@ -556,6 +643,78 @@ const BusinessProfilePage: React.FC<BusinessProfilePageProps> = ({
         qrValue={companyQRCode}
         onClose={() => setQrCodeModalVisible(false)}
       />
+
+      {/* Remove confirmation modal (works on web) */}
+      <Modal visible={confirmRemove !== null} transparent animationType="fade">
+        <View style={styles.confirmOverlay}>
+          <View style={styles.confirmBox}>
+            <Text style={styles.confirmTitle}>
+              {confirmRemove === 'logo' ? 'Remove Logo/Avatar?' : 'Remove Banner?'}
+            </Text>
+            <Text style={styles.confirmMessage}>
+              {confirmRemove === 'logo'
+                ? 'Are you sure you want to remove the logo and avatar?'
+                : 'Are you sure you want to remove the banner image?'}
+            </Text>
+            <View style={styles.confirmButtons}>
+              <TouchableOpacity style={styles.confirmButtonCancel} onPress={() => setConfirmRemove(null)}>
+                <Text style={styles.confirmButtonCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.confirmButtonRemove}
+                onPress={confirmRemove === 'logo' ? doRemoveLogo : doRemoveBanner}>
+                <Text style={styles.confirmButtonRemoveText}>Remove</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Banner crop modal: drag selection then confirm */}
+      <Modal visible={!!bannerCropUri} transparent animationType="slide">
+        <View style={styles.cropModalRoot}>
+          <View style={styles.cropModalContent}>
+            <Text style={styles.cropModalTitle}>Select banner area</Text>
+            <Text style={styles.cropModalHint}>Drag the frame to move the selection vertically (or horizontally), then confirm.</Text>
+            {bannerCropUri && (
+              <View
+                style={styles.cropImageWrap}
+                onLayout={onBannerImageLayout}
+                {...bannerCropPan.panHandlers}>
+                <Image
+                  source={{ uri: bannerCropUri }}
+                  style={styles.cropImage}
+                  resizeMode="contain"
+                  onLoad={onBannerImageLoad}
+                />
+                {bannerLayoutSize && bannerImageSize && (() => {
+                  const box = getBannerCropBox();
+                  if (!box) return null;
+                  return (
+                    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+                      <View style={[styles.cropMask, { height: box.top }]} />
+                      <View style={[styles.cropMaskRow, { height: box.height }]}>
+                        <View style={[styles.cropMask, { width: box.left }]} />
+                        <View style={[styles.cropSelection, { width: box.width, height: box.height }]} />
+                        <View style={[styles.cropMask, { flex: 1 }]} />
+                      </View>
+                      <View style={[styles.cropMask, { flex: 1 }]} />
+                    </View>
+                  );
+                })()}
+              </View>
+            )}
+            <View style={styles.cropModalButtons}>
+              <TouchableOpacity style={styles.confirmButtonCancel} onPress={cancelBannerCrop}>
+                <Text style={styles.confirmButtonCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.cropConfirmButton} onPress={confirmBannerCrop}>
+                <Text style={styles.confirmButtonRemoveText}>Use this area</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </PageTemplate>
   );
 };
@@ -723,6 +882,118 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     marginTop: 8,
     marginBottom: 8,
+  },
+  confirmOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  confirmBox: {
+    backgroundColor: Colors.background,
+    borderRadius: 12,
+    padding: 24,
+    minWidth: 280,
+    maxWidth: 400,
+  },
+  confirmTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: Colors.text.primary,
+    marginBottom: 8,
+  },
+  confirmMessage: {
+    fontSize: 15,
+    color: Colors.text.secondary,
+    marginBottom: 20,
+  },
+  confirmButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    justifyContent: 'flex-end',
+  },
+  confirmButtonCancel: {
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    backgroundColor: Colors.neutral[200],
+  },
+  confirmButtonCancelText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: Colors.text.primary,
+  },
+  confirmButtonRemove: {
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    backgroundColor: '#dc3545',
+  },
+  confirmButtonRemoveText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: Colors.background,
+  },
+  cropModalRoot: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+  },
+  cropModalContent: {
+    backgroundColor: Colors.background,
+    borderRadius: 12,
+    padding: 16,
+    maxWidth: '100%',
+    maxHeight: '90%',
+  },
+  cropModalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: Colors.text.primary,
+    marginBottom: 4,
+  },
+  cropModalHint: {
+    fontSize: 13,
+    color: Colors.text.secondary,
+    marginBottom: 12,
+  },
+  cropImageWrap: {
+    width: '100%',
+    height: 280,
+    position: 'relative',
+    backgroundColor: Colors.neutral[100],
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  cropImage: {
+    width: '100%',
+    height: '100%',
+  },
+  cropMask: {
+    backgroundColor: 'rgba(0,0,0,0.6)',
+  },
+  cropMaskRow: {
+    flexDirection: 'row',
+  },
+  cropSelection: {
+    borderWidth: 2,
+    borderColor: Colors.primary,
+    backgroundColor: 'transparent',
+  },
+  cropModalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    justifyContent: 'flex-end',
+    marginTop: 16,
+  },
+  cropConfirmButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    backgroundColor: Colors.primary,
   },
 });
 

@@ -223,6 +223,80 @@ export const resizeToBanner = async (
   }
 };
 
+/**
+ * Crop a region from an image and resize to banner size (400x120).
+ * Used when user selects a region in the banner crop modal.
+ * @param imageUriOrBase64 - Full image
+ * @param originX - Left of crop in image pixels
+ * @param originY - Top of crop in image pixels
+ * @param cropWidth - Width of crop in image pixels
+ * @param cropHeight - Height of crop in image pixels
+ */
+export const cropBannerRegion = async (
+  imageUriOrBase64: string,
+  originX: number,
+  originY: number,
+  cropWidth: number,
+  cropHeight: number
+): Promise<string | null> => {
+  if (!imageUriOrBase64 || cropWidth <= 0 || cropHeight <= 0) return null;
+  try {
+    if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+      return new Promise((resolve) => {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => {
+          try {
+            const canvas = document.createElement('canvas');
+            canvas.width = BANNER_WIDTH;
+            canvas.height = BANNER_HEIGHT;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) {
+              resolve(null);
+              return;
+            }
+            ctx.drawImage(
+              img,
+              Math.max(0, originX), Math.max(0, originY), cropWidth, cropHeight,
+              0, 0, BANNER_WIDTH, BANNER_HEIGHT
+            );
+            resolve(canvas.toDataURL('image/jpeg', 0.85));
+          } catch (e) {
+            console.error('[logoUtils] cropBannerRegion error:', e);
+            resolve(null);
+          }
+        };
+        img.onerror = () => resolve(null);
+        img.src = imageUriOrBase64;
+      });
+    }
+    try {
+      const { manipulateAsync, SaveFormat } = require('expo-image-manipulator');
+      const result = await manipulateAsync(
+        imageUriOrBase64,
+        [
+          {
+            crop: {
+              originX: Math.round(originX),
+              originY: Math.round(originY),
+              width: Math.round(cropWidth),
+              height: Math.round(cropHeight),
+            },
+          },
+          { resize: { width: BANNER_WIDTH, height: BANNER_HEIGHT } },
+        ],
+        { base64: true, compress: 0.85, format: SaveFormat.JPEG }
+      );
+      if (result?.base64) return `data:image/jpeg;base64,${result.base64}`;
+      if (result?.uri) return result.uri;
+    } catch (_) {}
+    return null;
+  } catch (error) {
+    console.error('[logoUtils] Error in cropBannerRegion:', error);
+    return null;
+  }
+};
+
 
 
 
