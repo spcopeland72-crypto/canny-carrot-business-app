@@ -42,6 +42,7 @@ import {MessageStoreProvider} from './src/contexts/MessageStoreContext';
 import MessagesInboxScreen from './src/components/MessagesInboxScreen';
 import MessageChatScreen from './src/components/MessageChatScreen';
 import ChatPage from './src/components/ChatPage';
+import ManageProductsPage from './src/components/ManageProductsPage';
 import OnlineAdminPage from './src/components/OnlineAdminPage';
 import ScanModal from './src/components/ScanModal';
 import LoginPage from './src/components/LoginPage';
@@ -586,9 +587,17 @@ function App(): React.JSX.Element {
             onSave={handleAddCampaign}
           />
         );
+      case 'Products':
+        return (
+          <ManageProductsPage
+            currentScreen={currentScreen}
+            onNavigate={handleNavigate}
+            onBack={handleBack}
+            onScanPress={handleScanPress}
+          />
+        );
       case 'Settings':
       case 'Analytics':
-      case 'Products':
       case 'Reports':
       case 'About':
         return (

@@ -125,6 +125,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   const [notificationsModalVisible, setNotificationsModalVisible] = useState(false);
   const [helpModalVisible, setHelpModalVisible] = useState(false);
   const [companyMenuVisible, setCompanyMenuVisible] = useState(false);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [hasUnreadNotifications] = useState(true);
   const [logoError, setLogoError] = useState(false);
   const [bannerError, setBannerError] = useState(false);
@@ -364,6 +365,13 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   // In-app messaging: load inbox when Home mounts and we have a businessId (same as customer app on login)
   const { loadInboxFromApi, conversations: messageConversations, deleteConversation } = useMessageStore();
   const recentNotifications = messageConversations.slice(0, 10);
+
+  const handleConfirmDeleteNotification = () => {
+    if (deleteConfirmId) {
+      deleteConversation(deleteConfirmId);
+      setDeleteConfirmId(null);
+    }
+  };
   useEffect(() => {
     if (currentScreen !== 'Home') return;
     let mounted = true;
@@ -1103,7 +1111,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                     </View>
                     <TouchableOpacity
                       style={styles.notificationActionButton}
-                      onPress={() => deleteConversation(item.id)}
+                      onPress={() => setDeleteConfirmId(item.id)}
                       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                       <Text style={styles.notificationActionIcon}>🗑️</Text>
                     </TouchableOpacity>
@@ -1326,6 +1334,31 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
         showSuccessMessage={false}
       />
       
+      {/* Delete notification confirm modal (same as customer app MessagesInboxScreen) */}
+      <Modal
+        visible={deleteConfirmId != null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setDeleteConfirmId(null)}>
+        <TouchableOpacity
+          style={styles.deleteOverlay}
+          activeOpacity={1}
+          onPress={() => setDeleteConfirmId(null)}>
+          <View style={styles.deleteModal} onStartShouldSetResponder={() => true}>
+            <Text style={styles.deleteModalTitle}>Delete message?</Text>
+            <Text style={styles.deleteModalSubtitle}>This cannot be undone.</Text>
+            <View style={styles.deleteModalButtons}>
+              <TouchableOpacity style={styles.deleteModalCancel} onPress={() => setDeleteConfirmId(null)}>
+                <Text style={styles.deleteModalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.deleteModalConfirm} onPress={handleConfirmDeleteNotification}>
+                <Text style={styles.deleteModalConfirmText}>Delete</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
       {/* Modals */}
       <HelpModal
         visible={helpModalVisible}
@@ -1959,6 +1992,60 @@ const styles = StyleSheet.create({
   },
   notificationActionIcon: {
     fontSize: 18,
+  },
+  deleteOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  deleteModal: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 24,
+    width: '100%',
+    maxWidth: 320,
+  },
+  deleteModalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1a1a1a',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  deleteModalSubtitle: {
+    fontSize: 14,
+    color: '#616161',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  deleteModalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+  },
+  deleteModalCancel: {
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    backgroundColor: '#f0f0f0',
+    marginRight: 12,
+  },
+  deleteModalCancelText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1a1a1a',
+  },
+  deleteModalConfirm: {
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    backgroundColor: '#d32f2f',
+  },
+  deleteModalConfirmText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
   },
   chatCard: {
     backgroundColor: Colors.neutral[50],
