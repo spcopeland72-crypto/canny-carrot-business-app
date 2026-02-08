@@ -29,7 +29,8 @@ export interface Reward {
   stampsRequired: number;        // Required stamps to earn reward
   costStamps?: number;            // Alias for stampsRequired
   type: 'product' | 'discount' | 'freebie' | 'experience' | 'voucher' | 'upgrade';
-  value?: number;                 // For discounts, the amount off
+  value?: number;                 // For discounts: amount off in £ (when using Value £)
+  discountPercent?: number;       // For discounts: percentage off (when using Discount %)
   isActive: boolean;              // Active status (true/false instead of status enum)
   validFrom: string;              // When reward becomes available
   validTo?: string;               // When reward expires

@@ -10,7 +10,9 @@ import {
   Modal,
   TextInput,
   Alert,
+  Platform,
 } from 'react-native';
+import { Colors } from '../constants/Colors';
 import BottomNavigation from './BottomNavigation';
 import { businessRepository } from '../services/localRepository';
 import type { BusinessProfile } from '../types';
@@ -179,8 +181,8 @@ export default function ManageProductsPage({
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
-      <View style={styles.header}>
+      <StatusBar barStyle="light-content" backgroundColor={Colors.primary} />
+      <View style={styles.headerBanner}>
         <TouchableOpacity
           style={styles.headerBackTouch}
           onPress={() => (onBack ? onBack() : onNavigate('More'))}
@@ -322,39 +324,50 @@ export default function ManageProductsPage({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: Colors.background,
   },
-  header: {
+  headerBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     paddingVertical: 16,
     paddingHorizontal: 20,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#e5e5e5',
+    backgroundColor: Colors.primary,
     position: 'relative',
+    ...Platform.select({
+      web: {
+        position: 'sticky' as const,
+        top: 0,
+        zIndex: 100,
+      },
+      default: {},
+    }),
   },
   headerBackTouch: {
-    padding: 4,
-    zIndex: 1,
+    position: 'absolute',
+    left: 20,
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
   },
   headerBackText: {
-    fontSize: 24,
-    color: '#1a1a1a',
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: Colors.background,
   },
   headerTitle: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#1a1a1a',
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: Colors.background,
     textAlign: 'center',
-    pointerEvents: 'none',
   },
   headerRight: {
-    width: 32,
-    height: 32,
+    position: 'absolute',
+    right: 20,
+    width: 40,
+    height: 40,
   },
   listContent: {
     paddingVertical: 8,

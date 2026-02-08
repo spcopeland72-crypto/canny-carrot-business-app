@@ -95,6 +95,16 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
   const [campaignQRModalVisible, setCampaignQRModalVisible] = useState(false);
   const [campaignQRModalTitle, setCampaignQRModalTitle] = useState('');
   const [campaignQRModalValue, setCampaignQRModalValue] = useState('');
+  // Free product combobox: text input + dropdown (when reward type = Free Product)
+  const [freeProductInput, setFreeProductInput] = useState('');
+  const [freeProductDropdownVisible, setFreeProductDropdownVisible] = useState(false);
+  // Discount: Value £ or Discount % (when reward type = Discount)
+  const [discountValuePounds, setDiscountValuePounds] = useState('');
+  const [discountValuePercent, setDiscountValuePercent] = useState('');
+  const [discountPoundsModalVisible, setDiscountPoundsModalVisible] = useState(false);
+  const [discountPercentModalVisible, setDiscountPercentModalVisible] = useState(false);
+  const [tempDiscountPounds, setTempDiscountPounds] = useState('');
+  const [tempDiscountPercent, setTempDiscountPercent] = useState('');
 
   // Load reward/campaign data and form fields on mount (if editing)
   useEffect(() => {
@@ -216,6 +226,12 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
               setSelectedProducts(loadedReward.selectedProducts || []);
               setSelectedActions(loadedReward.selectedActions || []);
               setPinCode(loadedReward.pinCode || '');
+              const prods = loadedReward.selectedProducts || [];
+              setFreeProductInput(prods[0] || '');
+              if (loadedReward.type === 'discount') {
+                setDiscountValuePounds(loadedReward.value != null ? String(loadedReward.value) : '');
+                setDiscountValuePercent(loadedReward.discountPercent != null ? String(loadedReward.discountPercent) : '');
+              }
             }
           }
         } catch (error) {
@@ -231,6 +247,12 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
         setSelectedProducts((reward as any).selectedProducts || []);
         setSelectedActions((reward as any).selectedActions || []);
         setPinCode((reward as any).pinCode || '');
+        const prods = (reward as any).selectedProducts || [];
+        setFreeProductInput(prods[0] || '');
+        if ((reward as any).type === 'discount') {
+          setDiscountValuePounds((reward as any).value != null ? String((reward as any).value) : '');
+          setDiscountValuePercent((reward as any).discountPercent != null ? String((reward as any).discountPercent) : '');
+        }
       }
     };
     loadRewardData();
@@ -687,6 +709,8 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
         setSuccessModalVisible(true);
       } else {
         // Save as Reward
+        const poundsNum = rewardType === 'discount' && discountValuePounds.trim() ? parseFloat(discountValuePounds.trim()) : undefined;
+        const percentNum = rewardType === 'discount' && discountValuePercent.trim() ? parseFloat(discountValuePercent.trim()) : undefined;
         const rewardToSave: Reward = {
           id: rewardIdToSave,
           businessId: auth.businessId,
@@ -695,6 +719,8 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
           stampsRequired: requirementValue,
           costStamps: requirementValue,
           type: dbType,
+          ...(rewardType === 'discount' && poundsNum != null && !Number.isNaN(poundsNum) ? { value: poundsNum } : {}),
+          ...(rewardType === 'discount' && percentNum != null && !Number.isNaN(percentNum) ? { discountPercent: percentNum } : {}),
           isActive: true,
           validFrom: now,
           validTo: undefined,
@@ -1490,6 +1516,7 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
                 onPress={() => {
                   setRewardType('free_product');
                   setCustomTypeText('');
+                  setFreeProductInput(selectedProducts[0] || '');
                 }}>
                 <Text
                   style={[
@@ -1545,6 +1572,180 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
               placeholderTextColor={Colors.text.light}
             />
           )}
+
+          {/* Free Product: text input with dropdown of products (rewards only) */}
+          {!isCampaign && rewardType === 'free_product' && (
+            <View style={styles.freeProductComboWrap}>
+              <Text style={styles.label}>Product</Text>
+              <TextInput
+                style={styles.input}
+                value={freeProductInput}
+                onChangeText={(text) => {
+                  setFreeProductInput(text);
+                  setFreeProductDropdownVisible(true);
+                }}
+                onFocus={() => setFreeProductDropdownVisible(true)}
+                onBlur={() => {
+                  // On blur: if text exactly matches a product, add to selected
+                  const trimmed = freeProductInput.trim();
+                  if (trimmed && products.some((p) => p === trimmed) && !selectedProducts.includes(trimmed)) {
+                    setSelectedProducts([...selectedProducts, trimmed]);
+                  }
+                  setTimeout(() => setFreeProductDropdownVisible(false), 200);
+                }}
+                placeholder="Type or select product"
+                placeholderTextColor={Colors.text.light}
+              />
+              {freeProductDropdownVisible && products.length > 0 && (
+                <View style={styles.freeProductDropdown}>
+                  <ScrollView
+                    style={styles.freeProductDropdownScroll}
+                    keyboardShouldPersistTaps="handled"
+                    nestedScrollEnabled>
+                    {products
+                      .filter((p) =>
+                        p.toLowerCase().includes(freeProductInput.trim().toLowerCase())
+                      )
+                      .map((product) => (
+                        <TouchableOpacity
+                          key={product}
+                          style={[
+                            styles.dropdownOption,
+                            selectedProducts.includes(product) && styles.dropdownOptionSelected,
+                          ]}
+                          onPress={() => {
+                            if (!selectedProducts.includes(product)) {
+                              setSelectedProducts([...selectedProducts, product]);
+                            }
+                            setFreeProductInput(product);
+                            setFreeProductDropdownVisible(false);
+                          }}>
+                          <Text
+                            style={[
+                              styles.dropdownOptionText,
+                              selectedProducts.includes(product) && styles.dropdownOptionTextSelected,
+                            ]}>
+                            {selectedProducts.includes(product) ? '✓ ' : ''}
+                            {product}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                  </ScrollView>
+                </View>
+              )}
+            </View>
+          )}
+
+          {/* Discount: Value £ or Discount % (rewards only) */}
+          {!isCampaign && rewardType === 'discount' && (
+            <View style={styles.discountOptionsWrap}>
+              <Text style={styles.label}>Discount</Text>
+              <TouchableOpacity
+                style={styles.discountOptionRow}
+                onPress={() => {
+                  setTempDiscountPounds(discountValuePounds);
+                  setDiscountPoundsModalVisible(true);
+                }}>
+                <Text style={styles.discountOptionLabel}>Value £</Text>
+                <Text style={[styles.discountOptionValue, !discountValuePounds && styles.discountOptionPlaceholder]}>
+                  {discountValuePounds ? `£${discountValuePounds}` : 'Enter amount'}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.discountOptionRow}
+                onPress={() => {
+                  setTempDiscountPercent(discountValuePercent);
+                  setDiscountPercentModalVisible(true);
+                }}>
+                <Text style={styles.discountOptionLabel}>Discount %</Text>
+                <Text style={[styles.discountOptionValue, !discountValuePercent && styles.discountOptionPlaceholder]}>
+                  {discountValuePercent ? `${discountValuePercent}%` : 'Enter percentage'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* Value £ dialog */}
+          <Modal
+            visible={discountPoundsModalVisible}
+            transparent
+            animationType="fade"
+            onRequestClose={() => setDiscountPoundsModalVisible(false)}>
+            <TouchableOpacity
+              style={styles.modalOverlay}
+              activeOpacity={1}
+              onPress={() => setDiscountPoundsModalVisible(false)}>
+              <View style={styles.discountDialogBox} onStartShouldSetResponder={() => true}>
+                <Text style={styles.modalTitle}>Value £</Text>
+                <Text style={styles.label}>Amount (£)</Text>
+                <TextInput
+                  style={styles.input}
+                  value={tempDiscountPounds}
+                  onChangeText={setTempDiscountPounds}
+                  placeholder="e.g. 5.00"
+                  placeholderTextColor={Colors.text.light}
+                  keyboardType="decimal-pad"
+                />
+                <View style={styles.discountDialogButtons}>
+                  <TouchableOpacity
+                    style={[styles.modalButton, styles.cancelButton]}
+                    onPress={() => setDiscountPoundsModalVisible(false)}>
+                    <Text style={styles.cancelButtonText}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.modalButton, styles.createButton]}
+                    onPress={() => {
+                      const v = tempDiscountPounds.trim();
+                      setDiscountValuePounds(v);
+                      setDiscountPoundsModalVisible(false);
+                    }}>
+                    <Text style={styles.createButtonText}>Save</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </TouchableOpacity>
+          </Modal>
+
+          {/* Discount % dialog */}
+          <Modal
+            visible={discountPercentModalVisible}
+            transparent
+            animationType="fade"
+            onRequestClose={() => setDiscountPercentModalVisible(false)}>
+            <TouchableOpacity
+              style={styles.modalOverlay}
+              activeOpacity={1}
+              onPress={() => setDiscountPercentModalVisible(false)}>
+              <View style={styles.discountDialogBox} onStartShouldSetResponder={() => true}>
+                <Text style={styles.modalTitle}>Discount %</Text>
+                <Text style={styles.label}>Percentage (%)</Text>
+                <TextInput
+                  style={styles.input}
+                  value={tempDiscountPercent}
+                  onChangeText={setTempDiscountPercent}
+                  placeholder="e.g. 10"
+                  placeholderTextColor={Colors.text.light}
+                  keyboardType="decimal-pad"
+                />
+                <View style={styles.discountDialogButtons}>
+                  <TouchableOpacity
+                    style={[styles.modalButton, styles.cancelButton]}
+                    onPress={() => setDiscountPercentModalVisible(false)}>
+                    <Text style={styles.cancelButtonText}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.modalButton, styles.createButton]}
+                    onPress={() => {
+                      const v = tempDiscountPercent.trim();
+                      setDiscountValuePercent(v);
+                      setDiscountPercentModalVisible(false);
+                    }}>
+                    <Text style={styles.createButtonText}>Save</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </TouchableOpacity>
+          </Modal>
 
           {/* Campaign Date Pickers - Hard positioned before PIN Code for visibility and touch */}
           {isCampaign && (
@@ -2127,6 +2328,23 @@ const styles = StyleSheet.create({
     maxHeight: '60%',
     padding: 16,
   },
+  freeProductComboWrap: {
+    marginTop: 8,
+    position: 'relative',
+    zIndex: 10,
+  },
+  freeProductDropdown: {
+    marginTop: 4,
+    maxHeight: 200,
+    backgroundColor: Colors.background,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: Colors.neutral[200],
+    overflow: 'hidden',
+  },
+  freeProductDropdownScroll: {
+    maxHeight: 200,
+  },
   dropdownOption: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -2200,6 +2418,45 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: Colors.background,
+  },
+  discountOptionsWrap: {
+    marginTop: 8,
+  },
+  discountOptionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    marginBottom: 8,
+    backgroundColor: Colors.background,
+    borderWidth: 1,
+    borderColor: Colors.neutral[200],
+    borderRadius: 8,
+  },
+  discountOptionLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: Colors.text.primary,
+  },
+  discountOptionValue: {
+    fontSize: 16,
+    color: Colors.text.primary,
+  },
+  discountOptionPlaceholder: {
+    color: Colors.text.light,
+  },
+  discountDialogBox: {
+    backgroundColor: Colors.background,
+    borderRadius: 12,
+    padding: 24,
+    width: '85%',
+    maxWidth: 340,
+  },
+  discountDialogButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 20,
   },
   campaignSummary: {
     backgroundColor: Colors.neutral[50],
