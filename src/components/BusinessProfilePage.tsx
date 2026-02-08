@@ -404,8 +404,9 @@ const BusinessProfilePage: React.FC<BusinessProfilePageProps> = ({
       const existingProfile = await businessRepository.get();
       const businessId = existingProfile?.id || `business-${Date.now()}`;
       
-      // Build updated profile (UK address fields + avatar + banner for sync)
+      // Build updated profile: spread existing first so form values (address, images) are not overwritten
       const updatedProfile: BusinessProfile = {
+        ...existingProfile,
         id: businessId,
         name: businessName,
         email: email,
@@ -420,7 +421,6 @@ const BusinessProfilePage: React.FC<BusinessProfilePageProps> = ({
         logo: logo || undefined,
         logoIcon: logoIcon || undefined,
         banner: banner || undefined,
-        ...existingProfile,
         updatedAt: new Date().toISOString(),
         createdAt: existingProfile?.createdAt || new Date().toISOString(),
       };
