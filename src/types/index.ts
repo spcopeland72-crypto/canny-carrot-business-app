@@ -290,6 +290,8 @@ export type ScreenName =
   | 'Reports'
   | 'About'
   | 'EventLog'
+  | 'Messages'
+  | 'MessageChat'
   | 'HelpGettingStarted'
   | 'HelpCustomers'
   | 'HelpRewards'

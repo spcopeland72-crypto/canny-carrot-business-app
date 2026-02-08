@@ -95,6 +95,18 @@ interface ApiResponse<T> {
   };
 }
 
+// In-app notification (business inbox, same shape as customer)
+export interface BusinessMessage {
+  id: string;
+  type?: string;
+  title: string;
+  message: string;
+  data?: Record<string, unknown>;
+  createdAt: string;
+  read?: boolean;
+  readAt?: string;
+}
+
 // Helper for API calls
 async function apiCall<T>(
   endpoint: string,
@@ -166,6 +178,11 @@ export const businessApi = {
   // Get business members/customers
   async getMembers(id: string, page: number = 1, limit: number = 20): Promise<ApiResponse<Customer[]>> {
     return apiCall<Customer[]>(`/businesses/${id}/members?page=${page}&limit=${limit}`);
+  },
+
+  // In-app inbox (unified platform)
+  async getNotifications(businessId: string, limit: number = 50, offset: number = 0): Promise<ApiResponse<BusinessMessage[]>> {
+    return apiCall<BusinessMessage[]>(`/businesses/${businessId}/notifications?limit=${limit}&offset=${offset}`);
   },
 };
 

@@ -37,6 +37,7 @@ const MorePage: React.FC<MorePageProps> = ({
     {id: '5', title: 'Reports', screen: 'Reports', icon: '📄'},
     {id: '6', title: 'About', screen: 'About', icon: 'ℹ️'},
     {id: '7', title: 'Event Log', screen: 'EventLog', icon: '📋'},
+    {id: '8', title: 'Messages', screen: 'Messages', icon: '💬'},
   ];
 
   const openMessagingDashboard = () => {

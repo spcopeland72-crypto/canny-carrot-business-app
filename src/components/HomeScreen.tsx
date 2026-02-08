@@ -26,6 +26,7 @@ import RewardQRCodeModal from './RewardQRCodeModal';
 import QRCodeModal from './QRCodeModal';
 import {generateRewardQRCode, generateCampaignItemQRCode} from '../utils/qrCodeUtils';
 import {getStoredAuth} from '../services/authService';
+import {useMessageStore} from '../contexts/MessageStoreContext';
 import AnimatedLineChart from './AnimatedLineChart';
 import AnimatedBarChart from './AnimatedBarChart';
 import AnimatedDonutChart from './AnimatedDonutChart';
@@ -360,6 +361,18 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   // Use campaigns from props, fallback to local state, then empty array
   const campaigns = propsCampaigns.length > 0 ? propsCampaigns : (localCampaigns.length > 0 ? localCampaigns : []);
 
+  // In-app messaging: load inbox when Home mounts and we have a businessId (same as customer app on login)
+  const { loadInboxFromApi, conversations: messageConversations, deleteConversation } = useMessageStore();
+  const recentNotifications = messageConversations.slice(0, 10);
+  useEffect(() => {
+    if (currentScreen !== 'Home') return;
+    let mounted = true;
+    getStoredAuth().then((auth) => {
+      if (mounted && auth?.businessId) loadInboxFromApi(auth.businessId);
+    });
+    return () => { mounted = false; };
+  }, [currentScreen, loadInboxFromApi]);
+
   // 2x2 Box Elements (matching customer app Features section)
   const boxElements = [
     {
@@ -426,20 +439,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
       chartType: 'area',
       chartData: [30, 35, 38, 40, 42, 43, 44, 45],
     },
-  ];
-
-  // Notifications - System inbox with priority messages
-  const notifications = [
-    {id: '1', message: 'System maintenance scheduled for tonight at 2 AM', priority: 'high', timestamp: '2 hours ago'},
-    {id: '2', message: 'New customer registration: Sarah Johnson', priority: 'medium', timestamp: '3 hours ago'},
-    {id: '3', message: 'Reward redemption completed: Buy 10 Get 1 Free', priority: 'low', timestamp: '4 hours ago'},
-    {id: '4', message: 'Campaign "Christmas Special" ending in 2 days', priority: 'high', timestamp: '5 hours ago'},
-    {id: '5', message: 'Payment received: £45.00 from customer #1234', priority: 'low', timestamp: '6 hours ago'},
-    {id: '6', message: 'API rate limit warning: 80% of daily limit used', priority: 'high', timestamp: '7 hours ago'},
-    {id: '7', message: 'New review submitted: 5 stars from John Smith', priority: 'medium', timestamp: '8 hours ago'},
-    {id: '8', message: 'Customer support ticket #456 created', priority: 'medium', timestamp: '9 hours ago'},
-    {id: '9', message: 'Weekly analytics report ready for review', priority: 'low', timestamp: '1 day ago'},
-    {id: '10', message: 'Backup completed successfully', priority: 'low', timestamp: '1 day ago'},
   ];
 
   // Chat messages - Inbox of messages
@@ -1065,52 +1064,52 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
           </View>
         </View>
 
-        {/* Notifications - System Inbox with Priority Messages */}
+        {/* Notifications - 10 most recent messages with priority traffic lights, delete bin; View All → Messages */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>NOTIFICATIONS</Text>
-            <TouchableOpacity onPress={() => setNotificationsModalVisible(true)}>
+            <TouchableOpacity onPress={() => onNavigate('Messages')}>
               <Text style={styles.viewAllText}>View All</Text>
             </TouchableOpacity>
           </View>
           <View style={styles.notificationsCard}>
-            <ScrollView 
+            <ScrollView
               nestedScrollEnabled={true}
               showsVerticalScrollIndicator={true}
               style={styles.notificationsScrollView}>
-              {notifications.map((notification) => (
-                <View key={notification.id} style={styles.notificationItemContainer}>
-                  <View style={styles.notificationLeft}>
-                    <View style={[
-                      styles.trafficLight,
-                      notification.priority === 'high' && styles.trafficLightRed,
-                      notification.priority === 'medium' && styles.trafficLightYellow,
-                      notification.priority === 'low' && styles.trafficLightGreen,
-                    ]} />
-                    <View style={styles.notificationContent}>
-                      <Text 
-                        style={styles.notificationMessage}
-                        numberOfLines={1}
-                        ellipsizeMode="tail">
-                        {notification.message}
-                      </Text>
-                      <Text style={styles.notificationTimestamp}>{notification.timestamp}</Text>
-                    </View>
-                  </View>
-                  <View style={styles.notificationActions}>
-                    <TouchableOpacity
-                      style={styles.notificationActionButton}
-                      onPress={() => {/* Open notification */}}>
-                      <Text style={styles.notificationActionIcon}>👁️</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.notificationActionButton}
-                      onPress={() => {/* Archive notification */}}>
-                      <Text style={styles.notificationActionIcon}>📦</Text>
-                    </TouchableOpacity>
-                  </View>
+              {recentNotifications.length === 0 ? (
+                <View style={styles.notificationItemContainer}>
+                  <Text style={styles.notificationMessage}>No messages yet.</Text>
                 </View>
-              ))}
+              ) : (
+                recentNotifications.map((item) => (
+                  <View key={item.id} style={styles.notificationItemContainer}>
+                    <View style={styles.notificationLeft}>
+                      <View style={[
+                        styles.trafficLight,
+                        item.priority === 'important' && styles.trafficLightRed,
+                        item.priority === 'update' && styles.trafficLightAmber,
+                        (item.priority === 'information' || !item.priority) && styles.trafficLightGreen,
+                      ]} />
+                      <View style={styles.notificationContent}>
+                        <Text
+                          style={styles.notificationMessage}
+                          numberOfLines={1}
+                          ellipsizeMode="tail">
+                          {item.lastMessage || item.name}
+                        </Text>
+                        <Text style={styles.notificationTimestamp}>{item.lastTimestamp}</Text>
+                      </View>
+                    </View>
+                    <TouchableOpacity
+                      style={styles.notificationActionButton}
+                      onPress={() => deleteConversation(item.id)}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                      <Text style={styles.notificationActionIcon}>🗑️</Text>
+                    </TouchableOpacity>
+                  </View>
+                ))
+              )}
             </ScrollView>
           </View>
         </View>
@@ -1928,13 +1927,13 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   trafficLightRed: {
-    backgroundColor: '#FF0000',
+    backgroundColor: '#E53935',
   },
-  trafficLightYellow: {
-    backgroundColor: '#FFA500',
+  trafficLightAmber: {
+    backgroundColor: '#FFB300',
   },
   trafficLightGreen: {
-    backgroundColor: '#00FF00',
+    backgroundColor: '#43A047',
   },
   notificationContent: {
     flex: 1,

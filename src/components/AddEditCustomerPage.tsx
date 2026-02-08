@@ -11,6 +11,7 @@ import {
 import {Colors} from '../constants/Colors';
 import PageTemplate from './PageTemplate';
 import {customersRepository} from '../services/localRepository';
+import {appendCreateEvent, appendEditEvent} from '../services/eventLogService';
 import type {Customer} from '../types';
 
 interface AddEditCustomerPageProps {
@@ -66,8 +67,13 @@ const AddEditCustomerPage: React.FC<AddEditCustomerPageProps> = ({
       // IMMEDIATELY save to local repository (save method handles create/update)
       console.log(`[AddEditCustomer] Immediately saving customer to local repository: ${newCustomerId}`);
       await customersRepository.save(customer);
+      if (isEdit) {
+        await appendEditEvent('customer', newCustomerId, name).catch(() => {});
+      } else {
+        await appendCreateEvent('customer', newCustomerId, name).catch(() => {});
+      }
       console.log(`✅ [AddEditCustomer] Customer saved to local repository: ${newCustomerId}`);
-      
+
       Alert.alert('Success', `Customer ${isEdit ? 'updated' : 'added'} successfully`);
       onBack?.();
     } catch (error) {

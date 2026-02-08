@@ -14,6 +14,7 @@ import {
 import {Colors} from '../constants/Colors';
 import {businessApi, rewardApi} from '../services/api';
 import {rewardsRepository} from '../services/localRepository';
+import {appendCreateEvent} from '../services/eventLogService';
 import {generateRewardQRCode} from '../utils/qrCodeUtils';
 import {businessRepository} from '../services/localRepository';
 
@@ -183,6 +184,7 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({onComplete, onSkip}) => 
       // IMMEDIATELY save to local repository
       console.log(`[Onboarding] Immediately saving reward to local repository: ${rewardId}`);
       await rewardsRepository.save(rewardToSave);
+      await appendCreateEvent('reward', rewardId, rewardName).catch(() => {});
       console.log(`✅ [Onboarding] Reward saved to local repository: ${rewardId}`);
       
       // Also sync to API (async, won't block)

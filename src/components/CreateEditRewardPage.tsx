@@ -17,6 +17,7 @@ import QRCodeModal from './QRCodeModal';
 import {generateRewardQRCode, generateCampaignItemQRCode} from '../utils/qrCodeUtils';
 import {businessRepository, rewardsRepository, campaignsRepository} from '../services/localRepository';
 import {getStoredAuth} from '../services/authService';
+import {appendCreateEvent, appendEditEvent} from '../services/eventLogService';
 import type {BusinessProfile, Reward, Campaign, CampaignType} from '../types';
 
 interface CreateEditRewardPageProps {
@@ -630,7 +631,12 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
         // NOTE: For edits, this only saves locally (no immediate Redis write)
         // For new campaigns, this also writes to Redis immediately
         await campaignsRepository.save(campaignToSave);
-        
+        if (isEdit) {
+          await appendEditEvent('campaign', rewardIdToSave, name).catch(() => {});
+        } else {
+          await appendCreateEvent('campaign', rewardIdToSave, name).catch(() => {});
+        }
+
         // Generate QR codes for each selected product and action
         const newQRCodes = new Map<string, string>();
         const businessName = businessProfile?.name ?? '';
@@ -708,8 +714,13 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
         
         // Save to local repository (DB format) - this will also write to Redis
         await rewardsRepository.save(rewardToSave);
+        if (isEdit) {
+          await appendEditEvent('reward', rewardIdToSave, name).catch(() => {});
+        } else {
+          await appendCreateEvent('reward', rewardIdToSave, name).catch(() => {});
+        }
       }
-      
+
       // Call onSave callback if provided (for parent component notifications)
       // EXACT SAME FOR BOTH REWARDS AND CAMPAIGNS
       if (onSave) {

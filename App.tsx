@@ -38,6 +38,9 @@ import ScanPage from './src/components/ScanPage';
 import HelpPage from './src/components/HelpPage';
 import MorePage from './src/components/MorePage';
 import EventLogPage from './src/components/EventLogPage';
+import {MessageStoreProvider} from './src/contexts/MessageStoreContext';
+import MessagesInboxScreen from './src/components/MessagesInboxScreen';
+import MessageChatScreen from './src/components/MessageChatScreen';
 import ChatPage from './src/components/ChatPage';
 import OnlineAdminPage from './src/components/OnlineAdminPage';
 import ScanModal from './src/components/ScanModal';
@@ -64,6 +67,9 @@ function App(): React.JSX.Element {
   
   // Campaigns state management - will be loaded from file or use initial values
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+
+  // In-app messaging: selected conversation for MessageChat screen
+  const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
 
   // Helper function to generate QR code for a reward using shared utility
   const generateQRCode = (reward: Reward): string => {
@@ -479,6 +485,29 @@ function App(): React.JSX.Element {
             onBack={handleBack}
           />
         );
+      case 'Messages':
+        return (
+          <MessagesInboxScreen
+            currentScreen={currentScreen}
+            onNavigate={handleNavigate}
+            onOpenChat={(id) => {
+              setSelectedConversationId(id);
+              handleNavigate('MessageChat');
+            }}
+            onBack={handleBack}
+            onScanPress={handleScanPress}
+          />
+        );
+      case 'MessageChat':
+        return (
+          <MessageChatScreen
+            conversationId={selectedConversationId ?? ''}
+            currentScreen={currentScreen}
+            onBack={handleBack}
+            onNavigate={handleNavigate}
+            onScanPress={handleScanPress}
+          />
+        );
       case 'Chat':
         return (
           <ChatPage
@@ -662,12 +691,14 @@ function App(): React.JSX.Element {
 
   return (
     <RefreshProvider refreshAfterSync={handleSyncComplete}>
-      {renderScreen()}
-      <ScanModal
-        visible={scanModalVisible}
-        onBarcodeScanned={handleBarcodeScanned}
-        onClose={() => setScanModalVisible(false)}
-      />
+      <MessageStoreProvider>
+        {renderScreen()}
+        <ScanModal
+          visible={scanModalVisible}
+          onBarcodeScanned={handleBarcodeScanned}
+          onClose={() => setScanModalVisible(false)}
+        />
+      </MessageStoreProvider>
     </RefreshProvider>
   );
 }

@@ -44,3 +44,29 @@ export async function appendLogoutEvent(): Promise<void> {
     data: {},
   });
 }
+
+/** Log a create (entityType: reward | campaign | customer | business_profile). */
+export async function appendCreateEvent(
+  entityType: 'reward' | 'campaign' | 'customer' | 'business_profile',
+  entityId: string,
+  name?: string,
+): Promise<void> {
+  await appendEventLog({
+    timestamp: new Date().toISOString(),
+    action: 'CREATE',
+    data: { entityType, entityId, name: name ?? '' },
+  });
+}
+
+/** Log an edit (entityType: reward | campaign | customer | business_profile). */
+export async function appendEditEvent(
+  entityType: 'reward' | 'campaign' | 'customer' | 'business_profile',
+  entityId: string,
+  name?: string,
+): Promise<void> {
+  await appendEventLog({
+    timestamp: new Date().toISOString(),
+    action: 'EDIT',
+    data: { entityType, entityId, name: name ?? '' },
+  });
+}

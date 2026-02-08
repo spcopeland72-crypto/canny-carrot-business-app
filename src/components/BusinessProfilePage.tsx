@@ -17,6 +17,7 @@ import PageTemplate from './PageTemplate';
 import QRCodeModal from './QRCodeModal';
 import {generateCompanyQRCode} from '../utils/qrCodeUtils';
 import {businessRepository} from '../services/localRepository';
+import {appendEditEvent} from '../services/eventLogService';
 import {generateCircularIcon} from '../utils/logoUtils';
 import type {BusinessProfile} from '../types';
 
@@ -263,7 +264,8 @@ const BusinessProfilePage: React.FC<BusinessProfilePageProps> = ({
 
       // Save to local repository
       await businessRepository.save(updatedProfile);
-      
+      await appendEditEvent('business_profile', businessId, businessName).catch(() => {});
+
       Alert.alert('Success', 'Business profile updated successfully');
       onBack?.();
     } catch (error) {
