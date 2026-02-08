@@ -149,6 +149,80 @@ export const getLogoDimensions = async (
   }
 };
 
+/** Banner target size: 120px height, 400px width (for customer/business app headers). */
+export const BANNER_WIDTH = 400;
+export const BANNER_HEIGHT = 120;
+
+/**
+ * Resize/crop image to banner dimensions (400x120px) for use in customer and business apps.
+ * On web uses canvas (cover-style crop); on native uses expo-image-manipulator when available.
+ */
+export const resizeToBanner = async (
+  imageUriOrBase64: string | null | undefined
+): Promise<string | null> => {
+  if (!imageUriOrBase64) return null;
+  try {
+    if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+      return new Promise((resolve) => {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => {
+          try {
+            const canvas = document.createElement('canvas');
+            canvas.width = BANNER_WIDTH;
+            canvas.height = BANNER_HEIGHT;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) {
+              resolve(null);
+              return;
+            }
+            const targetAspect = BANNER_WIDTH / BANNER_HEIGHT;
+            const imgAspect = img.width / img.height;
+            let sx: number, sy: number, sWidth: number, sHeight: number;
+            if (imgAspect >= targetAspect) {
+              sHeight = img.height;
+              sWidth = img.height * targetAspect;
+              sx = (img.width - sWidth) / 2;
+              sy = 0;
+            } else {
+              sWidth = img.width;
+              sHeight = img.width / targetAspect;
+              sx = 0;
+              sy = (img.height - sHeight) / 2;
+            }
+            ctx.drawImage(img, sx, sy, sWidth, sHeight, 0, 0, BANNER_WIDTH, BANNER_HEIGHT);
+            resolve(canvas.toDataURL('image/jpeg', 0.85));
+          } catch (e) {
+            console.error('[logoUtils] Banner resize error:', e);
+            resolve(null);
+          }
+        };
+        img.onerror = () => resolve(null);
+        img.src = imageUriOrBase64;
+      });
+    }
+    // React Native: use expo-image-manipulator
+    try {
+      const { manipulateAsync, SaveFormat } = require('expo-image-manipulator');
+      const result = await manipulateAsync(
+        imageUriOrBase64,
+        [{ resize: { width: BANNER_WIDTH, height: BANNER_HEIGHT } }],
+        { base64: true, compress: 0.85, format: SaveFormat.JPEG }
+      );
+      if (result?.base64) {
+        return `data:image/jpeg;base64,${result.base64}`;
+      }
+      if (result?.uri) return result.uri;
+    } catch (_) {
+      // Fallback: return as-is (e.g. web may use canvas above)
+    }
+    return imageUriOrBase64;
+  } catch (error) {
+    console.error('[logoUtils] Error resizing banner:', error);
+    return null;
+  }
+};
+
 
 
 

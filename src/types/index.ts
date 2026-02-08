@@ -217,9 +217,11 @@ export interface BusinessProfile {
   addressLine2?: string;
   city?: string;
   postcode?: string;
+  region?: string;            // County / region (UK)
   country?: string;
   logo?: string;              // Full logo image (base64 data URI)
-  logoIcon?: string;          // Circular icon version of logo (64x64, optimized for app use)
+  logoIcon?: string;          // Circular avatar (128x128 round, optimal for customer/business apps)
+  banner?: string;            // Banner image (400x120px) for customer/business apps
   additionalFiles?: string[];  // Flyers, menus, etc.
   companyQRCode?: string;      // Unique QR code assigned by admin (7-digit format)
   companyNumber?: string;      // Business registration number

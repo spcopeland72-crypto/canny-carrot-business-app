@@ -18,8 +18,10 @@ import QRCodeModal from './QRCodeModal';
 import {generateCompanyQRCode} from '../utils/qrCodeUtils';
 import {businessRepository} from '../services/localRepository';
 import {appendEditEvent} from '../services/eventLogService';
-import {generateCircularIcon} from '../utils/logoUtils';
+import {generateCircularIcon, resizeToBanner, BANNER_HEIGHT, BANNER_WIDTH} from '../utils/logoUtils';
 import type {BusinessProfile} from '../types';
+
+const AVATAR_SIZE = 128; // Optimal for customer and business apps
 
 interface BusinessProfilePageProps {
   currentScreen: string;
@@ -37,10 +39,17 @@ const BusinessProfilePage: React.FC<BusinessProfilePageProps> = ({
   const [businessName, setBusinessName] = useState('Blackwells Butchers');
   const [email, setEmail] = useState('info@blackwells.com');
   const [phone, setPhone] = useState('+44 20 1234 5678');
-  const [address, setAddress] = useState('123 High Street, London');
-  const [logo, setLogo] = useState<string | null>(null); // Base64 or URI
-  const [logoIcon, setLogoIcon] = useState<string | null>(null); // Circular icon version
+  const [addressLine1, setAddressLine1] = useState('');
+  const [addressLine2, setAddressLine2] = useState('');
+  const [city, setCity] = useState('');
+  const [postcode, setPostcode] = useState('');
+  const [region, setRegion] = useState('');
+  const [country, setCountry] = useState('United Kingdom');
+  const [logo, setLogo] = useState<string | null>(null);
+  const [logoIcon, setLogoIcon] = useState<string | null>(null); // Round avatar (128px)
   const [logoLoading, setLogoLoading] = useState(false);
+  const [banner, setBanner] = useState<string | null>(null);
+  const [bannerLoading, setBannerLoading] = useState(false);
   const [file1, setFile1] = useState<any>(null);
   const [file2, setFile2] = useState<any>(null);
   const [qrCodeModalVisible, setQrCodeModalVisible] = useState(false);
@@ -55,10 +64,15 @@ const BusinessProfilePage: React.FC<BusinessProfilePageProps> = ({
           setBusinessName(profile.name || '');
           setEmail(profile.email || '');
           setPhone(profile.phone || '');
-          setAddress(profile.address || profile.addressLine1 || '');
-          if (profile.logo) {
-            setLogo(profile.logo);
-          }
+          setAddressLine1(profile.addressLine1 ?? '');
+          setAddressLine2(profile.addressLine2 ?? '');
+          setCity(profile.city ?? '');
+          setPostcode(profile.postcode ?? '');
+          setRegion(profile.region ?? '');
+          setCountry(profile.country ?? 'United Kingdom');
+          if (profile.logo) setLogo(profile.logo);
+          if (profile.logoIcon) setLogoIcon(profile.logoIcon);
+          if (profile.banner) setBanner(profile.banner);
         }
       } catch (error) {
         console.error('Error loading business profile:', error);
@@ -176,9 +190,9 @@ const BusinessProfilePage: React.FC<BusinessProfilePageProps> = ({
         setLogo(base64Uri);
         console.log(`[BusinessProfile] Logo saved: ${asset.width || 'unknown'}x${asset.height || 'unknown'}, file size: ${asset.fileSize ? (asset.fileSize / 1024).toFixed(1) + 'KB' : 'unknown'}`);
         
-        // Generate circular icon (64x64, same size as reward icons)
+        // Generate round avatar (128x128, optimal for customer and business apps)
         try {
-          const circularIcon = await generateCircularIcon(base64Uri, 64);
+          const circularIcon = await generateCircularIcon(base64Uri, AVATAR_SIZE);
           if (circularIcon) {
             setLogoIcon(circularIcon);
             console.log('[BusinessProfile] Circular icon generated successfully');
@@ -205,8 +219,8 @@ const BusinessProfilePage: React.FC<BusinessProfilePageProps> = ({
 
   const removeLogo = () => {
     Alert.alert(
-      'Remove Logo',
-      'Are you sure you want to remove the logo?',
+      'Remove Logo/Avatar',
+      'Are you sure you want to remove the logo and avatar?',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -217,6 +231,61 @@ const BusinessProfilePage: React.FC<BusinessProfilePageProps> = ({
             setLogoIcon(null);
           },
         },
+      ]
+    );
+  };
+
+  const pickBanner = async () => {
+    try {
+      setBannerLoading(true);
+      if (Platform.OS !== 'web') {
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== 'granted') {
+          Alert.alert('Permission Required', 'Please grant camera roll permissions to upload a banner.');
+          setBannerLoading(false);
+          return;
+        }
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [BANNER_WIDTH / BANNER_HEIGHT, 1],
+        quality: 0.8,
+        base64: true,
+        allowsMultipleSelection: false,
+      });
+      if (result.canceled) {
+        setBannerLoading(false);
+        return;
+      }
+      const asset = result.assets[0];
+      const uriOrBase64 = asset.base64
+        ? `data:${asset.mimeType || 'image/jpeg'};base64,${asset.base64}`
+        : asset.uri;
+      if (!uriOrBase64) {
+        setBannerLoading(false);
+        return;
+      }
+      const resized = await resizeToBanner(uriOrBase64);
+      if (resized) {
+        setBanner(resized);
+        console.log(`[BusinessProfile] Banner saved: ${BANNER_WIDTH}x${BANNER_HEIGHT}px`);
+      }
+    } catch (error) {
+      console.error('Error picking banner:', error);
+      Alert.alert('Error', 'Failed to pick or resize banner. Please try again.');
+    } finally {
+      setBannerLoading(false);
+    }
+  };
+
+  const removeBanner = () => {
+    Alert.alert(
+      'Remove Banner',
+      'Are you sure you want to remove the banner image?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Remove', style: 'destructive', onPress: () => setBanner(null) },
       ]
     );
   };
@@ -248,16 +317,23 @@ const BusinessProfilePage: React.FC<BusinessProfilePageProps> = ({
       const existingProfile = await businessRepository.get();
       const businessId = existingProfile?.id || `business-${Date.now()}`;
       
-      // Build updated profile
+      // Build updated profile (UK address fields + avatar + banner for sync)
       const updatedProfile: BusinessProfile = {
         id: businessId,
         name: businessName,
         email: email,
         phone: phone,
-        address: address,
-        logo: logo || undefined, // Store logo (base64 or URI)
-        logoIcon: logoIcon || undefined, // Store circular icon version
-        ...existingProfile, // Preserve other fields
+        address: [addressLine1, addressLine2, city, postcode].filter(Boolean).join(', ') || undefined,
+        addressLine1: addressLine1 || undefined,
+        addressLine2: addressLine2 || undefined,
+        city: city || undefined,
+        postcode: postcode || undefined,
+        region: region || undefined,
+        country: country || undefined,
+        logo: logo || undefined,
+        logoIcon: logoIcon || undefined,
+        banner: banner || undefined,
+        ...existingProfile,
         updatedAt: new Date().toISOString(),
         createdAt: existingProfile?.createdAt || new Date().toISOString(),
       };
@@ -313,14 +389,51 @@ const BusinessProfilePage: React.FC<BusinessProfilePageProps> = ({
             placeholderTextColor={Colors.text.light}
           />
 
-          <Text style={styles.label}>Address</Text>
+          <Text style={styles.label}>Address (UK)</Text>
           <TextInput
             style={styles.input}
-            value={address}
-            onChangeText={setAddress}
-            placeholder="Enter address"
+            value={addressLine1}
+            onChangeText={setAddressLine1}
+            placeholder="Address line 1"
             placeholderTextColor={Colors.text.light}
-            multiline
+          />
+          <TextInput
+            style={styles.input}
+            value={addressLine2}
+            onChangeText={setAddressLine2}
+            placeholder="Address line 2 (optional)"
+            placeholderTextColor={Colors.text.light}
+          />
+          <View style={styles.addressRow}>
+            <TextInput
+              style={[styles.input, styles.inputHalf]}
+              value={city}
+              onChangeText={setCity}
+              placeholder="City"
+              placeholderTextColor={Colors.text.light}
+            />
+            <TextInput
+              style={[styles.input, styles.inputHalf]}
+              value={postcode}
+              onChangeText={setPostcode}
+              placeholder="Postcode"
+              placeholderTextColor={Colors.text.light}
+              autoCapitalize="characters"
+            />
+          </View>
+          <TextInput
+            style={styles.input}
+            value={region}
+            onChangeText={setRegion}
+            placeholder="Region / County (optional)"
+            placeholderTextColor={Colors.text.light}
+          />
+          <TextInput
+            style={styles.input}
+            value={country}
+            onChangeText={setCountry}
+            placeholder="Country"
+            placeholderTextColor={Colors.text.light}
           />
 
           <Text style={styles.label}>Company QR Code</Text>
@@ -333,9 +446,9 @@ const BusinessProfilePage: React.FC<BusinessProfilePageProps> = ({
             This QR code is assigned when your business is created by Canny Carrot admin
           </Text>
 
-          <Text style={styles.label}>Logo</Text>
+          <Text style={styles.label}>Logo / Avatar</Text>
           <Text style={styles.labelHint}>
-            Recommended: Square image, max 512x512 pixels, max 500KB, PNG/JPG/WEBP format
+            Upload an image; crop to a square, then we create a round avatar at {AVATAR_SIZE}×{AVATAR_SIZE}px for customer and business apps. Max 512×512, 500KB, PNG/JPG/WEBP.
           </Text>
           <TouchableOpacity
             style={[styles.uploadButton, logoLoading && styles.uploadButtonDisabled]}
@@ -350,24 +463,22 @@ const BusinessProfilePage: React.FC<BusinessProfilePageProps> = ({
               </View>
             ) : (
               <Text style={styles.uploadButtonText}>
-                {logo ? 'Change Logo' : 'Upload Logo'}
+                {logo ? 'Change Logo / Avatar' : 'Upload Logo / Avatar'}
               </Text>
             )}
           </TouchableOpacity>
           {logo && (
             <View style={styles.logoContainer}>
               <View style={styles.logoRow}>
-                {/* Full Logo */}
                 <View style={styles.logoPreview}>
                   <Text style={styles.logoLabel}>Full Logo</Text>
                   <Image source={{uri: logo}} style={styles.thumbnail} />
                 </View>
-                {/* Circular Icon */}
                 {logoIcon && (
                   <View style={styles.logoPreview}>
-                    <Text style={styles.logoLabel}>Circular Icon</Text>
-                    <View style={styles.circularIconContainer}>
-                      <Image source={{uri: logoIcon}} style={styles.circularIcon} />
+                    <Text style={styles.logoLabel}>Round Avatar ({AVATAR_SIZE}px)</Text>
+                    <View style={[styles.circularIconContainer, { width: AVATAR_SIZE, height: AVATAR_SIZE, borderRadius: AVATAR_SIZE / 2 }]}>
+                      <Image source={{uri: logoIcon}} style={[styles.circularIcon, { width: AVATAR_SIZE, height: AVATAR_SIZE }]} />
                     </View>
                   </View>
                 )}
@@ -376,6 +487,34 @@ const BusinessProfilePage: React.FC<BusinessProfilePageProps> = ({
                 style={styles.removeLogoButton}
                 onPress={removeLogo}>
                 <Text style={styles.removeLogoText}>✕ Remove</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          <Text style={styles.label}>Banner image</Text>
+          <Text style={styles.labelHint}>
+            {BANNER_WIDTH}×{BANNER_HEIGHT}px for use in customer and business app headers. Crop/resize applied on upload.
+          </Text>
+          <TouchableOpacity
+            style={[styles.uploadButton, bannerLoading && styles.uploadButtonDisabled]}
+            onPress={pickBanner}
+            disabled={bannerLoading}>
+            {bannerLoading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="small" color={Colors.background} />
+                <Text style={[styles.uploadButtonText, {marginLeft: 8}]}>Processing...</Text>
+              </View>
+            ) : (
+              <Text style={styles.uploadButtonText}>
+                {banner ? 'Change Banner' : 'Upload Banner'}
+              </Text>
+            )}
+          </TouchableOpacity>
+          {banner && (
+            <View style={styles.bannerContainer}>
+              <Image source={{uri: banner}} style={styles.bannerPreview} resizeMode="cover" />
+              <TouchableOpacity style={styles.removeLogoButton} onPress={removeBanner}>
+                <Text style={styles.removeLogoText}>✕ Remove banner</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -451,6 +590,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.neutral[200],
     color: Colors.text.primary,
+    marginBottom: 8,
+  },
+  addressRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  inputHalf: {
+    flex: 1,
   },
   uploadButton: {
     backgroundColor: Colors.secondary,
@@ -516,6 +663,19 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: Colors.text.secondary,
     fontWeight: '500',
+  },
+  bannerContainer: {
+    marginTop: 12,
+    alignItems: 'flex-start',
+  },
+  bannerPreview: {
+    width: '100%',
+    maxWidth: 320,
+    height: 96,
+    borderRadius: 8,
+    backgroundColor: Colors.neutral[100],
+    borderWidth: 1,
+    borderColor: Colors.neutral[200],
   },
   uploadButtonDisabled: {
     opacity: 0.6,
