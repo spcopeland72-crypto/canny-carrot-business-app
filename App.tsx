@@ -1,4 +1,4 @@
-import React, {useState, useEffect} from 'react';
+import React, {useState, useEffect, useRef} from 'react';
 import {View, Text, StyleSheet, Platform, Linking, Alert} from 'react-native';
 
 // Suppress React Native Web touch responder warnings and runtime errors (harmless but noisy)
@@ -69,8 +69,9 @@ function App(): React.JSX.Element {
   // Campaigns state management - will be loaded from file or use initial values
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
 
-  // In-app messaging: selected conversation for MessageChat screen
+  // In-app messaging: selected conversation for MessageChat screen (ref so id is available immediately on navigate)
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
+  const conversationIdRef = useRef<string | null>(null);
 
   // Helper function to generate QR code for a reward using shared utility
   const generateQRCode = (reward: Reward): string => {
@@ -492,6 +493,7 @@ function App(): React.JSX.Element {
             currentScreen={currentScreen}
             onNavigate={handleNavigate}
             onOpenChat={(id) => {
+              conversationIdRef.current = id;
               setSelectedConversationId(id);
               handleNavigate('MessageChat');
             }}
@@ -502,7 +504,7 @@ function App(): React.JSX.Element {
       case 'MessageChat':
         return (
           <MessageChatScreen
-            conversationId={selectedConversationId ?? ''}
+            conversationId={conversationIdRef.current ?? selectedConversationId ?? ''}
             currentScreen={currentScreen}
             onBack={handleBack}
             onNavigate={handleNavigate}

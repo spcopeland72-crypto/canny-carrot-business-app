@@ -363,13 +363,31 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   const campaigns = propsCampaigns.length > 0 ? propsCampaigns : (localCampaigns.length > 0 ? localCampaigns : []);
 
   // In-app messaging: load inbox when Home mounts and we have a businessId (same as customer app on login)
-  const { loadInboxFromApi, conversations: messageConversations, deleteConversation } = useMessageStore();
+  const { loadInboxFromApi, conversations: messageConversations, deleteConversation, markConversationRead } = useMessageStore();
   const recentNotifications = messageConversations.slice(0, 10);
+  const [selectedNotification, setSelectedNotification] = useState<(typeof messageConversations)[0] | null>(null);
 
   const handleConfirmDeleteNotification = () => {
     if (deleteConfirmId) {
       deleteConversation(deleteConfirmId);
       setDeleteConfirmId(null);
+    }
+  };
+
+  const handleOpenNotification = (item: (typeof messageConversations)[0]) => {
+    markConversationRead(item.id);
+    // Defer so the tap isn't swallowed by nested ScrollView; then modal shows reliably
+    setTimeout(() => setSelectedNotification(item), 0);
+  };
+
+  const handleCloseNotificationDialog = () => {
+    setSelectedNotification(null);
+  };
+
+  const handleDeleteFromNotificationDialog = () => {
+    if (selectedNotification) {
+      deleteConversation(selectedNotification.id);
+      setSelectedNotification(null);
     }
   };
   useEffect(() => {
@@ -1092,7 +1110,10 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
               ) : (
                 recentNotifications.map((item) => (
                   <View key={item.id} style={styles.notificationItemContainer}>
-                    <View style={styles.notificationLeft}>
+                    <TouchableOpacity
+                      style={styles.notificationLeft}
+                      activeOpacity={0.7}
+                      onPress={() => handleOpenNotification(item)}>
                       <View style={[
                         styles.trafficLight,
                         item.priority === 'important' && styles.trafficLightRed,
@@ -1101,14 +1122,14 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                       ]} />
                       <View style={styles.notificationContent}>
                         <Text
-                          style={styles.notificationMessage}
+                          style={[styles.notificationMessage, item.read && styles.notificationRead]}
                           numberOfLines={1}
                           ellipsizeMode="tail">
                           {item.lastMessage || item.name}
                         </Text>
-                        <Text style={styles.notificationTimestamp}>{item.lastTimestamp}</Text>
+                        <Text style={[styles.notificationTimestamp, item.read && styles.notificationRead]}>{item.lastTimestamp}</Text>
                       </View>
-                    </View>
+                    </TouchableOpacity>
                     <TouchableOpacity
                       style={styles.notificationActionButton}
                       onPress={() => setDeleteConfirmId(item.id)}
@@ -1355,6 +1376,37 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                 <Text style={styles.deleteModalConfirmText}>Delete</Text>
               </TouchableOpacity>
             </View>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Message dialog: open from notifications list — Close and Delete */}
+      <Modal
+        visible={selectedNotification != null}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={handleCloseNotificationDialog}>
+        <TouchableOpacity
+          style={styles.messageDialogOverlay}
+          activeOpacity={1}
+          onPress={handleCloseNotificationDialog}>
+          <View style={styles.messageDialogModal} onStartShouldSetResponder={() => true}>
+            {selectedNotification ? (
+              <>
+                <Text style={styles.messageDialogTitle}>{selectedNotification.name}</Text>
+                <Text style={styles.messageDialogTimestamp}>{selectedNotification.lastTimestamp}</Text>
+                <Text style={styles.messageDialogBody}>{selectedNotification.lastMessage}</Text>
+                <View style={styles.messageDialogButtons}>
+                  <TouchableOpacity style={styles.messageDialogClose} onPress={handleCloseNotificationDialog}>
+                    <Text style={styles.messageDialogCloseText}>Close</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.messageDialogDelete} onPress={handleDeleteFromNotificationDialog}>
+                    <Text style={styles.messageDialogDeleteText}>Delete</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            ) : null}
           </View>
         </TouchableOpacity>
       </Modal>
@@ -1981,6 +2033,9 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: Colors.text.secondary,
   },
+  notificationRead: {
+    opacity: 0.5,
+  },
   notificationActions: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -2043,6 +2098,65 @@ const styles = StyleSheet.create({
     backgroundColor: '#d32f2f',
   },
   deleteModalConfirmText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  messageDialogOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  messageDialogModal: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 24,
+    width: '100%',
+    maxWidth: 360,
+  },
+  messageDialogTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1a1a1a',
+    marginBottom: 4,
+  },
+  messageDialogTimestamp: {
+    fontSize: 12,
+    color: Colors.text.secondary,
+    marginBottom: 12,
+  },
+  messageDialogBody: {
+    fontSize: 15,
+    color: Colors.text.primary,
+    lineHeight: 22,
+    marginBottom: 20,
+  },
+  messageDialogButtons: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+  },
+  messageDialogClose: {
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    backgroundColor: '#f0f0f0',
+    marginRight: 12,
+  },
+  messageDialogCloseText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1a1a1a',
+  },
+  messageDialogDelete: {
+    marginLeft: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    backgroundColor: '#d32f2f',
+  },
+  messageDialogDeleteText: {
     fontSize: 16,
     fontWeight: '600',
     color: '#fff',
