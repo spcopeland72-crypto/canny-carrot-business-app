@@ -157,21 +157,19 @@ export function MessageStoreProvider({ children }: { children: React.ReactNode }
       const list = res.data.filter((n): n is BusinessMessage => n != null && typeof n === 'object');
       const newConvs = list.map((n) => notificationToConversation(n));
 
-      setConversations((prev) => {
-        const byId = new Map(prev.map((c) => [c.id, c]));
-        for (const c of newConvs) {
-          if (c.id != null && c.id !== '' && !deletedSet.has(c.id)) {
-            byId.set(c.id, {
-              ...c,
-              read: readSet.has(c.id) || c.read,
-              unreadCount: readSet.has(c.id) ? 0 : c.unreadCount,
-            });
-          }
+      // Build list from API only (apply local read/deleted). Do not merge with prev so the same message does not re-append each login.
+      const byId = new Map<string, Conversation>();
+      for (const c of newConvs) {
+        if (c.id != null && c.id !== '' && !deletedSet.has(c.id)) {
+          byId.set(c.id, {
+            ...c,
+            read: readSet.has(c.id) || c.read,
+            unreadCount: readSet.has(c.id) ? 0 : c.unreadCount,
+          });
         }
-        const merged = [...byId.values()].filter((c) => !deletedSet.has(c.id));
-        merged.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
-        return merged;
-      });
+      }
+      const merged = [...byId.values()].sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+      setConversations(merged);
     } catch {
       // keep existing conversations on error
     }

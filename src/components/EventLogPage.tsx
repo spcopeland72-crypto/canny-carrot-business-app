@@ -37,6 +37,9 @@ const EventLogPage: React.FC<EventLogPageProps> = ({
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}>
         <View style={styles.menuList}>
+          <View style={styles.menuItem}>
+            <Text style={styles.menuItemSubtitle}>Per device (this browser). Login/logout and counts are recorded here.</Text>
+          </View>
           {log.length === 0 ? (
             <View style={styles.menuItem}>
               <Text style={styles.menuItemTitle}>No events yet.</Text>
@@ -73,6 +76,12 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: Colors.neutral[200],
     minHeight: 72,
+  },
+  menuItemSubtitle: {
+    fontSize: 12,
+    color: Colors.text.secondary || Colors.text.primary,
+    fontWeight: '400',
+    fontStyle: 'italic',
   },
   menuItemTitle: {
     fontSize: 16,

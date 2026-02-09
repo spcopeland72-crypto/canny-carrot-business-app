@@ -377,8 +377,17 @@ export const loginBusiness = async (email: string, password: string): Promise<Bu
       ]);
       const rewardCount = activeRewards.length;
       const campaignCount = allCampaigns.length;
-      await appendLoginEvent({ rewardCount, campaignCount }).catch(() => {});
-      await setSyncManifestBaseline({ rewardsAtLogin: rewardCount, campaignsAtLogin: campaignCount }).catch(() => {});
+      try {
+        await appendLoginEvent({ rewardCount, campaignCount });
+        console.log(`[EVENT LOG] Login recorded: rewardCount=${rewardCount} campaignCount=${campaignCount}`);
+      } catch (e) {
+        console.error('[EVENT LOG] appendLoginEvent failed:', e);
+      }
+      try {
+        await setSyncManifestBaseline({ rewardsAtLogin: rewardCount, campaignsAtLogin: campaignCount });
+      } catch (e) {
+        console.error('[EVENT LOG] setSyncManifestBaseline failed:', e);
+      }
 
       return existingAuth;
     }
@@ -518,8 +527,17 @@ export const loginBusiness = async (email: string, password: string): Promise<Bu
     ]);
     const rewardCount = activeRewards.length;
     const campaignCount = allCampaigns.length;
-    await appendLoginEvent({ rewardCount, campaignCount }).catch(() => {});
-    await setSyncManifestBaseline({ rewardsAtLogin: rewardCount, campaignsAtLogin: campaignCount }).catch(() => {});
+    try {
+      await appendLoginEvent({ rewardCount, campaignCount });
+      console.log(`[EVENT LOG] Login recorded: rewardCount=${rewardCount} campaignCount=${campaignCount}`);
+    } catch (e) {
+      console.error('[EVENT LOG] appendLoginEvent failed:', e);
+    }
+    try {
+      await setSyncManifestBaseline({ rewardsAtLogin: rewardCount, campaignsAtLogin: campaignCount });
+    } catch (e) {
+      console.error('[EVENT LOG] setSyncManifestBaseline failed:', e);
+    }
 
     return auth;
   } catch (error: any) {
@@ -571,7 +589,12 @@ export const getStoredInvitation = async (): Promise<InvitationData | null> => {
 export const logoutBusiness = async (): Promise<void> => {
   try {
     const { appendLogoutEvent } = await import('./eventLogService');
-    await appendLogoutEvent().catch(() => {});
+    try {
+      await appendLogoutEvent();
+      console.log('[EVENT LOG] Logout recorded');
+    } catch (e) {
+      console.error('[EVENT LOG] appendLogoutEvent failed:', e);
+    }
 
     // Get current business ID for sync
     const auth = await getStoredAuth();
