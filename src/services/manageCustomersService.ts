@@ -24,6 +24,13 @@ export interface TokenWithCustomersItem {
     customerName: string;
     pointsEarned: number;
     pointsRequired: number;
+    /** Products purchased (reward: selected product; campaign: collected products). */
+    product?: string;
+    /** Actions completed (campaign: collected actions; reward: —). */
+    action?: string;
+    /** Campaign: items collected (product/action with names). */
+    collectedItems?: { itemType: string; itemName: string }[];
+    collectedItemsCount?: number;
     lastScanAt: string | null;
     scansLast30: number;
     scansLast90: number;

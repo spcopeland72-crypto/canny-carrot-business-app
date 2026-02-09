@@ -702,6 +702,14 @@ export const downloadAllData = async (businessId: string, apiBaseUrl: string = '
       const businessResult = await businessResponse.json();
       if (businessResult.success && businessResult.data) {
         const businessData = businessResult.data;
+        // Diagnose: what did we actually receive? (explains consistent partial data across devices if API/network truncates or strips)
+        const hasAddress = !!(businessData.address?.line1 ?? (businessData as { addressLine1?: string }).addressLine1 ?? (businessData as { profile?: { addressLine1?: string } }).profile?.addressLine1);
+        const hasBanner = !!((businessData as { banner?: string }).banner ?? (businessData as { profile?: { banner?: string } }).profile?.banner);
+        const keys = Object.keys(businessData);
+        console.log(`📥 [REPOSITORY] GET business response: keys=${keys.length} hasAddress=${hasAddress} hasBanner=${hasBanner} (addressLine1=${!!(businessData as { addressLine1?: string }).addressLine1} banner=${!!(businessData as { banner?: string }).banner})`);
+        if (!hasAddress || !hasBanner) {
+          console.warn(`⚠️ [REPOSITORY] Profile data missing in API response - address=${hasAddress} banner=${hasBanner}. Redis has both; check API response size or serialization.`);
+        }
         // Capture business.updatedAt as the top-level repository timestamp
         dbRepositoryTimestamp = businessData.updatedAt || businessData.profile?.updatedAt || null;
         if (dbRepositoryTimestamp) {

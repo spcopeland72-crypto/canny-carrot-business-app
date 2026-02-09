@@ -21,6 +21,10 @@ interface TokenWithCustomers {
     customerName: string;
     pointsEarned: number;
     pointsRequired: number;
+    product?: string;
+    action?: string;
+    collectedItems?: { itemType: string; itemName: string }[];
+    collectedItemsCount?: number;
     lastScanAt: string | null;
     scansLast30: number;
     scansLast90: number;
@@ -108,6 +112,10 @@ const ManageCustomersListPage: React.FC<ManageCustomersListPageProps> = ({
     name: string;
     pointsEarned: number;
     pointsRequired: number;
+    product?: string;
+    action?: string;
+    collectedItems?: { itemType: string; itemName: string }[];
+    collectedItemsCount?: number;
     lastScanAt: string | null;
     scansLast30: number;
     totalScans: number;
@@ -133,6 +141,10 @@ const ManageCustomersListPage: React.FC<ManageCustomersListPageProps> = ({
           name: token.name,
           pointsEarned: c.pointsEarned,
           pointsRequired: c.pointsRequired,
+          product: c.product,
+          action: c.action,
+          collectedItems: c.collectedItems,
+          collectedItemsCount: c.collectedItemsCount,
           lastScanAt: c.lastScanAt,
           scansLast30: c.scansLast30,
           totalScans: c.totalScans,
@@ -144,13 +156,33 @@ const ManageCustomersListPage: React.FC<ManageCustomersListPageProps> = ({
     return Array.from(byCustomer.values());
   })();
 
-  const renderTokenLines = (items: TokenEntry[]) =>
+  const renderTokenLines = (items: TokenEntry[], type: 'reward' | 'campaign') =>
     items.map((item) => (
       <View key={item.tokenId} style={styles.tokenLine}>
         <Text style={styles.tokenNameInline}>{item.name}:</Text>
         <Text style={styles.pointsText}>
           {item.pointsEarned}/{item.pointsRequired}
         </Text>
+        {(item.product != null && item.product !== '' && item.product !== '—') && (
+          <>
+            <Text style={styles.metaLabel}>Products purchased</Text>
+            <Text style={styles.metaValue}>{item.product}</Text>
+          </>
+        )}
+        {(item.action != null && item.action !== '' && item.action !== '—') && (
+          <>
+            <Text style={styles.metaLabel}>Actions completed</Text>
+            <Text style={styles.metaValue}>{item.action}</Text>
+          </>
+        )}
+        {type === 'campaign' && Array.isArray(item.collectedItems) && item.collectedItems.length > 0 && (
+          <>
+            <Text style={styles.metaLabel}>Collected</Text>
+            <Text style={styles.metaValue}>
+              {item.collectedItems.map((i) => `${i.itemType}: ${i.itemName}`).join('; ')}
+            </Text>
+          </>
+        )}
         <Text style={styles.metaLabel}>Last purchase</Text>
         <Text style={styles.metaValue}>{formatLastPurchase(item.lastScanAt)}</Text>
         <Text style={styles.metaLabel}>No. of visits in last 30 days</Text>
@@ -192,13 +224,13 @@ const ManageCustomersListPage: React.FC<ManageCustomersListPageProps> = ({
                 {cust.rewards.length > 0 && (
                   <View style={styles.subsection}>
                     <Text style={styles.subsectionTitle}>Rewards</Text>
-                    {renderTokenLines(cust.rewards)}
+                    {renderTokenLines(cust.rewards, 'reward')}
                   </View>
                 )}
                 {cust.campaigns.length > 0 && (
                   <View style={styles.subsection}>
                     <Text style={styles.subsectionTitle}>Campaigns</Text>
-                    {renderTokenLines(cust.campaigns)}
+                    {renderTokenLines(cust.campaigns, 'campaign')}
                   </View>
                 )}
               </View>
