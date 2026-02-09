@@ -879,9 +879,13 @@ export const getSyncStatus = async (): Promise<SyncMetadata> => {
   return await getSyncMetadata();
 };
 
+/** Event log and sync manifest keys (same as eventLogService) — cleared on logout. */
+const EVENT_LOG_KEY = 'local_repo:event_log';
+const SYNC_MANIFEST_KEY = 'local_repo:sync_manifest';
+
 /**
- * CLEAR ALL DATA (for testing/logout)
- * Clears primary repository but keeps archived repositories
+ * CLEAR ALL DATA (for logout). Clears primary repository, event log, sync manifest, and rewards trash.
+ * Keeps archived repositories. Call after logout sync completes.
  */
 export const clearRepository = async (): Promise<void> => {
   try {
@@ -893,8 +897,11 @@ export const clearRepository = async (): Promise<void> => {
       REPOSITORY_KEYS.SYNC_METADATA,
       REPOSITORY_KEYS.LAST_SYNC,
       REPOSITORY_KEYS.CURRENT_BUSINESS_ID,
+      REPOSITORY_KEYS.REWARDS_TRASH,
+      EVENT_LOG_KEY,
+      SYNC_MANIFEST_KEY,
     ]);
-    console.log('✅ Repository cleared');
+    console.log('✅ [REPOSITORY] Local store cleared (profile, rewards, campaigns, customers, event log, sync manifest)');
   } catch (error) {
     console.error('Error clearing repository:', error);
     throw error;

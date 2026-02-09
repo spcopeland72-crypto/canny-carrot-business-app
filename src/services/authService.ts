@@ -614,36 +614,37 @@ export const getStoredInvitation = async (): Promise<InvitationData | null> => {
 
 /**
  * Logout
- * Ensures all changes are committed/synced before logging out
+ * 1. Append EVENT:LOGOUT to event log (so it is included in the sync payload).
+ * 2. Sync: upload or download. Event log is sent with the rest of the business data (dump + commit).
+ * 3. Clear auth and local store.
  */
 export const logoutBusiness = async (): Promise<void> => {
   try {
+    // 1. Record logout in event log first so it is synced with profile, rewards, campaigns
     const { appendLogoutEvent } = await import('./eventLogService');
     try {
       await appendLogoutEvent();
-      console.log('[EVENT LOG] Logout recorded');
+      console.log('[EVENT LOG] Logout event appended (included in sync payload)');
     } catch (e) {
-      console.error('[EVENT LOG] appendLogoutEvent failed:', e);
+      console.error('[EVENT LOG] appendLogoutEvent failed — continuing logout; event log may be missing logout entry:', e);
     }
 
-    // Get current business ID for sync
     const auth = await getStoredAuth();
     const businessId = auth?.businessId;
 
     if (businessId) {
-      // Use case 3 of 3: Sync only on Sync click, login, logout. 1 rule: newest overwrites oldest.
-      // MUST use performUnifiedSync only. Never full-replacement. If you see "full replacement" on logout, rebuild the app.
-      console.log('🔄 [LOGOUT] Logout sync — 1 rule: newest overwrites oldest');
+      // 2. Sync: event log is part of the dump and commit body (unifiedSyncService sends getEventLog() with business data)
+      console.log('🔄 [LOGOUT] Syncing business data and event log to Redis...');
       try {
         const { performUnifiedSync } = require('./unifiedSyncService');
         const syncResult = await performUnifiedSync(businessId);
-        
+
         if (syncResult.direction === 'upload') {
-          console.log('✅ [LOGOUT] Uploaded local → Redis (local was newer)');
+          console.log('✅ [LOGOUT] Uploaded local → Redis (profile, rewards, campaigns, event log)');
         } else if (syncResult.direction === 'download') {
-          console.log('✅ [LOGOUT] Downloaded Redis → local (Redis was newer); no overwrite of Redis');
+          console.log('✅ [LOGOUT] Downloaded Redis → local (Redis was newer)');
         } else {
-          console.log('✅ [LOGOUT] No sync (equal/none); Redis unchanged');
+          console.log('✅ [LOGOUT] No sync (equal/none)');
         }
         const s = syncResult.synced;
         console.log('   Direction:', syncResult.direction, '| Profile:', !!s?.profile, '| Rewards:', s?.rewards ?? 0, '| Campaigns:', s?.campaigns ?? 0);
@@ -655,10 +656,10 @@ export const logoutBusiness = async (): Promise<void> => {
         // Continue with logout even if sync fails
       }
     }
-    
-    // Clear authentication
+
     await AsyncStorage.removeItem(AUTH_STORAGE_KEY);
-    console.log('✅ [LOGOUT] Logged out successfully');
+    await repoModule.clearRepository();
+    console.log('✅ [LOGOUT] Auth removed and local store cleared');
   } catch (error) {
     console.error('❌ [LOGOUT] Error logging out:', error);
     throw error;
