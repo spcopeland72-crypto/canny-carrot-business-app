@@ -1,3 +1,7 @@
+/**
+ * Message store (inbox) — keep logic and shape identical to customer app MessageStoreContext.
+ * Differences: storage (AsyncStorage), API (getNotifications, markNotificationsRead), entity id (businessId, getStoredAuth).
+ */
 import React, {createContext, useContext, useState, useCallback, useRef} from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api, { type BusinessMessage } from '../services/api';
@@ -157,19 +161,21 @@ export function MessageStoreProvider({ children }: { children: React.ReactNode }
       const list = res.data.filter((n): n is BusinessMessage => n != null && typeof n === 'object');
       const newConvs = list.map((n) => notificationToConversation(n));
 
-      // Build list from API only (apply local read/deleted). Do not merge with prev so the same message does not re-append each login.
-      const byId = new Map<string, Conversation>();
-      for (const c of newConvs) {
-        if (c.id != null && c.id !== '' && !deletedSet.has(c.id)) {
-          byId.set(c.id, {
-            ...c,
-            read: readSet.has(c.id) || c.read,
-            unreadCount: readSet.has(c.id) ? 0 : c.unreadCount,
-          });
+      setConversations((prev) => {
+        const byId = new Map(prev.map((c) => [c.id, c]));
+        for (const c of newConvs) {
+          if (c.id != null && c.id !== '' && !deletedSet.has(c.id)) {
+            byId.set(c.id, {
+              ...c,
+              read: readSet.has(c.id) || c.read,
+              unreadCount: readSet.has(c.id) ? 0 : c.unreadCount,
+            });
+          }
         }
-      }
-      const merged = [...byId.values()].sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
-      setConversations(merged);
+        const merged = [...byId.values()].filter((c) => !deletedSet.has(c.id));
+        merged.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+        return merged;
+      });
     } catch {
       // keep existing conversations on error
     }
@@ -180,10 +186,14 @@ export function MessageStoreProvider({ children }: { children: React.ReactNode }
       prev.map((c) => (c.id === id ? { ...c, read: true, unreadCount: 0 } : c))
     );
     const businessId = lastBusinessIdRef.current;
+    const persistRead = (bid: string) => {
+      addInboxReadId(bid, id).catch(() => {});
+      api.business.markNotificationsRead(bid, [id]).catch(() => {});
+    };
     if (businessId) {
-      addInboxReadId(businessId, id).catch(() => {});
+      persistRead(businessId);
     } else {
-      getStoredAuth().then((a) => a?.businessId && addInboxReadId(a.businessId, id).catch(() => {}));
+      getStoredAuth().then((a) => a?.businessId && persistRead(a.businessId));
     }
   }, []);
 
@@ -196,7 +206,7 @@ export function MessageStoreProvider({ children }: { children: React.ReactNode }
       const newMsg: ChatMessage = { id: `m${Date.now()}`, text, sender, timestamp: timeStr };
       const updated = prev.map((c) => {
         if (c.id !== conversationId) return c;
-        const messages = [...(Array.isArray(c.messages) ? c.messages : []), newMsg];
+        const messages = [...c.messages, newMsg];
         return {
           ...c,
           messages,
@@ -220,12 +230,6 @@ export function MessageStoreProvider({ children }: { children: React.ReactNode }
     const businessId = lastBusinessIdRef.current;
     if (businessId) {
       appendInboxEvent(businessId, { type: 'delete', conversationId: id, at: new Date().toISOString() }).catch(() => {});
-    } else {
-      getStoredAuth().then((a) => {
-        if (a?.businessId) {
-          appendInboxEvent(a.businessId, { type: 'delete', conversationId: id, at: new Date().toISOString() }).catch(() => {});
-        }
-      });
     }
   }, []);
 
