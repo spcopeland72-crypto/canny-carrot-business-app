@@ -38,7 +38,7 @@ const EventLogPage: React.FC<EventLogPageProps> = ({
         showsVerticalScrollIndicator={false}>
         <View style={styles.menuList}>
           <View style={styles.menuItem}>
-            <Text style={styles.menuItemSubtitle}>Per device (this browser). Login/logout and counts are recorded here.</Text>
+            <Text style={styles.menuItemSubtitle}>One event log in Redis. Downloaded on login; new events uploaded on sync or logout.</Text>
           </View>
           {log.length === 0 ? (
             <View style={styles.menuItem}>

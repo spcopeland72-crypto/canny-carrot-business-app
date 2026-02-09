@@ -404,23 +404,24 @@ const BusinessProfilePage: React.FC<BusinessProfilePageProps> = ({
       const existingProfile = await businessRepository.get();
       const businessId = existingProfile?.id || `business-${Date.now()}`;
       
-      // Build updated profile: spread existing first so form values (address, images) are not overwritten
+      // Build updated profile: spread existing first. Only overwrite address/banner/images when form has a value,
+      // so we never wipe Redis with undefined when user saves without editing those fields (e.g. after incomplete load).
       const updatedProfile: BusinessProfile = {
         ...existingProfile,
         id: businessId,
         name: businessName,
         email: email,
         phone: phone,
-        address: [addressLine1, addressLine2, city, postcode].filter(Boolean).join(', ') || undefined,
-        addressLine1: addressLine1 || undefined,
-        addressLine2: addressLine2 || undefined,
-        city: city || undefined,
-        postcode: postcode || undefined,
-        region: region || undefined,
-        country: country || undefined,
-        logo: logo || undefined,
-        logoIcon: logoIcon || undefined,
-        banner: banner || undefined,
+        address: [addressLine1, addressLine2, city, postcode].filter(Boolean).join(', ') || existingProfile?.address,
+        addressLine1: (addressLine1?.trim() || undefined) ?? existingProfile?.addressLine1,
+        addressLine2: (addressLine2?.trim() || undefined) ?? existingProfile?.addressLine2,
+        city: (city?.trim() || undefined) ?? existingProfile?.city,
+        postcode: (postcode?.trim() || undefined) ?? existingProfile?.postcode,
+        region: (region?.trim() || undefined) ?? existingProfile?.region,
+        country: (country?.trim() || undefined) ?? existingProfile?.country,
+        logo: logo ?? existingProfile?.logo,
+        logoIcon: logoIcon ?? existingProfile?.logoIcon,
+        banner: banner ?? existingProfile?.banner,
         updatedAt: new Date().toISOString(),
         createdAt: existingProfile?.createdAt || new Date().toISOString(),
       };

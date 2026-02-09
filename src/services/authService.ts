@@ -370,6 +370,21 @@ export const loginBusiness = async (email: string, password: string): Promise<Bu
         // Don't fail login if repo load fails - user can still use app offline
       }
 
+      // One event log in Redis: always refresh from Redis on login so all devices show the same log
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/v1/businesses/${existingAuth.businessId}`);
+        if (res.ok) {
+          const json = await res.json();
+          if (json?.success && json?.data && Array.isArray(json.data.transactionLog)) {
+            const { setEventLog } = await import('./eventLogService');
+            await setEventLog(json.data.transactionLog);
+            console.log('[EVENT LOG] Refreshed from Redis on login');
+          }
+        }
+      } catch (e) {
+        console.error('[EVENT LOG] Refresh from Redis on login failed:', e);
+      }
+
       const { appendLoginEvent, setSyncManifestBaseline } = await import('./eventLogService');
       const [activeRewards, allCampaigns] = await Promise.all([
         repoModule.rewardsRepository.getActive(),
@@ -515,6 +530,21 @@ export const loginBusiness = async (email: string, password: string): Promise<Bu
     } catch (repoError) {
       console.error('⚠️ Error loading repository from local storage (will retry later):', repoError);
       // Don't fail login if repo load fails - user can still use app offline
+    }
+
+    // One event log in Redis: always refresh from Redis on login so all devices show the same log
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/v1/businesses/${auth.businessId}`);
+      if (res.ok) {
+        const json = await res.json();
+        if (json?.success && json?.data && Array.isArray(json.data.transactionLog)) {
+          const { setEventLog } = await import('./eventLogService');
+          await setEventLog(json.data.transactionLog);
+          console.log('[EVENT LOG] Refreshed from Redis on login');
+        }
+      }
+    } catch (e) {
+      console.error('[EVENT LOG] Refresh from Redis on login failed:', e);
     }
 
     // Manage Customers: download latest from index at login (no timestamps, no cache)

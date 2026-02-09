@@ -108,9 +108,32 @@ const downloadAllData = async (businessId: string): Promise<{
         if (Array.isArray(data.transactionLog)) {
           result.transactionLog = data.transactionLog;
         }
-        // Save only profile fields to business repo; rewards/campaigns come from separate GET and are saved to their repos
-        const { rewards: _r, campaigns: _c, transactionLog: _t, ...profileOnly } = data;
-        result.profile = data.profile || profileOnly;
+        // Normalize to BusinessProfile so address, logoIcon, banner, region are always mapped (API/Redis may use top-level or nested)
+        const p = data.profile || data;
+        result.profile = {
+          id: data.id || businessId,
+          name: data.name ?? p.name ?? '',
+          email: data.email ?? p.email ?? '',
+          phone: data.phone ?? p.phone ?? '',
+          addressLine1: data.address?.line1 ?? p.addressLine1 ?? (data as { addressLine1?: string }).addressLine1 ?? '',
+          addressLine2: data.address?.line2 ?? p.addressLine2 ?? (data as { addressLine2?: string }).addressLine2 ?? '',
+          city: data.address?.city ?? p.city ?? (data as { city?: string }).city ?? '',
+          postcode: data.address?.postcode ?? p.postcode ?? (data as { postcode?: string }).postcode ?? '',
+          region: p.region ?? (data as { region?: string }).region,
+          country: p.country ?? (data as { country?: string }).country ?? 'UK',
+          logo: data.logo ?? p.logo ?? (data as { logo?: string }).logo,
+          logoIcon: p.logoIcon ?? (data as { logoIcon?: string }).logoIcon,
+          banner: p.banner ?? (data as { banner?: string }).banner,
+          website: p.website,
+          socialMedia: p.socialMedia,
+          category: data.category ?? p.category,
+          description: data.description ?? p.description,
+          companyNumber: p.companyNumber,
+          createdAt: data.createdAt ?? p.createdAt,
+          updatedAt: data.updatedAt ?? p.updatedAt,
+          products: data.products ?? p.products ?? [],
+          actions: data.actions ?? p.actions ?? [],
+        };
         console.log('  ✅ Downloaded business profile');
       }
     }
