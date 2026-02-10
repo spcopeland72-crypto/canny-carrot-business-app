@@ -39,8 +39,10 @@ export type ParsedQR =
   | { type: 'unknown'; data: null };
 
 /**
- * Generate QR code for a reward
- * Format: REWARD:{businessId}:{businessName}:{id}:{name}:{requirement}:{rewardType}:{products}:{pinCode}
+ * Generate QR code for a reward (all create-reward form variables embedded).
+ * Format: REWARD:{businessId}:{businessName}:{id}:{name}:{requirement}:{rewardType}:{products}:{pinCode}:{value}:{discountPercent}
+ * - value: discount amount in £ (empty if not discount)
+ * - discountPercent: discount % (empty if not discount)
  */
 export const generateRewardQRCode = (
   id: string,
@@ -52,17 +54,21 @@ export const generateRewardQRCode = (
   pinCode?: string,
   businessProfile?: any,
   pointsPerPurchase?: number,
-  businessId?: string
+  businessId?: string,
+  value?: number,
+  discountPercent?: number
 ): string => {
   const productsValue = products && products.length > 0
     ? products.join(',')
-    : '';
+    : (actions && actions.length > 0 ? actions.join(',') : '');
   const pinCodeValue = pinCode || '';
   const businessIdValue = businessId || '';
   const businessNameValue = (businessProfile?.name ?? '')
     .replace(/:/g, '-')
     .trim() || '';
-  return `REWARD:${businessIdValue}:${businessNameValue}:${id}:${name}:${requirement}:${rewardType}:${productsValue}:${pinCodeValue}`;
+  const valueStr = rewardType === 'discount' && value != null && !Number.isNaN(value) ? String(value) : '';
+  const percentStr = rewardType === 'discount' && discountPercent != null && !Number.isNaN(discountPercent) ? String(discountPercent) : '';
+  return `REWARD:${businessIdValue}:${businessNameValue}:${id}:${name}:${requirement}:${rewardType}:${productsValue}:${pinCodeValue}:${valueStr}:${percentStr}`;
 };
 
 /**

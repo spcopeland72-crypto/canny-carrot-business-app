@@ -95,9 +95,6 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
   const [campaignQRModalVisible, setCampaignQRModalVisible] = useState(false);
   const [campaignQRModalTitle, setCampaignQRModalTitle] = useState('');
   const [campaignQRModalValue, setCampaignQRModalValue] = useState('');
-  // Free product combobox: text input + dropdown (when reward type = Free Product)
-  const [freeProductInput, setFreeProductInput] = useState('');
-  const [freeProductDropdownVisible, setFreeProductDropdownVisible] = useState(false);
   // Discount: Value £ or Discount % (when reward type = Discount)
   const [discountValuePounds, setDiscountValuePounds] = useState('');
   const [discountValuePercent, setDiscountValuePercent] = useState('');
@@ -227,7 +224,6 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
               setSelectedActions(loadedReward.selectedActions || []);
               setPinCode(loadedReward.pinCode || '');
               const prods = loadedReward.selectedProducts || [];
-              setFreeProductInput(prods[0] || '');
               if (loadedReward.type === 'discount') {
                 setDiscountValuePounds(loadedReward.value != null ? String(loadedReward.value) : '');
                 setDiscountValuePercent(loadedReward.discountPercent != null ? String(loadedReward.discountPercent) : '');
@@ -248,7 +244,6 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
         setSelectedActions((reward as any).selectedActions || []);
         setPinCode((reward as any).pinCode || '');
         const prods = (reward as any).selectedProducts || [];
-        setFreeProductInput(prods[0] || '');
         if ((reward as any).type === 'discount') {
           setDiscountValuePounds((reward as any).value != null ? String((reward as any).value) : '');
           setDiscountValuePercent((reward as any).discountPercent != null ? String((reward as any).discountPercent) : '');
@@ -537,6 +532,8 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
       
       let qrCodeValue: string;
       try {
+        const poundsNum = rewardType === 'discount' && discountValuePounds.trim() ? parseFloat(discountValuePounds.trim()) : undefined;
+        const percentNum = rewardType === 'discount' && discountValuePercent.trim() ? parseFloat(discountValuePercent.trim()) : undefined;
         qrCodeValue = generateRewardQRCode(
           rewardIdToSave,
           name,
@@ -562,7 +559,9 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
             socialMedia: businessProfile.socialMedia,
           } : undefined,
           pointsValue, // Include points per purchase
-          auth.businessId // Include business ID
+          auth.businessId, // Include business ID
+          poundsNum,
+          percentNum
         );
         
         // QR code size validation is now handled in generateRewardQRCode
@@ -1523,7 +1522,6 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
                 onPress={() => {
                   setRewardType('free_product');
                   setCustomTypeText('');
-                  setFreeProductInput(selectedProducts[0] || '');
                 }}>
                 <Text
                   style={[
@@ -1580,68 +1578,7 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
             />
           )}
 
-          {/* Free Product: text input with dropdown of products (rewards only) */}
-          {!isCampaign && rewardType === 'free_product' && (
-            <View style={styles.freeProductComboWrap}>
-              <Text style={styles.label}>Product</Text>
-              <TextInput
-                style={styles.input}
-                value={freeProductInput}
-                onChangeText={(text) => {
-                  setFreeProductInput(text);
-                  setFreeProductDropdownVisible(true);
-                }}
-                onFocus={() => setFreeProductDropdownVisible(true)}
-                onBlur={() => {
-                  // On blur: if text exactly matches a product, add to selected
-                  const trimmed = freeProductInput.trim();
-                  if (trimmed && products.some((p) => p === trimmed) && !selectedProducts.includes(trimmed)) {
-                    setSelectedProducts([...selectedProducts, trimmed]);
-                  }
-                  setTimeout(() => setFreeProductDropdownVisible(false), 200);
-                }}
-                placeholder="Type or select product"
-                placeholderTextColor={Colors.text.light}
-              />
-              {freeProductDropdownVisible && products.length > 0 && (
-                <View style={styles.freeProductDropdown}>
-                  <ScrollView
-                    style={styles.freeProductDropdownScroll}
-                    keyboardShouldPersistTaps="handled"
-                    nestedScrollEnabled>
-                    {products
-                      .filter((p) =>
-                        p.toLowerCase().includes(freeProductInput.trim().toLowerCase())
-                      )
-                      .map((product) => (
-                        <TouchableOpacity
-                          key={product}
-                          style={[
-                            styles.dropdownOption,
-                            selectedProducts.includes(product) && styles.dropdownOptionSelected,
-                          ]}
-                          onPress={() => {
-                            if (!selectedProducts.includes(product)) {
-                              setSelectedProducts([...selectedProducts, product]);
-                            }
-                            setFreeProductInput(product);
-                            setFreeProductDropdownVisible(false);
-                          }}>
-                          <Text
-                            style={[
-                              styles.dropdownOptionText,
-                              selectedProducts.includes(product) && styles.dropdownOptionTextSelected,
-                            ]}>
-                            {selectedProducts.includes(product) ? '✓ ' : ''}
-                            {product}
-                          </Text>
-                        </TouchableOpacity>
-                      ))}
-                  </ScrollView>
-                </View>
-              )}
-            </View>
-          )}
+          {/* Free Product (rewards only): uses same Select Products dropdown + list as above (type === 'product') — no separate UI */}
 
           {/* Discount: Value £ or Discount % (rewards only) */}
           {!isCampaign && rewardType === 'discount' && (
@@ -1672,17 +1609,19 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
             </View>
           )}
 
-          {/* Value £ dialog */}
+          {/* Value £ dialog — backdrop and dialog are siblings so tapping input does not close */}
           <Modal
             visible={discountPoundsModalVisible}
             transparent
             animationType="fade"
             onRequestClose={() => setDiscountPoundsModalVisible(false)}>
-            <TouchableOpacity
-              style={styles.modalOverlay}
-              activeOpacity={1}
-              onPress={() => setDiscountPoundsModalVisible(false)}>
-              <View style={styles.discountDialogBox} onStartShouldSetResponder={() => true}>
+            <View style={styles.modalOverlay}>
+              <TouchableOpacity
+                style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.5)' }]}
+                activeOpacity={1}
+                onPress={() => setDiscountPoundsModalVisible(false)}
+              />
+              <View style={styles.discountDialogBox}>
                 <Text style={styles.modalTitle}>Value £</Text>
                 <Text style={styles.label}>Amount (£)</Text>
                 <TextInput
@@ -1710,20 +1649,22 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
                   </TouchableOpacity>
                 </View>
               </View>
-            </TouchableOpacity>
+            </View>
           </Modal>
 
-          {/* Discount % dialog */}
+          {/* Discount % dialog — backdrop and dialog are siblings so tapping input does not close */}
           <Modal
             visible={discountPercentModalVisible}
             transparent
             animationType="fade"
             onRequestClose={() => setDiscountPercentModalVisible(false)}>
-            <TouchableOpacity
-              style={styles.modalOverlay}
-              activeOpacity={1}
-              onPress={() => setDiscountPercentModalVisible(false)}>
-              <View style={styles.discountDialogBox} onStartShouldSetResponder={() => true}>
+            <View style={styles.modalOverlay}>
+              <TouchableOpacity
+                style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.5)' }]}
+                activeOpacity={1}
+                onPress={() => setDiscountPercentModalVisible(false)}
+              />
+              <View style={styles.discountDialogBox}>
                 <Text style={styles.modalTitle}>Discount %</Text>
                 <Text style={styles.label}>Percentage (%)</Text>
                 <TextInput
@@ -1751,7 +1692,7 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
                   </TouchableOpacity>
                 </View>
               </View>
-            </TouchableOpacity>
+            </View>
           </Modal>
 
           {/* Campaign Date Pickers - Hard positioned before PIN Code for visibility and touch */}
