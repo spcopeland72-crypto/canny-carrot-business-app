@@ -1462,6 +1462,8 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
                       setRewardType('free_product');
                       setCustomTypeText('');
                       setCampaignTypeDropdownVisible(false);
+                      setType('product');
+                      setDropdownVisible(true);
                     }}>
                     <Text
                       style={[
@@ -1522,6 +1524,8 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
                 onPress={() => {
                   setRewardType('free_product');
                   setCustomTypeText('');
+                  setType('product');
+                  setDropdownVisible(true);
                 }}>
                 <Text
                   style={[
@@ -1631,6 +1635,9 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
                   placeholder="e.g. 5.00"
                   placeholderTextColor={Colors.text.light}
                   keyboardType="decimal-pad"
+                  autoComplete="off"
+                  autoCorrect={false}
+                  spellCheck={false}
                 />
                 <View style={styles.discountDialogButtons}>
                   <TouchableOpacity
@@ -1674,6 +1681,9 @@ const CreateEditRewardPage: React.FC<CreateEditRewardPageProps> = ({
                   placeholder="e.g. 10"
                   placeholderTextColor={Colors.text.light}
                   keyboardType="decimal-pad"
+                  autoComplete="off"
+                  autoCorrect={false}
+                  spellCheck={false}
                 />
                 <View style={styles.discountDialogButtons}>
                   <TouchableOpacity
