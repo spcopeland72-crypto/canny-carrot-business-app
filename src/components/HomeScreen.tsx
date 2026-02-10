@@ -131,6 +131,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   const [bannerError, setBannerError] = useState(false);
   const [businessName, setBusinessName] = useState('Business'); // Default until loaded from repository
   const [businessLogo, setBusinessLogo] = useState<string | null>(null); // Business logo from profile
+  const [businessBanner, setBusinessBanner] = useState<string | null>(null); // Business banner from profile; if set, use instead of default CC banner
   const [rewardQRModalVisible, setRewardQRModalVisible] = useState(false);
   const [selectedRewardForQR, setSelectedRewardForQR] = useState<Reward | null>(null);
   const [generatedQRValue, setGeneratedQRValue] = useState<string>('');
@@ -219,6 +220,13 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
           } else if (profile.logo) {
             setBusinessLogo(profile.logo);
             console.log('[HomeScreen] Loaded business logo from repository');
+          }
+          if (profile.banner) {
+            setBusinessBanner(profile.banner);
+            setBannerError(false);
+            console.log('[HomeScreen] Loaded business banner from repository');
+          } else {
+            setBusinessBanner(null);
           }
         } else {
           console.log('[HomeScreen] No business profile found in repository, using default');
@@ -482,7 +490,74 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   ];
 
   const renderBannerContent = () => {
+    const useBusinessBanner = !!businessBanner && !bannerError;
     if (mode === 'online') {
+      if (useBusinessBanner) {
+        return (
+          <View style={styles.bannerOnlineWrapper}>
+            <Image
+              source={{ uri: businessBanner! }}
+              style={styles.bannerImageFill}
+              resizeMode="cover"
+              onError={() => setBannerError(true)}
+            />
+            <View style={styles.bannerOnlineOverlay}>
+              <View style={styles.bannerContent}>
+                <View style={styles.bannerTextContainer}>
+                  <Text style={styles.bannerTitleOnline}>Canny Carrot</Text>
+                  <Text style={styles.bannerSubtitleOnline}>Online</Text>
+                  <View style={styles.socialIconsContainer}>
+                    {socialIcons.facebook && (
+                      <TouchableOpacity
+                        style={[styles.socialIcon, {marginRight: 7}]}
+                        onPress={() => Linking.openURL('https://www.facebook.com/CannyCarrotRewards')}>
+                        <Image source={socialIcons.facebook} style={styles.socialIconImage} resizeMode="contain" />
+                      </TouchableOpacity>
+                    )}
+                    {socialIcons.instagram && (
+                      <TouchableOpacity
+                        style={[styles.socialIcon, {marginRight: 7}]}
+                        onPress={() => Linking.openURL('https://www.instagram.com/cannycarrotrewards')}>
+                        <Image source={socialIcons.instagram} style={styles.socialIconImage} resizeMode="contain" />
+                      </TouchableOpacity>
+                    )}
+                    {socialIcons.tiktok && (
+                      <TouchableOpacity
+                        style={[styles.socialIcon, {marginRight: 7}]}
+                        onPress={() => Linking.openURL('https://www.tiktok.com/@cannycarrotrewards')}>
+                        <Image source={socialIcons.tiktok} style={styles.socialIconImage} resizeMode="contain" />
+                      </TouchableOpacity>
+                    )}
+                    {socialIcons.x && (
+                      <TouchableOpacity
+                        style={[styles.socialIcon, {marginRight: 7}]}
+                        onPress={() => Linking.openURL('https://twitter.com/CannyCarrotRew')}>
+                        <Image source={socialIcons.x} style={styles.socialIconImage} resizeMode="contain" />
+                      </TouchableOpacity>
+                    )}
+                    {socialIcons.linkedin && (
+                      <TouchableOpacity
+                        style={styles.socialIcon}
+                        onPress={() => Linking.openURL('https://www.linkedin.com/company/canny-carrot-rewards')}>
+                        <Image source={socialIcons.linkedin} style={styles.socialIconImage} resizeMode="contain" />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </View>
+                <View style={styles.bannerLogoContainer}>
+                  {ccIconImage ? (
+                    <Image source={ccIconImage} style={styles.bannerLogoImage} resizeMode="contain" />
+                  ) : (
+                    <View style={styles.bannerLogoPlaceholder}>
+                      <Text style={styles.bannerLogoText}>Logo</Text>
+                    </View>
+                  )}
+                </View>
+              </View>
+            </View>
+          </View>
+        );
+      }
       return (
         <View style={styles.bannerOnline}>
           <View style={styles.bannerContent}>
@@ -538,6 +613,18 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
             </View>
           </View>
         </View>
+      );
+    }
+    if (useBusinessBanner) {
+      return (
+        <Image
+          source={{ uri: businessBanner }}
+          style={styles.bannerImage}
+          resizeMode="cover"
+          onError={() => {
+            setBannerError(true);
+          }}
+        />
       );
     }
     if (bannerImage && !bannerError) {
@@ -708,7 +795,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
           <View style={styles.bannerSection}>
             {renderBannerContent()}
           {/* Social Media Icons for banner with image (in-store only) */}
-          {mode !== 'online' && bannerImage && !bannerError && (
+          {mode !== 'online' && (businessBanner || bannerImage) && !bannerError && (
             <View style={styles.bannerSocialIconsOverlay}>
               <View style={styles.socialIconsContainer}>
                 {socialIcons.facebook && (
@@ -1608,6 +1695,32 @@ const styles = StyleSheet.create({
     minHeight: 128,
     justifyContent: 'center',
     width: '100%',
+  },
+  bannerOnlineWrapper: {
+    width: '100%',
+    minHeight: 128,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  bannerImageFill: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
+  },
+  bannerOnlineOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    paddingHorizontal: 20,
+    paddingVertical: 17,
+    justifyContent: 'center',
   },
   bannerTitleOnline: {
     fontSize: 28,
